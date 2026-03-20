@@ -23,24 +23,83 @@
 
 ## 🚀 部署模式
 
-支持两种部署模式，通过 `DEPLOY_MODE` 环境变量切换：
+### 模式 1: 全量云端部署 (推荐简单场景)
 
-### 云端模式 (Cloud)
-```bash
-DEPLOY_MODE=cloud docker-compose --profile cloud up -d
-```
-- 完整前端 Web UI
-- 监控面板
-- 用户管理 + 审计日志
-- SSL/HTTPS 支持
+所有服务部署在同一台云服务器：
 
-### 本地模式 (Local)
 ```bash
-DEPLOY_MODE=local docker-compose up -d
+# 克隆项目
+git clone https://github.com/AlbertTon166/agent-teams-manager.git
+cd agent-teams-manager
+
+# 配置环境
+cp .env.example .env
+# 编辑 .env 设置密码和域名
+
+# 启动服务
+docker-compose --profile cloud up -d
 ```
-- 仅 Teams 核心服务
-- 无前端（纯 API）
-- 更轻量，适合内网部署
+
+### 模式 2: 混合部署 (RAG 本地化)
+
+```
+┌─────────────────────────────────────────────────────────┐
+│                    云端服务器                             │
+│   Frontend (80)  │  Backend API (3001)  │  ChromaDB     │
+│                                                          │
+│   ┌─────────────────────────────────────────────┐        │
+│   │  PostgreSQL  │  Redis  │  RAG Proxy         │        │
+│   └─────────────────────────────────────────────┘        │
+└─────────────────────────────────────────────────────────┘
+```
+
+---
+
+## 🌉 Cloudflare Tunnel 内网穿透
+
+本地部署 RAG + 云端管理界面，通过 Cloudflare Tunnel 互通：
+
+```
+本地机器                              Cloudflare              云端服务器
+┌─────────────────┐                ┌───────────┐           ┌────────────────┐
+│ ChromaDB :8000 │◄───────────────►│  免费隧道  │◄────────►│ Frontend :80  │
+│ Backend :3001  │                │ (CDN加速)  │           │   HTTPS        │
+└─────────────────┘                └───────────┘           └────────────────┘
+     │
+     │ cloudflared 隧道
+     ▼
+   公网可访问 (api.yourdomain.com, rag.yourdomain.com)
+```
+
+### 快速配置 Cloudflare Tunnel
+
+```bash
+# 1. 安装 cloudflared (Linux)
+curl -L https://github.com/cloudflare/cloudflared/releases/latest/download/cloudflared-linux-amd64 \
+  -o /usr/local/bin/cloudflared && chmod +x /usr/local/bin/cloudflared
+
+# 2. 登录 Cloudflare
+cloudflared login
+
+# 3. 创建 Tunnel
+cloudflared tunnel create agent-teams
+
+# 4. 配置 DNS (在 Cloudflare Dashboard)
+# 添加 CNAME: api.yourdomain.com -> agent-teams.cfarg.net
+
+# 5. 启动隧道
+./scripts/tunnel-start.sh yourdomain.com
+```
+
+### 一键启动脚本
+
+```bash
+# 交互式配置 (首次)
+./scripts/tunnel-start.sh yourdomain.com
+
+# 直接运行 (后续)
+./scripts/tunnel-start.sh
+```
 
 ---
 
@@ -53,7 +112,8 @@ DEPLOY_MODE=local docker-compose up -d
 | **后端** | Node.js + Express |
 | **数据库** | PostgreSQL 16 |
 | **缓存** | Redis 7 |
-| **向量库** | ChromaDB |
+| **向量库** | ChromaDB (RAG) |
+| **隧道** | Cloudflare Tunnel |
 | **部署** | Docker + Docker Compose |
 
 ---
@@ -62,9 +122,9 @@ DEPLOY_MODE=local docker-compose up -d
 
 ### 前置要求
 
-- Node.js 22+
 - Docker + Docker Compose
-- PostgreSQL / Redis (或使用 Docker)
+- PostgreSQL / Redis (Docker 自动启动)
+- Cloudflare 账号 (内网穿透用，可选)
 
 ### 1. 克隆项目
 
@@ -96,7 +156,7 @@ cd server && npm install && node index.js
 # 云端模式 (完整)
 docker-compose --profile cloud up -d
 
-# 本地模式 (仅 API)
+# 本地模式 (仅 API + RAG)
 docker-compose up -d
 ```
 
@@ -109,7 +169,7 @@ docker-compose up -d
 - **会话过期** - 7 天自动过期
 - **登录锁定** - 15 分钟内 5 次失败锁定
 - **审计日志** - 记录所有操作
-- **HTTPS** - Let's Encrypt 自动续期
+- **HTTPS** - Let's Encrypt 自动续期 / Cloudflare Tunnel
 
 ---
 
@@ -142,33 +202,26 @@ agent-teams-manager/
 │   ├── index.js              # Express API
 │   ├── db.js                 # 数据库操作
 │   └── Dockerfile
+├── cloudflared/              # Cloudflare Tunnel 配置
+│   └── config.yml
 ├── docker-compose.yml         # Docker 编排
 ├── docker-compose.prod.yml    # 生产环境配置
 ├── monitoring/               # Prometheus 监控
-└── scripts/                  # 部署脚本
+└── scripts/
+    ├── tunnel-start.sh       # 隧道启动脚本
+    └── ssl-setup.sh          # SSL 证书脚本
 ```
 
 ---
 
-## 🔧 配置选项
+## 🔧 内网穿透对比
 
-### 环境变量
-
-| 变量 | 默认值 | 说明 |
-|------|--------|------|
-| `DEPLOY_MODE` | `cloud` | 部署模式 (cloud/local) |
-| `PG_PASSWORD` | `postgres` | PostgreSQL 密码 |
-| `REDIS_PASSWORD` | - | Redis 密码 |
-| `CORS_ORIGIN` | `*` | CORS 允许的源 |
-| `DOMAIN` | - | 域名 (SSL 用) |
-
----
-
-## 📚 相关文档
-
-- [部署指南](./docs/docker-deployment.md) - 详细的 Docker 部署说明
-- [执行流程](./EXECUTION_FLOW.md) - 系统执行流程
-- [设计规格](./SPEC.md) - 技术设计规格
+| 方案 | 云端资源 | 免费 | 稳定性 | 推荐场景 |
+|------|---------|------|--------|---------|
+| **Cloudflare Tunnel** | 极低 | ✅ | ⭐⭐⭐⭐⭐ | 生产环境 |
+| **Tailscale** | 极低 | ✅ | ⭐⭐⭐⭐ | 快速原型 |
+| **FRP** | 需要 frps | ✅ | ⭐⭐⭐ | 有服务器 |
+| **Ngrok** | 无 | 有限 | ⭐⭐⭐ | 开发测试 |
 
 ---
 
@@ -180,10 +233,4 @@ agent-teams-manager/
 
 ## 📄 许可证
 
-MIT License - 详见 [LICENSE](LICENSE) 文件
-
----
-
-<p align="center">
-  <strong>Made with ❤️ by 芽芽</strong>
-</p>
+MIT License

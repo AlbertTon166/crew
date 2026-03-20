@@ -1,34 +1,21 @@
 #===========================================
 # 生产环境 Docker Compose
-# 版本锁定配置
+# 使用 Cloudflare Tunnel 实现内网穿透
 #===========================================
 
-# OpenClaw 版本锁定 (请勿修改)
-x-openclaw-version: &openclaw_version
-  # 当前生产环境锁定的 OpenClaw 版本
-  OPENCLAW_VERSION: "2026.3.13"
-  OPENCLAW_BUILD: "61d171a"
-
-x-common-env: &common_env
-  NODE_ENV: production
-  # 锁定版本配置
-  NODE_VERSION: "22.0.0"
-  NPM_VERSION: "10.0.0"
-
 services:
-  # PostgreSQL Database
+  # ========== 数据库服务 ==========
+  
   postgres:
     image: postgres:16-alpine
     container_name: ${PROJECT_NAME:-agent-teams}-postgres
     restart: unless-stopped
     environment:
-      <<: *common_env
       POSTGRES_DB: agent_teams
       POSTGRES_USER: ${PG_USER:-postgres}
       POSTGRES_PASSWORD: ${PG_PASSWORD:-postgres}
     volumes:
       - postgres_data:/var/lib/postgresql/data
-      - ./backups:/backups
     ports:
       - "${PG_PORT:-5432}:5432"
     networks:
@@ -42,10 +29,7 @@ services:
       resources:
         limits:
           memory: 1G
-        reservations:
-          memory: 256M
 
-  # Redis Cache
   redis:
     image: redis:7-alpine
     container_name: ${PROJECT_NAME:-agent-teams}-redis
@@ -66,12 +50,10 @@ services:
       resources:
         limits:
           memory: 512M
-        reservations:
-          memory: 128M
 
-  # ChromaDB Vector Database
+  # ========== RAG 知识库 (本地部署) ==========
   chromadb:
-    image: chromadb/chroma:0.4.22
+    image: chromadb/chroma:latest
     container_name: ${PROJECT_NAME:-agent-teams}-chromadb
     restart: unless-stopped
     environment:
@@ -92,38 +74,28 @@ services:
       resources:
         limits:
           memory: 2G
-        reservations:
-          memory: 512M
 
-  # Backend API Server
+  # ========== Backend API ==========
   backend:
     build:
       context: ./server
       dockerfile: Dockerfile
-      args:
-        NODE_VERSION: 22.0.0
-        NPM_VERSION: 10.0.0
-        OPENCLAW_VERSION: "2026.3.13"
     container_name: ${PROJECT_NAME:-agent-teams}-backend
     restart: unless-stopped
     environment:
-      <<: *common_env
-      <<: *openclaw_version
+      NODE_ENV: production
       PORT: 3001
-      # Database
+      DEPLOY_MODE: ${DEPLOY_MODE:-cloud}
       PG_HOST: postgres
       PG_PORT: 5432
       PG_DATABASE: agent_teams
       PG_USER: ${PG_USER:-postgres}
       PG_PASSWORD: ${PG_PASSWORD:-postgres}
-      # Redis
       REDIS_HOST: redis
       REDIS_PORT: 6379
       REDIS_PASSWORD: ${REDIS_PASSWORD:-}
-      # ChromaDB
       CHROMA_HOST: chromadb
       CHROMA_PORT: 8000
-      # CORS
       CORS_ORIGIN: ${CORS_ORIGIN:-https://your-domain.com}
     ports:
       - "${SERVER_PORT:-3001}:3001"
@@ -143,28 +115,19 @@ services:
         limits:
           cpus: '2'
           memory: 2G
-        reservations:
-          cpus: '0.5'
-          memory: 512M
-    logging:
-      driver: "json-file"
-      options:
-        max-size: "50m"
-        max-file: "5"
 
-  # Frontend Web UI
+  # ========== Frontend (云端模式) ==========
   frontend:
+    profiles: [cloud]
     build:
       context: ./client
       dockerfile: Dockerfile
     container_name: ${PROJECT_NAME:-agent-teams}-frontend
     restart: unless-stopped
     environment:
-      <<: *common_env
       VITE_API_URL: ${API_URL:-https://api.your-domain.com}
-      VITE_VERSION: "2026.3.13"
     volumes:
-      # Let's Encrypt SSL certificates
+      # Let's Encrypt SSL 证书 (可选)
       - ./data/certbot/conf:/etc/letsencrypt:ro
       - ./data/certbot/www:/var/www/certbot:ro
     ports:
@@ -174,39 +137,10 @@ services:
       - backend
     networks:
       - agent-network
-    deploy:
-      resources:
-        limits:
-          cpus: '1'
-          memory: 512M
-        reservations:
-          cpus: '0.25'
-          memory: 128M
-    logging:
-      driver: "json-file"
-      options:
-        max-size: "20m"
-        max-file: "3"
-
-  # Certbot for Let's Encrypt SSL
-  certbot:
-    image: certbot/certbot:latest
-    container_name: ${PROJECT_NAME:-agent-teams}-certbot
-    restart: unless-stopped
-    volumes:
-      - ./data/certbot/conf:/etc/letsencrypt
-      - ./data/certbot/www:/var/www/certbot
-    entrypoint: "/bin/sh -c 'trap exit TERM; while :; do certbot renew; sleep 12h; done;'"
-    networks:
-      - agent-network
 
 networks:
   agent-network:
     driver: bridge
-    ipam:
-      driver: default
-      config:
-        - subnet: 172.28.0.0/16
 
 volumes:
   postgres_data:

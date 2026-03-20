@@ -8,6 +8,10 @@
 data/certbot/
 !.gitkeep
 
+# Cloudflare Tunnel Credentials
+.cloudflared/
+cloudflared/credentials.json
+
 # Environment files
 .env
 .env.local
