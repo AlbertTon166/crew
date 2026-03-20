@@ -1,0 +1,36 @@
+import { BrowserRouter, Routes, Route } from 'react-router-dom'
+import Layout from './components/Layout'
+import Dashboard from './pages/Dashboard'
+import Projects from './pages/Projects'
+import Agents from './pages/Agents'
+import Knowledge from './pages/Knowledge'
+import Requirements from './pages/Requirements'
+import APIDoc from './pages/APIDoc'
+import { AuthProvider } from './context/AuthContext'
+import { LanguageProvider } from './context/LanguageContext'
+import { DeployModeProvider } from './context/DeployModeContext'
+
+function App() {
+  return (
+    <LanguageProvider>
+      <AuthProvider>
+        <DeployModeProvider>
+          <BrowserRouter>
+            <Routes>
+              <Route path="/" element={<Layout />}>
+                <Route index element={<Dashboard />} />
+                <Route path="projects" element={<Projects />} />
+                <Route path="requirements" element={<Requirements />} />
+                <Route path="agents" element={<Agents />} />
+                <Route path="knowledge" element={<Knowledge />} />
+                <Route path="api-doc" element={<APIDoc />} />
+              </Route>
+            </Routes>
+          </BrowserRouter>
+        </DeployModeProvider>
+      </AuthProvider>
+    </LanguageProvider>
+  )
+}
+
+export default App

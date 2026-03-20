@@ -1,0 +1,47 @@
+#===========================================
+# Git Ignore - 安全敏感文件
+#===========================================
+
+# SSL Certificates (NEVER commit these!)
+*.pem
+*.key
+data/certbot/
+!.gitkeep
+
+# Environment files
+.env
+.env.local
+.env.production
+
+# Node modules
+node_modules/
+*/node_modules/
+
+# Build outputs
+dist/
+build/
+
+# Docker volumes (sensitive data)
+postgres_data/
+redis_data/
+chroma_data/
+
+# Backups
+backups/
+
+# Logs
+*.log
+npm-debug.log*
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# Certbot challenge files
+.acme-challenge/
