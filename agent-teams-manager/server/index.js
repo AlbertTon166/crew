@@ -805,6 +805,206 @@ app.get('/api/projects/:id/requirements', async (req, res) => {
   }
 })
 
+// ==================== PM Agent & Requirements ====================
+
+// Get PM Agent info
+app.get('/api/pm-agent', async (req, res) => {
+  try {
+    // Find or create a PM agent
+    const pool = getPgPool()
+    let pmAgent = await pool.query("SELECT * FROM agents WHERE role = 'pm' LIMIT 1")
+    
+    if (pmAgent.rows.length === 0) {
+      // Create PM agent if doesn't exist
+      const result = await pool.query(
+        `INSERT INTO agents (name, role, status, model_provider, model_name, enabled) 
+         VALUES ($1, $2, $3, $4, $5, $6) RETURNING *`,
+        ['Product Manager Agent', 'pm', 'online', 'openai', 'gpt-4', true]
+      )
+      pmAgent = { rows: [result.rows[0]] }
+    }
+    
+    res.json({
+      id: pmAgent.rows[0].id,
+      name: pmAgent.rows[0].name,
+      role: pmAgent.rows[0].role,
+      status: pmAgent.rows[0].status,
+      model_provider: pmAgent.rows[0].model_provider,
+      model_name: pmAgent.rows[0].model_name,
+      enabled: pmAgent.rows[0].enabled
+    })
+  } catch (error) {
+    console.error('PM Agent error:', error)
+    res.status(500).json({ error: 'Failed to get PM agent' })
+  }
+})
+
+// Analyze requirement and generate recommended roles
+function analyzeRequirement(content) {
+  const text = content.toLowerCase()
+  const recommendations = []
+  
+  // Always include planner
+  recommendations.push({
+    roleId: 'planner',
+    roleName: '规划智能体',
+    roleNameEn: 'Planner',
+    minCount: 1,
+    description: '需求分析、任务分解'
+  })
+  
+  // Analyze keywords for frontend
+  if (text.includes('前端') || text.includes('界面') || text.includes('UI') || 
+      text.includes('页面') || text.includes('前端开发') || text.includes('react') ||
+      text.includes('vue') || text.includes('angular') || text.includes('html') ||
+      text.includes('css') || text.includes('javascript') || text.includes('移动端') ||
+      text.includes('mobile') || text.includes('web')) {
+    recommendations.push({
+      roleId: 'frontend',
+      roleName: '前端开发',
+      roleNameEn: 'Frontend Dev',
+      minCount: 1,
+      description: '负责界面和交互开发'
+    })
+  }
+  
+  // Analyze keywords for backend
+  if (text.includes('后端') || text.includes('API') || text.includes('接口') ||
+      text.includes('数据库') || text.includes('server') || text.includes('后端开发') ||
+      text.includes('node') || text.includes('python') || text.includes('java') ||
+      text.includes('golang') || text.includes('微服务') || text.includes('云函数')) {
+    recommendations.push({
+      roleId: 'backend',
+      roleName: '后端开发',
+      roleNameEn: 'Backend Dev',
+      minCount: 1,
+      description: '负责API和数据库开发'
+    })
+  }
+  
+  // Analyze keywords for reviewer
+  if (text.includes('代码审查') || text.includes('review') || text.includes('审核') ||
+      text.includes('质量') || text.includes('安全') || text.includes('性能')) {
+    recommendations.push({
+      roleId: 'reviewer',
+      roleName: '审核智能体',
+      roleNameEn: 'Reviewer',
+      minCount: 1,
+      description: '代码审查和质量把控'
+    })
+  }
+  
+  // Analyze keywords for tester
+  if (text.includes('测试') || text.includes('test') || text.includes('自动化') ||
+      text.includes('单元测试') || text.includes('集成测试') || text.includes('QA')) {
+    recommendations.push({
+      roleId: 'tester',
+      roleName: '测试智能体',
+      roleNameEn: 'Tester',
+      minCount: 1,
+      description: '自动化测试和Bug追踪'
+    })
+  }
+  
+  // Default to at least frontend + backend if no specific keywords
+  if (recommendations.length <= 1) {
+    recommendations.push({
+      roleId: 'frontend',
+      roleName: '前端开发',
+      roleNameEn: 'Frontend Dev',
+      minCount: 1,
+      description: '负责界面和交互开发'
+    })
+    recommendations.push({
+      roleId: 'backend',
+      roleName: '后端开发',
+      roleNameEn: 'Backend Dev',
+      minCount: 1,
+      description: '负责API和数据库开发'
+    })
+  }
+  
+  return recommendations
+}
+
+// Send requirement to PM Agent
+app.post('/api/requirements', async (req, res) => {
+  try {
+    const { project_id, content } = req.body
+    
+    if (!content) {
+      return res.status(400).json({ error: 'Content is required' })
+    }
+    
+    // Simulate PM agent processing
+    const pool = getPgPool()
+    const pmAgent = await pool.query("SELECT * FROM agents WHERE role = 'pm' LIMIT 1")
+    
+    if (pmAgent.rows.length === 0) {
+      return res.status(404).json({ error: 'PM agent not found' })
+    }
+    
+    // Create requirement record
+    const requirementResult = await pool.query(
+      `INSERT INTO project_requirements (project_id, title, content, file_name, file_size, file_type)
+       VALUES ($1, $2, $3, $4, $5, $6) RETURNING *`,
+      [project_id || 'default', 'Requirement', content, 'direct-input', content.length, 'text']
+    )
+    
+    // Analyze requirement and generate recommendations
+    const recommendedRoles = analyzeRequirement(content)
+    const minTotalAgents = recommendedRoles.reduce((sum, r) => sum + r.minCount, 0)
+    
+    // Update project's recommended_roles if project exists
+    if (project_id && project_id !== 'default') {
+      await pool.query(
+        'UPDATE projects SET recommended_roles = $1 WHERE id = $2',
+        [JSON.stringify(recommendedRoles), project_id]
+      )
+    }
+    
+    // Generate PM response with recommendations
+    const roleListZh = recommendedRoles.map(r => `${r.minCount}个${r.roleName}`).join('、')
+    const pmResponse = {
+      id: uuidv4(),
+      content: `我已收到您的需求。
+
+经过分析，该项目需要以下智能体配置：
+
+${recommendedRoles.map(r => `• ${r.roleName}：${r.description}（最少${r.minCount}人）`).join('\n')}
+
+**总计：至少 ${minTotalAgents} 个智能体**
+
+您可以在需求确认后，进入"待开"状态配置具体的智能体数量。`,
+      contentZh: `我已收到您的需求。
+
+经过分析，该项目需要以下智能体配置：
+
+${recommendedRoles.map(r => `• ${r.roleName}：${r.description}（最少${r.minCount}人）`).join('\n')}
+
+**总计：至少 ${minTotalAgents} 个智能体**
+
+您可以在需求确认后，进入"待开"状态配置具体的智能体数量。`,
+      status: 'clarifying',
+      source: 'pm',
+      created_at: new Date().toISOString(),
+      updated_at: new Date().toISOString()
+    }
+    
+    res.json({
+      requirement: requirementResult.rows[0],
+      pm_agent: pmAgent.rows[0],
+      message: pmResponse,
+      response: pmResponse.contentZh,
+      recommended_roles: recommendedRoles,
+      min_total_agents: minTotalAgents
+    })
+  } catch (error) {
+    console.error('Requirements error:', error)
+    res.status(500).json({ error: 'Failed to process requirement' })
+  }
+})
+
 // ==================== Initialize and start server ====================
 initDB().then(() => {
   app.listen(PORT, () => {

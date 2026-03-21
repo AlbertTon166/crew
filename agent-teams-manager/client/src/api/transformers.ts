@@ -22,6 +22,16 @@ export function transformAgent(apiAgent: any) {
 
 // Transform Project from API to frontend format
 export function transformProject(apiProject: any) {
+  // Parse recommended_roles from API response (stored as snake_case in DB)
+  let recommendedRoles = apiProject.recommended_roles
+  if (typeof recommendedRoles === 'string') {
+    try {
+      recommendedRoles = JSON.parse(recommendedRoles)
+    } catch {
+      recommendedRoles = []
+    }
+  }
+  
   return {
     id: apiProject.id,
     name: apiProject.name,
@@ -35,7 +45,8 @@ export function transformProject(apiProject: any) {
     dueDate: '',
     totalTokens: 0,
     agentCount: 0,
-    recommendedAgents: apiProject.recommended_agents || 1,
+    recommendedAgents: recommendedRoles?.length || 1,
+    recommendedRoles: recommendedRoles || [],
   }
 }
 

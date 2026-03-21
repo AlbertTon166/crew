@@ -82,17 +82,24 @@ export default function Projects() {
   // Agent Assignment Modal
   const [showAgentModal, setShowAgentModal] = useState(false)
   const [selectedProjectForAgent, setSelectedProjectForAgent] = useState<any>(null)
-  const [selectedRoles, setSelectedRoles] = useState<string[]>(['planner', 'frontend', 'backend'])
+  // Agent counts per role: { planner: 1, frontend: 2, ... }
+  const [agentCounts, setAgentCounts] = useState<Record<string, number>>({
+    planner: 1,
+    frontend: 1,
+    backend: 1,
+    reviewer: 0,
+    tester: 0
+  })
   const [selectedChannels, setSelectedChannels] = useState<string[]>(['email'])
   const [showApiDoc, setShowApiDoc] = useState(false)
   const [expandedProjects, setExpandedProjects] = useState<Set<string>>(new Set())
   const [editingDoc, setEditingDoc] = useState<string | null>(null)
 
   const mockProjects = [
-    { id: '1', name: 'E-commerce Platform', nameZh: '电商平台', description: 'Build a full-stack e-commerce platform', descZh: '构建全栈电商平台', status: 'in_progress', tasks: [], createdAt: '2026-03-10T08:00:00Z', updatedAt: '2026-03-18T10:00:00Z', totalTokens: 450000, agentCount: 3, recommendedAgents: 3, version: 'V1.0.0' },
-    { id: '2', name: 'Mobile App Redesign', nameZh: '移动端改版', description: 'Redesign the mobile app UI/UX', descZh: '重新设计移动端UI/UX', status: 'completed', tasks: [], createdAt: '2026-03-05T08:00:00Z', updatedAt: '2026-03-15T16:00:00Z', totalTokens: 280000, agentCount: 2, recommendedAgents: 2, version: 'V1.0.0' },
-    { id: '3', name: 'API Integration', nameZh: 'API集成', description: 'Third-party API integration', descZh: '第三方API集成', status: 'evaluating', tasks: [], createdAt: '2026-03-19T08:00:00Z', updatedAt: '2026-03-19T08:00:00Z', totalTokens: 0, agentCount: 0, recommendedAgents: 1, version: 'V1.0.0' },
-    { id: '4', name: 'Data Analytics', nameZh: '数据分析', description: 'Analytics dashboard', descZh: '数据看板', status: 'pending_dev', tasks: [], createdAt: '2026-03-19T08:00:00Z', updatedAt: '2026-03-19T08:00:00Z', totalTokens: 0, agentCount: 0, recommendedAgents: 2, version: 'V1.0.0' },
+    { id: '1', name: 'E-commerce Platform', nameZh: '电商平台', description: 'Build a full-stack e-commerce platform', descZh: '构建全栈电商平台', status: 'in_progress', tasks: [], createdAt: '2026-03-10T08:00:00Z', updatedAt: '2026-03-18T10:00:00Z', totalTokens: 450000, agentCount: 3, recommendedAgents: 3, recommendedRoles: [{roleId: 'planner', roleName: '规划智能体', roleNameEn: 'Planner', minCount: 1, description: '需求分析'}, {roleId: 'frontend', roleName: '前端开发', roleNameEn: 'Frontend Dev', minCount: 1, description: '界面开发'}, {roleId: 'backend', roleName: '后端开发', roleNameEn: 'Backend Dev', minCount: 1, description: 'API开发'}], version: 'V1.0.0' },
+    { id: '2', name: 'Mobile App Redesign', nameZh: '移动端改版', description: 'Redesign the mobile app UI/UX', descZh: '重新设计移动端UI/UX', status: 'completed', tasks: [], createdAt: '2026-03-05T08:00:00Z', updatedAt: '2026-03-15T16:00:00Z', totalTokens: 280000, agentCount: 2, recommendedAgents: 2, recommendedRoles: [{roleId: 'planner', roleName: '规划智能体', roleNameEn: 'Planner', minCount: 1, description: '需求分析'}, {roleId: 'frontend', roleName: '前端开发', roleNameEn: 'Frontend Dev', minCount: 1, description: '界面开发'}], version: 'V1.0.0' },
+    { id: '3', name: 'API Integration', nameZh: 'API集成', description: 'Third-party API integration', descZh: '第三方API集成', status: 'evaluating', tasks: [], createdAt: '2026-03-19T08:00:00Z', updatedAt: '2026-03-19T08:00:00Z', totalTokens: 0, agentCount: 0, recommendedAgents: 1, recommendedRoles: [{roleId: 'planner', roleName: '规划智能体', roleNameEn: 'Planner', minCount: 1, description: '需求分析'}], version: 'V1.0.0' },
+    { id: '4', name: 'Data Analytics', nameZh: '数据分析', description: 'Analytics dashboard', descZh: '数据看板', status: 'pending_dev', tasks: [], createdAt: '2026-03-19T08:00:00Z', updatedAt: '2026-03-19T08:00:00Z', totalTokens: 0, agentCount: 0, recommendedAgents: 2, recommendedRoles: [{roleId: 'planner', roleName: '规划智能体', roleNameEn: 'Planner', minCount: 1, description: '需求分析'}, {roleId: 'frontend', roleName: '前端开发', roleNameEn: 'Frontend Dev', minCount: 1, description: '界面开发'}], version: 'V1.0.0' },
   ]
 
   // Project Build Documentation (same as Requirements page)
@@ -348,7 +355,21 @@ export default function Projects() {
                 {/* Configure Agent Button - Only for pending_dev */}
                 {project.status === 'pending_dev' && (
                   <button
-                    onClick={() => { setSelectedProjectForAgent(project); setShowAgentModal(true) }}
+                    onClick={() => { 
+                      setSelectedProjectForAgent(project); 
+                      // Initialize agent counts from recommended roles or defaults
+                      const counts: Record<string, number> = { planner: 1 }
+                      if (project.recommendedRoles && Array.isArray(project.recommendedRoles)) {
+                        project.recommendedRoles.forEach((r: any) => {
+                          counts[r.roleId] = r.minCount || 1
+                        })
+                      } else {
+                        counts.frontend = 1
+                        counts.backend = 1
+                      }
+                      setAgentCounts(counts)
+                      setShowAgentModal(true) 
+                    }}
                     style={{
                       display: 'flex',
                       alignItems: 'center',
@@ -710,7 +731,10 @@ export default function Projects() {
                 </div>
               </div>
               <div style={{ display: 'flex', gap: '8px' }}>
-                <button onClick={() => { setSelectedRoles(['planner', 'frontend', 'backend']); setSelectedChannels(['email']); }} style={{ padding: '8px', background: 'var(--bg-tertiary)', border: 'none', borderRadius: '10px', cursor: 'pointer' }}>
+                <button onClick={() => { 
+                  setAgentCounts({ planner: 1, frontend: 1, backend: 1, reviewer: 0, tester: 0 })
+                  setSelectedChannels(['email']); 
+                }} style={{ padding: '8px', background: 'var(--bg-tertiary)', border: 'none', borderRadius: '10px', cursor: 'pointer' }}>
                   <RotateCw size={18} style={{ color: 'var(--text-secondary)' }} />
                 </button>
                 <button onClick={() => setShowAgentModal(false)} style={{ padding: '8px', background: 'var(--bg-tertiary)', border: 'none', borderRadius: '10px', cursor: 'pointer' }}>
@@ -719,104 +743,182 @@ export default function Projects() {
               </div>
             </div>
 
-            {/* Agent Roles Selection */}
+            {/* Agent Roles Selection - Counter Based */}
             <div style={{ marginBottom: '24px' }}>
               <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '12px' }}>
                 <label style={{ fontSize: '13px', fontWeight: '600', color: 'var(--text-secondary)' }}>
                   {language === 'zh' ? '👥 智能体职员' : '👥 Agent Staff'}
                 </label>
+                {/* Total count badge */}
                 <div style={{ 
                   padding: '6px 12px', 
                   borderRadius: '20px', 
-                  background: selectedRoles.length >= (selectedProjectForAgent.recommendedAgents || 1) 
-                    ? 'rgba(52, 211, 153, 0.15)' 
-                    : 'rgba(248, 113, 113, 0.15)',
-                  border: `1px solid ${selectedRoles.length >= (selectedProjectForAgent.recommendedAgents || 1) ? '#34D399' : '#F87171'}`,
+                  background: (() => {
+                    const total = Object.values(agentCounts).reduce((a, b) => a + b, 0)
+                    const minTotal = selectedProjectForAgent?.recommendedRoles?.reduce((sum: number, r: any) => sum + (r.minCount || 0), 0) || 1
+                    return total >= minTotal ? 'rgba(52, 211, 153, 0.15)' : 'rgba(248, 113, 113, 0.15)'
+                  })(),
+                  border: `1px solid ${(() => {
+                    const total = Object.values(agentCounts).reduce((a, b) => a + b, 0)
+                    const minTotal = selectedProjectForAgent?.recommendedRoles?.reduce((sum: number, r: any) => sum + (r.minCount || 0), 0) || 1
+                    return total >= minTotal ? '#34D399' : '#F87171'
+                  })()}`,
                 }}>
                   <span style={{ 
                     fontSize: '12px', 
                     fontWeight: '700',
-                    color: selectedRoles.length >= (selectedProjectForAgent.recommendedAgents || 1) ? '#34D399' : '#F87171'
+                    color: (() => {
+                      const total = Object.values(agentCounts).reduce((a, b) => a + b, 0)
+                      const minTotal = selectedProjectForAgent?.recommendedRoles?.reduce((sum: number, r: any) => sum + (r.minCount || 0), 0) || 1
+                      return total >= minTotal ? '#34D399' : '#F87171'
+                    })()
                   }}>
-                    {selectedRoles.length} / {selectedProjectForAgent.recommendedAgents || 1}
+                    {Object.values(agentCounts).reduce((a, b) => a + b, 0)} / {selectedProjectForAgent?.recommendedRoles?.reduce((sum: number, r: any) => sum + (r.minCount || 0), 0) || 1}
                   </span>
                 </div>
               </div>
               
-              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '10px' }}>
-                {agentRoles.map((role, index) => {
-                  const isSelected = selectedRoles.includes(role.id)
-                  const RoleIcon = role.icon
+              {/* Role list with counters */}
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+                {agentRoles.map((role) => {
+                  const count = agentCounts[role.id] || 0
                   const isPlanner = role.id === 'planner'
+                  // Get min count from recommended roles
+                  const recommendedRole = selectedProjectForAgent?.recommendedRoles?.find((r: any) => r.roleId === role.id)
+                  const minCount = recommendedRole?.minCount || 0
+                  const RoleIcon = role.icon
+                  
                   return (
-                    <button
+                    <div
                       key={role.id}
-                      onClick={() => {
-                        // Planner cannot be deselected
-                        if (isPlanner) return
-                        if (isSelected) {
-                          setSelectedRoles(selectedRoles.filter(r => r !== role.id))
-                        } else {
-                          setSelectedRoles([...selectedRoles, role.id])
-                        }
-                      }}
                       style={{
                         display: 'flex',
                         alignItems: 'center',
-                        gap: '10px',
+                        gap: '12px',
                         padding: '12px 14px',
                         borderRadius: '12px',
-                        border: isSelected ? `2px solid ${role.color}` : '1px solid var(--border)',
-                        background: isSelected ? `${role.color}15` : 'var(--bg-tertiary)',
-                        cursor: isPlanner ? 'default' : 'pointer',
-                        transition: 'all 0.2s',
-                        textAlign: 'left'
+                        border: count > 0 ? `2px solid ${role.color}` : '1px solid var(--border)',
+                        background: count > 0 ? `${role.color}15` : 'var(--bg-tertiary)',
+                        transition: 'all 0.2s'
                       }}
                     >
-                      <div style={{ 
-                        width: '24px', 
-                        height: '24px', 
-                        borderRadius: '6px', 
-                        background: isSelected ? role.color : 'var(--bg-tertiary)',
-                        border: isSelected ? 'none' : '1px solid var(--border)',
-                        display: 'flex', 
-                        alignItems: 'center', 
-                        justifyContent: 'center',
-                        flexShrink: 0,
-                        fontSize: '11px',
-                        fontWeight: '700',
-                        color: isSelected ? '#fff' : 'var(--text-tertiary)'
-                      }}>
-                        {isSelected ? '1' : '0'}
+                      {/* Role icon */}
+                      <div style={{ width: '36px', height: '36px', borderRadius: '8px', background: role.color, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                        <RoleIcon size={18} style={{ color: '#fff' }} />
                       </div>
-                      <div style={{ width: '32px', height: '32px', borderRadius: '8px', background: role.color, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
-                        <RoleIcon size={16} style={{ color: '#fff' }} />
-                      </div>
+                      
+                      {/* Role info */}
                       <div style={{ flex: 1 }}>
-                        <div style={{ fontSize: '12px', fontWeight: '600', color: 'var(--text-primary)', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                        <div style={{ fontSize: '13px', fontWeight: '600', color: 'var(--text-primary)', display: 'flex', alignItems: 'center', gap: '6px' }}>
                           {isPlanner && <Lock size={10} style={{ color: '#8B5CF6' }} />}
                           {language === 'zh' ? role.label : role.labelEn}
+                          {minCount > 0 && (
+                            <span style={{ fontSize: '10px', color: '#8B5CF6', fontWeight: '500' }}>
+                              ({language === 'zh' ? `最低${minCount}人` : `min ${minCount}`})
+                            </span>
+                          )}
                         </div>
-                        <div style={{ fontSize: '10px', color: 'var(--text-tertiary)', marginTop: '2px' }}>
+                        <div style={{ fontSize: '11px', color: 'var(--text-tertiary)', marginTop: '2px' }}>
                           {role.desc}
                         </div>
                       </div>
-                      <div style={{ width: '18px', height: '18px', borderRadius: '50%', border: isSelected ? 'none' : '2px solid var(--border)', background: isSelected ? role.color : 'transparent', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                        {isSelected && <CheckCircle size={12} style={{ color: '#fff' }} />}
+                      
+                      {/* Counter controls */}
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                        {isPlanner ? (
+                          // Planner: fixed at 1
+                          <div style={{ 
+                            padding: '6px 16px', 
+                            borderRadius: '8px', 
+                            background: role.color,
+                            color: '#fff',
+                            fontSize: '14px',
+                            fontWeight: '700'
+                          }}>
+                            1
+                          </div>
+                        ) : (
+                          // Other roles: +/- buttons
+                          <>
+                            <button
+                              onClick={() => setAgentCounts(prev => ({ ...prev, [role.id]: Math.max(0, (prev[role.id] || 0) - 1) }))}
+                              disabled={count <= 0}
+                              style={{
+                                width: '28px',
+                                height: '28px',
+                                borderRadius: '8px',
+                                border: '1px solid var(--border)',
+                                background: count > 0 ? 'var(--bg-card)' : 'var(--bg-tertiary)',
+                                color: count > 0 ? 'var(--text-primary)' : 'var(--text-tertiary)',
+                                fontSize: '16px',
+                                fontWeight: '700',
+                                cursor: count > 0 ? 'pointer' : 'not-allowed',
+                                display: 'flex',
+                                alignItems: 'center',
+                                justifyContent: 'center'
+                              }}
+                            >
+                              -
+                            </button>
+                            <div style={{ 
+                              minWidth: '24px',
+                              textAlign: 'center',
+                              fontSize: '14px',
+                              fontWeight: '700',
+                              color: count > 0 ? role.color : 'var(--text-tertiary)'
+                            }}>
+                              {count}
+                            </div>
+                            <button
+                              onClick={() => setAgentCounts(prev => ({ ...prev, [role.id]: (prev[role.id] || 0) + 1 }))}
+                              style={{
+                                width: '28px',
+                                height: '28px',
+                                borderRadius: '8px',
+                                border: '1px solid var(--border)',
+                                background: 'var(--bg-card)',
+                                color: 'var(--text-primary)',
+                                fontSize: '16px',
+                                fontWeight: '700',
+                                cursor: 'pointer',
+                                display: 'flex',
+                                alignItems: 'center',
+                                justifyContent: 'center'
+                              }}
+                            >
+                              +
+                            </button>
+                          </>
+                        )}
                       </div>
-                    </button>
+                    </div>
                   )
                 })}
               </div>
               
-              {/* Minimum constraint hint */}
+              {/* Detailed constraint hint */}
               <div style={{ marginTop: '12px', padding: '10px 12px', borderRadius: '8px', background: 'rgba(139, 92, 246, 0.1)', border: '1px solid rgba(139, 92, 246, 0.2)' }}>
-                <span style={{ fontSize: '11px', color: '#8B5CF6' }}>
-                  {language === 'zh' 
-                    ? `📋 最少需要 ${selectedProjectForAgent.recommendedAgents || 1} 个智能体（产品经理推荐）`
-                    : `📋 Minimum ${selectedProjectForAgent.recommendedAgents || 1} agents required (PM recommended)`}
-                </span>
-              </div>
+                {(() => {
+                  const missing: string[] = []
+                  selectedProjectForAgent?.recommendedRoles?.forEach((r: any) => {
+                    const current = agentCounts[r.roleId] || 0
+                    if (current < r.minCount) {
+                      missing.push(`${language === 'zh' ? r.roleName : r.roleNameEn}还差${r.minCount - current}人`)
+                    }
+                  })
+                  if (missing.length === 0) {
+                    return (
+                      <span style={{ fontSize: '11px', color: '#34D399' }}>
+                        ✅ {language === 'zh' ? '已满足最低配置要求' : 'Minimum requirements met'}
+                      </span>
+                    )
+                  }
+                  return (
+                    <span style={{ fontSize: '11px', color: '#F87171' }}>
+                      ⚠️ {missing.join('、')}
+                    </span>
+                  )
+                })()}</div>
             </div>
 
             {/* Notification Channels */}
@@ -972,7 +1074,7 @@ export default function Projects() {
                 }}
                 style={{ flex: 2, padding: '14px', background: 'linear-gradient(135deg, var(--primary), var(--accent-violet))', border: 'none', borderRadius: '12px', fontSize: '14px', fontWeight: '600', color: '#fff', cursor: 'pointer', boxShadow: '0 4px 16px var(--primary-glow)' }}
               >
-                {language === 'zh' ? `确认配置 ${selectedRoles.length} 个智能体` : `Confirm ${selectedRoles.length} Agents`}
+                {language === 'zh' ? `确认配置 ${Object.values(agentCounts).reduce((a, b) => a + b, 0)} 个智能体` : `Confirm ${Object.values(agentCounts).reduce((a, b) => a + b, 0)} Agents`}
               </button>
             </div>
           </div>

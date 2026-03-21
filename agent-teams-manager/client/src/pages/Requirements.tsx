@@ -192,21 +192,78 @@ export default function Requirements() {
   }
 
   const handleSend = async () => {
-    if (!inputMessage.trim()) return
+    if (!inputMessage.trim() || !selectedProject) return
     setSending(true)
-    await new Promise(r => setTimeout(r, 1000))
-    const newMsg: Requirement = {
-      id: `m${Date.now()}`,
-      projectId: selectedProject?.id || '1',
-      content: inputMessage,
-      contentZh: inputMessage,
-      status: 'pending',
-      source: 'user',
-      createdAt: new Date().toISOString(),
-      updatedAt: new Date().toISOString(),
+    
+    try {
+      // Call backend API to send requirement to PM agent
+      const response = await fetch('/api/requirements', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          project_id: selectedProject.id,
+          content: inputMessage
+        })
+      })
+      
+      if (response.ok) {
+        const result = await response.json()
+        
+        // Add user message
+        const userMsg: Requirement = {
+          id: `m${Date.now()}`,
+          projectId: selectedProject.id,
+          content: inputMessage,
+          contentZh: inputMessage,
+          status: 'pending',
+          source: 'user',
+          createdAt: new Date().toISOString(),
+          updatedAt: new Date().toISOString(),
+        }
+        setMessages(prev => [...prev, userMsg])
+        
+        // Add PM response
+        const pmMsg: Requirement = {
+          id: `pm${Date.now()}`,
+          projectId: selectedProject.id,
+          content: result.response || result.message?.content || 'Message received',
+          contentZh: result.message?.contentZh || result.response || '已收到消息',
+          status: result.message?.status || 'clarifying',
+          source: 'pm',
+          createdAt: new Date().toISOString(),
+          updatedAt: new Date().toISOString(),
+        }
+        setMessages(prev => [...prev, pmMsg])
+        
+        setInputMessage('')
+        
+        // Refresh stats
+        const statsData = await fetch('/api/dashboard/stats').then(r => r.json())
+        setStats({
+          pending: statsData.pendingTasks || 0,
+          clarifying: statsData.clarifyingTasks || 0,
+          confirmed: statsData.confirmedTasks || 0,
+          rejected: statsData.rejectedTasks || 0,
+          total: statsData.totalTasks || 0
+        })
+      }
+    } catch (error) {
+      console.error('Failed to send requirement:', error)
+      // Fallback to local mock
+      const newMsg: Requirement = {
+        id: `m${Date.now()}`,
+        projectId: selectedProject.id,
+        content: inputMessage,
+        contentZh: inputMessage,
+        status: 'pending',
+        source: 'user',
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+      }
+      setMessages(prev => [...prev, newMsg])
+      setInputMessage('')
     }
-    setMessages(prev => [...prev, newMsg])
-    setInputMessage('')
+    
     setSending(false)
   }
 
