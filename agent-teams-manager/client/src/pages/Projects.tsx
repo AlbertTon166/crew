@@ -2,12 +2,15 @@ import { useState, useEffect } from 'react'
 import { 
   Plus, Search, FolderKanban, Clock, 
   CheckCircle, Loader2, X, Bot, Users, ArrowRight, Coins,
-  Settings, MessageSquare, Zap, Code, TestTube, Shield, FileText, ChevronDown, Lock, RotateCw, WifiOff, Sparkles
+  Settings, MessageSquare, Zap, Code, TestTube, Shield, FileText, ChevronDown, Lock, RotateCw, WifiOff, Sparkles, Download
 } from 'lucide-react'
 import { useDashboardStore } from '../stores/dashboardStore'
 import { useLanguage } from '../context/LanguageContext'
 import { useDeployMode } from '../context/DeployModeContext'
 import TeamWizard from '../components/TeamWizard'
+import { projectsApi, tasksApi } from '../api'
+import { transformProject, transformTask } from '../api/transformers'
+import { exportProject } from '../utils/projectExport'
 
 // Agent role recommendations
 const agentRoles = [
@@ -124,20 +127,43 @@ export default function Projects() {
     }
   }
 
+  // Add state for export loading
+  const [exportingProject, setExportingProject] = useState<string | null>(null)
+
   useEffect(() => {
-    setProjects(mockProjects as any)
-    setTasks({
-      '1': [
-        { id: 't1', projectId: '1', title: 'User Module', titleZh: '用户模块', description: 'Implement user registration and login', status: 'completed', assignedAgentId: '3', executions: [], createdAt: '2026-03-10T08:00:00Z', updatedAt: '2026-03-18T10:00:00Z' },
-        { id: 't2', projectId: '1', title: 'Product Module', titleZh: '商品模块', description: 'Product list and details', status: 'in_progress', assignedAgentId: '3', executions: [], dependsOn: ['t1'], createdAt: '2026-03-10T09:00:00Z', updatedAt: '2026-03-10T09:00:00Z' },
-        { id: 't3', projectId: '1', title: 'Code Review', titleZh: '代码审查', description: 'Review user module code', status: 'needs_review', assignedAgentId: '5', executions: [], dependsOn: ['t1'], createdAt: '2026-03-10T10:00:00Z', updatedAt: '2026-03-10T10:00:00Z' },
-      ],
-      '2': [{ id: 't4', projectId: '2', title: 'UI Redesign', titleZh: 'UI改版', description: 'Redesign all screens', status: 'completed', assignedAgentId: '3', executions: [], createdAt: '2026-03-05T09:00:00Z', updatedAt: '2026-03-15T16:00:00Z' }],
-      '3': [],
-      '4': [],
-    })
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []) // Empty deps - only run once on mount
+    // Load data from API
+    const loadData = async () => {
+      try {
+        const projectsData = await projectsApi.getAll()
+        const transformedProjects = (projectsData as any[]).map(transformProject)
+        setProjects(transformedProjects)
+        
+        // Load tasks for each project
+        const allTasks: Record<string, any[]> = {}
+        for (const project of projectsData as any[]) {
+          const tasksData = await tasksApi.getAll(project.id)
+          allTasks[project.id] = (tasksData as any[]).map(transformTask)
+        }
+        setTasks(allTasks)
+      } catch (error) {
+        console.error('Failed to load from API, using mock data:', error)
+        // Fallback to mock data
+        setProjects(mockProjects as any)
+        setTasks({
+          '1': [
+            { id: 't1', projectId: '1', title: 'User Module', titleZh: '用户模块', description: 'Implement user registration and login', status: 'completed', assignedAgentId: '3', executions: [], createdAt: '2026-03-10T08:00:00Z', updatedAt: '2026-03-18T10:00:00Z' },
+            { id: 't2', projectId: '1', title: 'Product Module', titleZh: '商品模块', description: 'Product list and details', status: 'in_progress', assignedAgentId: '3', executions: [], dependsOn: ['t1'], createdAt: '2026-03-10T09:00:00Z', updatedAt: '2026-03-10T09:00:00Z' },
+            { id: 't3', projectId: '1', title: 'Code Review', titleZh: '代码审查', description: 'Review user module code', status: 'needs_review', assignedAgentId: '5', executions: [], dependsOn: ['t1'], createdAt: '2026-03-10T10:00:00Z', updatedAt: '2026-03-10T10:00:00Z' },
+          ],
+          '2': [{ id: 't4', projectId: '2', title: 'UI Redesign', titleZh: 'UI改版', description: 'Redesign all screens', status: 'completed', assignedAgentId: '3', executions: [], createdAt: '2026-03-05T09:00:00Z', updatedAt: '2026-03-15T16:00:00Z' }],
+          '3': [],
+          '4': [],
+        })
+      }
+    }
+    
+    loadData()
+  }, [])
 
   const getProjectName = (p: typeof mockProjects[0]) => language === 'zh' ? p.nameZh : p.name
   const getProjectDesc = (p: typeof mockProjects[0]) => language === 'zh' ? p.descZh : p.description
@@ -206,37 +232,6 @@ export default function Projects() {
         backgroundSize: '40px 40px'
       }}
     >
-      {/* Not Connected State */}
-      {!isConnected && (
-        <div style={{ 
-          display: 'flex', 
-          flexDirection: 'column', 
-          alignItems: 'center', 
-          justifyContent: 'center', 
-          padding: '80px 20px',
-          textAlign: 'center'
-        }}>
-          <div style={{ 
-            width: '80px', 
-            height: '80px', 
-            borderRadius: '50%', 
-            background: 'rgba(248, 113, 113, 0.1)', 
-            display: 'flex', 
-            alignItems: 'center', 
-            justifyContent: 'center',
-            marginBottom: '24px'
-          }}>
-            <WifiOff size={40} style={{ color: '#F87171' }} />
-          </div>
-          <h2 style={{ fontSize: '20px', fontWeight: '600', color: 'var(--text-primary)', marginBottom: '8px' }}>
-            {language === 'zh' ? '未连接到 Teams 服务器' : 'Not Connected to Teams Server'}
-          </h2>
-          <p style={{ fontSize: '14px', color: 'var(--text-secondary)', maxWidth: '400px' }}>
-            {language === 'zh' ? '请确保 Teams 服务器正在运行并且网络连接正常' : 'Please ensure the Teams server is running and network connection is normal'}
-          </p>
-        </div>
-      )}
-
       {/* Header */}
       <div style={{ display: 'flex', flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: '24px', flexWrap: 'wrap', gap: '16px' }}>
         <div>
@@ -384,6 +379,30 @@ export default function Projects() {
                   style={{ width: '44px', height: '44px', transform: expandedProjects.has(project.id) ? 'rotate(90deg)' : 'rotate(0deg)', transition: 'transform 0.3s ease' }}
                 >
                   <ArrowRight size={20} />
+                </button>
+                
+                {/* Export Button */}
+                <button 
+                  onClick={async () => {
+                    setExportingProject(project.id)
+                    try {
+                      await exportProject(project.id, project.name)
+                    } catch (err) {
+                      alert(language === 'zh' ? '导出失败' : 'Export failed')
+                    } finally {
+                      setExportingProject(null)
+                    }
+                  }}
+                  className="btn-icon"
+                  disabled={exportingProject === project.id}
+                  style={{ width: '44px', height: '44px' }}
+                  title={language === 'zh' ? '导出项目' : 'Export Project'}
+                >
+                  {exportingProject === project.id ? (
+                    <Loader2 size={20} className="spinner" />
+                  ) : (
+                    <Download size={20} />
+                  )}
                 </button>
               </div>
             </div>

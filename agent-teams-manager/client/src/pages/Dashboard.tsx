@@ -1,4 +1,4 @@
-import { useEffect } from 'react'
+import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { 
   Bot, 
@@ -13,12 +13,16 @@ import {
   Cpu,
   HardDrive,
   MemoryStick,
-  WifiOff
+  WifiOff,
+  Loader2
 } from 'lucide-react'
 import { useDashboardStore } from '../stores/dashboardStore'
 import { useLanguage } from '../context/LanguageContext'
 import { useDeployMode } from '../context/DeployModeContext'
+import { agentsApi, projectsApi, dashboardApi } from '../api'
+import { transformAgent, transformProject, transformStats } from '../api/transformers'
 
+// Mock data fallback
 const mockAgents = [
   { id: '1', name: 'Planner Agent', role: 'planner' as const, status: 'online' as const, modelProvider: 'openai', modelName: 'gpt-4', systemPrompt: '', skills: [] },
   { id: '2', name: 'Frontend Dev', role: 'frontend' as const, status: 'busy' as const, modelProvider: 'anthropic', modelName: 'claude-3', systemPrompt: '', skills: [] },
@@ -84,17 +88,55 @@ const formatToken = (token: number) => {
 export default function Dashboard() {
   const navigate = useNavigate()
   const { language } = useLanguage()
-  const { agents, stats, setAgents, setStats } = useDashboardStore()
+  const { agents, stats, setAgents, setStats, setProjects } = useDashboardStore()
   const { isConnected } = useDeployMode()
+  const [agentsLoading, setAgentsLoading] = useState(false)
+  const [agentsError, setAgentsError] = useState<string | null>(null)
+
+  // Fetch agents when connected
+  useEffect(() => {
+    if (!isConnected) return
+    
+    const fetchAgents = async () => {
+      setAgentsLoading(true)
+      setAgentsError(null)
+      try {
+        const agentsData = await agentsApi.getAll()
+        const transformedAgents = agentsData.map(transformAgent)
+        setAgents(transformedAgents)
+      } catch (error) {
+        console.error('Failed to fetch agents:', error)
+        setAgentsError('Failed to load agents')
+      } finally {
+        setAgentsLoading(false)
+      }
+    }
+    
+    fetchAgents()
+  }, [isConnected, setAgents])
 
   useEffect(() => {
-    // Only set mock data if store is empty (first load)
-    if (agents.length === 0) {
-      setAgents(mockAgents as any)
-      setStats(mockStats)
+    if (!isConnected) return
+    
+    // Load other data from API (projects, stats)
+    const loadData = async () => {
+      try {
+        // Fetch projects from API
+        const projectsData = await projectsApi.getAll()
+        const transformedProjects = projectsData.map(transformProject)
+        setProjects(transformedProjects)
+        
+        // Fetch stats from API
+        const statsData = await dashboardApi.getStats()
+        const transformedStats = transformStats(statsData)
+        setStats(transformedStats)
+      } catch (error) {
+        console.error('Failed to load data from API, using mock data:', error)
+      }
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []) // Empty deps - only run once on mount
+    
+    loadData()
+  }, [isConnected, setProjects, setStats])
 
   const getStatusConfig = (status: string) => {
     return language === 'zh' ? statusConfigZh[status] : statusConfig[status]
@@ -144,37 +186,6 @@ export default function Dashboard() {
         backgroundSize: '40px 40px'
       }}
     >
-      {/* Not Connected State */}
-      {!isConnected && (
-        <div style={{ 
-          display: 'flex', 
-          flexDirection: 'column', 
-          alignItems: 'center', 
-          justifyContent: 'center', 
-          padding: '80px 20px',
-          textAlign: 'center'
-        }}>
-          <div style={{ 
-            width: '80px', 
-            height: '80px', 
-            borderRadius: '50%', 
-            background: 'rgba(248, 113, 113, 0.1)', 
-            display: 'flex', 
-            alignItems: 'center', 
-            justifyContent: 'center',
-            marginBottom: '24px'
-          }}>
-            <WifiOff size={40} style={{ color: '#F87171' }} />
-          </div>
-          <h2 style={{ fontSize: '20px', fontWeight: '600', color: 'var(--text-primary)', marginBottom: '8px' }}>
-            {language === 'zh' ? '未连接到 Teams 服务器' : 'Not Connected to Teams Server'}
-          </h2>
-          <p style={{ fontSize: '14px', color: 'var(--text-secondary)', maxWidth: '400px' }}>
-            {language === 'zh' ? '仪表盘功能暂时不可用，请稍后再试' : 'Dashboard is temporarily unavailable, please try again later'}
-          </p>
-        </div>
-      )}
-
       {/* Header */}
       <div style={{ marginBottom: '32px' }}>
         <h1 style={{ fontSize: '28px', fontWeight: '700', color: 'var(--text-primary)', marginBottom: '8px' }}>
@@ -409,7 +420,48 @@ export default function Dashboard() {
             </div>
             
             <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-              {mockAgents.map(agent => (
+              {/* Loading State */}
+              {agentsLoading && (
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '32px 16px', gap: '12px', color: 'var(--text-tertiary)' }}>
+                  <Loader2 size={20} style={{ animation: 'spin 1s linear infinite' }} />
+                  <span style={{ fontSize: '14px' }}>{language === 'zh' ? '加载中...' : 'Loading...'}</span>
+                </div>
+              )}
+              
+              {/* Error State */}
+              {!agentsLoading && agentsError && (
+                <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: '32px 16px', gap: '8px' }}>
+                  <AlertCircle size={24} style={{ color: '#F87171' }} />
+                  <span style={{ fontSize: '13px', color: 'var(--text-tertiary)' }}>{agentsError}</span>
+                </div>
+              )}
+              
+              {/* Empty State */}
+              {!agentsLoading && !agentsError && agents.length === 0 && (
+                <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: '32px 16px', gap: '8px' }}>
+                  <Bot size={24} style={{ color: 'var(--text-tertiary)' }} />
+                  <span style={{ fontSize: '14px', color: 'var(--text-tertiary)' }}>{language === 'zh' ? '暂无智能体' : 'No agents yet'}</span>
+                  <button 
+                    onClick={() => navigate('/agents')} 
+                    style={{ 
+                      marginTop: '8px', 
+                      padding: '8px 16px', 
+                      background: 'linear-gradient(135deg, var(--primary), var(--accent-violet))', 
+                      border: 'none', 
+                      borderRadius: '8px', 
+                      fontSize: '13px', 
+                      fontWeight: '600', 
+                      color: '#fff', 
+                      cursor: 'pointer' 
+                    }}
+                  >
+                    {language === 'zh' ? '添加智能体' : 'Add Agent'}
+                  </button>
+                </div>
+              )}
+              
+              {/* Agent List */}
+              {!agentsLoading && !agentsError && agents.length > 0 && agents.map(agent => (
                 <div key={agent.id} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '12px 14px', borderRadius: '12px', background: 'var(--bg-tertiary)', border: '1px solid var(--border)', transition: 'all 0.2s' }} className="agent-item">
                   <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
                     <div className="avatar" style={{ width: '36px', height: '36px', fontSize: '12px' }}><Bot size={16} /></div>
@@ -455,6 +507,11 @@ export default function Dashboard() {
         .view-all-btn:hover { background: var(--bg-tertiary); color: var(--text-primary); }
         .agent-item:hover { border-color: var(--border-hover); transform: translateX(4px); }
         .table-row:hover td { background: rgba(255, 255, 255, 0.01); }
+        
+        @keyframes spin {
+          from { transform: rotate(0deg); }
+          to { transform: rotate(360deg); }
+        }
         
         /* Mobile Responsive */
         @media (max-width: 1024px) {

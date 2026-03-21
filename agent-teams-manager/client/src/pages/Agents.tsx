@@ -10,6 +10,8 @@ import {
 import { useDashboardStore } from '../stores/dashboardStore'
 import { useLanguage } from '../context/LanguageContext'
 import { useDeployMode } from '../context/DeployModeContext'
+import { agentsApi } from '../api'
+import { transformAgent } from '../api/transformers'
 
 const agentIcons: Record<string, any> = {
   'Planner Agent': ClipboardList,
@@ -84,12 +86,24 @@ export default function Agents() {
   // Use store agents if available, otherwise use default agents
   const agents = storeAgents.length > 0 ? storeAgents : defaultAgents
 
-  // Initialize store with default agents if store is empty
+  // Initialize store with data from API
   useEffect(() => {
-    if (storeAgents.length === 0) {
-      setAgents(defaultAgents as any)
+    const loadAgents = async () => {
+      try {
+        const agentsData = await agentsApi.getAll()
+        const transformedAgents = agentsData.map(transformAgent)
+        setAgents(transformedAgents)
+      } catch (error) {
+        console.error('Failed to load agents from API:', error)
+        // Fallback to default agents
+        if (storeAgents.length === 0) {
+          setAgents(defaultAgents as any)
+        }
+      }
     }
-  }, [storeAgents.length, setAgents])
+    
+    loadAgents()
+  }, [])
 
   const filteredAgents = agents.filter(agent => 
     agent.name.toLowerCase().includes(search.toLowerCase()) ||
@@ -167,38 +181,6 @@ export default function Agents() {
         backgroundSize: '40px 40px'
       }}
     >
-      {/* Not Connected State */}
-      {!isConnected && (
-        <div style={{ 
-          display: 'flex', 
-          flexDirection: 'column', 
-          alignItems: 'center', 
-          justifyContent: 'center', 
-          padding: '80px 20px',
-          textAlign: 'center'
-        }}>
-          <div style={{ 
-            width: '80px', 
-            height: '80px', 
-            borderRadius: '50%', 
-            background: 'rgba(248, 113, 113, 0.1)', 
-            display: 'flex', 
-            alignItems: 'center', 
-            justifyContent: 'center',
-            marginBottom: '24px',
-            animation: 'pulse 2s infinite'
-          }}>
-            <Loader2 size={40} style={{ color: '#F87171', animation: 'spin 2s linear infinite' }} />
-          </div>
-          <h2 style={{ fontSize: '20px', fontWeight: '600', color: 'var(--text-primary)', marginBottom: '8px' }}>
-            {language === 'zh' ? '等待 Teams 服务器连接...' : 'Waiting for Teams Server Connection...'}
-          </h2>
-          <p style={{ fontSize: '14px', color: 'var(--text-secondary)', maxWidth: '400px' }}>
-            {language === 'zh' ? '正在尝试连接 Teams 服务器，请稍候' : 'Attempting to connect to Teams server, please wait'}
-          </p>
-        </div>
-      )}
-
       {/* Header */}
       <div style={{ display: 'flex', flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: '24px', flexWrap: 'wrap', gap: '16px' }}>
         <div>

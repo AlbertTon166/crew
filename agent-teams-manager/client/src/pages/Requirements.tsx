@@ -3,6 +3,8 @@ import { Send, CheckCircle, XCircle, Loader2, Filter, FolderKanban, FileText, Cl
 import { useDashboardStore } from '../stores/dashboardStore'
 import { useLanguage } from '../context/LanguageContext'
 import { useDeployMode } from '../context/DeployModeContext'
+import { requirementsApi } from '../api'
+import FileUpload from '../components/FileUpload'
 
 interface Requirement {
   id: string
@@ -87,20 +89,66 @@ export default function Requirements() {
   }
 
   useEffect(() => {
-    setProjects(mockProjects as any)
-    setSelectedProject(mockProjects[0])
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []) // Empty deps - only run once on mount
+    // Load projects from API
+    const loadData = async () => {
+      try {
+        const { default: projectsApi } = await import('../api')
+        const projectsData = await projectsApi.projects.getAll()
+        const transformed = projectsData.map((p: any) => ({
+          id: p.id,
+          name: p.name,
+          nameZh: p.name,
+          description: p.description,
+          descZh: p.description,
+          status: p.status,
+          createdAt: p.created_at,
+          updatedAt: p.updated_at,
+        }))
+        setProjects(transformed as any)
+        if (transformed.length > 0) {
+          setSelectedProject(transformed[0])
+        }
+      } catch (error) {
+        console.error('Failed to load projects:', error)
+        setProjects(mockProjects as any)
+        setSelectedProject(mockProjects[0])
+      }
+    }
+    
+    loadData()
+  }, [])
 
   useEffect(() => {
     if (selectedProject) {
-      const projectMessages = mockMessages[selectedProject.id] || []
-      setMessages(projectMessages)
+      // Try to load from API first
+      const loadRequirements = async () => {
+        try {
+          const data = await requirementsApi.getByProject(selectedProject.id)
+          if (data && data.length > 0) {
+            setMessages(data.map((r: any) => ({
+              id: r.id,
+              projectId: r.project_id,
+              content: r.content,
+              contentZh: r.title,
+              status: 'confirmed',
+              source: 'user',
+              createdAt: r.created_at,
+              updatedAt: r.created_at,
+            })))
+            return
+          }
+        } catch (error) {
+          console.error('Failed to load requirements:', error)
+        }
+        
+        // Fallback to mock
+        const projectMessages = mockMessages[selectedProject.id] || []
+        setMessages(projectMessages)
+      }
+      
+      loadRequirements()
+      
       const s = { pending: 0, clarifying: 0, confirmed: 0, rejected: 0, total: 0 }
-      projectMessages.filter(m => m.source === 'user').forEach(m => {
-        s[m.status as keyof typeof s]++
-        s.total++
-      })
       setStats(s)
     }
   }, [selectedProject])
@@ -108,6 +156,40 @@ export default function Requirements() {
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' })
   }, [messages])
+
+  // Handle file upload
+  const handleFileUpload = async (file: File, content: string) => {
+    if (!selectedProject) return
+    
+    setSending(true)
+    try {
+      const result = await requirementsApi.upload(selectedProject.id, {
+        title: file.name,
+        content: content,
+        file_name: file.name,
+        file_size: file.size,
+        file_type: file.type,
+      })
+      
+      // Add to messages
+      const newMsg: Requirement = {
+        id: result.id,
+        projectId: selectedProject.id,
+        content: content.substring(0, 100) + (content.length > 100 ? '...' : ''),
+        contentZh: file.name,
+        status: 'confirmed',
+        source: 'user',
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+      }
+      setMessages(prev => [...prev, newMsg])
+    } catch (error) {
+      console.error('Upload failed:', error)
+      alert(language === 'zh' ? '上传失败' : 'Upload failed')
+    } finally {
+      setSending(false)
+    }
+  }
 
   const handleSend = async () => {
     if (!inputMessage.trim()) return
@@ -173,37 +255,6 @@ export default function Requirements() {
         backgroundSize: '40px 40px'
       }}
     >
-      {/* Not Connected State */}
-      {!isConnected && (
-        <div style={{ 
-          display: 'flex', 
-          flexDirection: 'column', 
-          alignItems: 'center', 
-          justifyContent: 'center', 
-          padding: '80px 20px',
-          textAlign: 'center'
-        }}>
-          <div style={{ 
-            width: '80px', 
-            height: '80px', 
-            borderRadius: '50%', 
-            background: 'rgba(248, 113, 113, 0.1)', 
-            display: 'flex', 
-            alignItems: 'center', 
-            justifyContent: 'center',
-            marginBottom: '24px'
-          }}>
-            <WifiOff size={40} style={{ color: '#F87171' }} />
-          </div>
-          <h2 style={{ fontSize: '20px', fontWeight: '600', color: 'var(--text-primary)', marginBottom: '8px' }}>
-            {language === 'zh' ? '未连接到 Teams 服务器' : 'Not Connected to Teams Server'}
-          </h2>
-          <p style={{ fontSize: '14px', color: 'var(--text-secondary)', maxWidth: '400px' }}>
-            {language === 'zh' ? '需求功能暂时不可用，请稍后再试' : 'Requirements feature is temporarily unavailable, please try again later'}
-          </p>
-        </div>
-      )}
-
       {/* Header */}
       <div style={{ marginBottom: '24px' }}>
         <h1 style={{ fontSize: '28px', fontWeight: '700', color: 'var(--text-primary)', marginBottom: '4px' }}>
@@ -358,7 +409,7 @@ export default function Requirements() {
 
           {/* Input */}
           <div style={{ padding: '16px 20px', borderTop: '1px solid var(--border)' }}>
-            <div style={{ display: 'flex', gap: '12px' }}>
+            <div style={{ display: 'flex', gap: '12px', alignItems: 'center' }}>
               <input
                 type="text"
                 value={inputMessage}
@@ -368,6 +419,14 @@ export default function Requirements() {
                 style={{ flex: 1, padding: '14px 18px', background: 'var(--bg-secondary)', border: '1px solid var(--border)', borderRadius: '14px', fontSize: '14px', color: 'var(--text-primary)', transition: 'all 0.2s' }}
                 className="requirement-input"
               />
+              
+              {/* File Upload Button */}
+              <FileUpload 
+                onUpload={handleFileUpload} 
+                disabled={sending}
+                language={language}
+              />
+              
               <button onClick={handleSend} disabled={sending || !inputMessage.trim()} className="btn-primary" style={{ padding: '14px 20px' }}>
                 {sending ? <Loader2 size={18} style={{ animation: 'spin 1s linear infinite' }} /> : <Send size={18} />}
               </button>

@@ -25,6 +25,7 @@ const db = {
 function initDemoData() {
   // Demo agents
   db.agents = [
+    { id: uuidv4(), name: 'Product Manager Agent', role: 'pm', status: 'online', model_provider: 'openai', model_name: 'gpt-4', enabled: true },
     { id: uuidv4(), name: 'Architect Agent', role: 'architect', status: 'online', model_provider: 'openai', model_name: 'gpt-4', enabled: true },
     { id: uuidv4(), name: 'Code Agent', role: 'coder', status: 'online', model_provider: 'openai', model_name: 'gpt-4', enabled: true },
     { id: uuidv4(), name: 'Review Agent', role: 'reviewer', status: 'idle', model_provider: 'openai', model_name: 'gpt-4', enabled: true },
@@ -198,6 +199,62 @@ app.post('/api/knowledge', (req, res) => {
   }
   db.knowledge.push(item)
   res.json(item)
+})
+
+// ==================== Requirements APIs (Routes to PM Agent) ====================
+
+// Get PM agent
+app.get('/api/pm-agent', (req, res) => {
+  const pmAgent = db.agents.find(a => a.role === 'pm' && a.enabled)
+  if (!pmAgent) {
+    return res.status(404).json({ error: 'Product Manager agent not found or disabled' })
+  }
+  res.json(pmAgent)
+})
+
+// Send requirement to PM agent for processing
+app.post('/api/requirements', (req, res) => {
+  const { content, project_id } = req.body
+  
+  // Find enabled PM agent
+  const pmAgent = db.agents.find(a => a.role === 'pm' && a.enabled)
+  if (!pmAgent) {
+    return res.status(503).json({ 
+      error: 'Product Manager agent not available',
+      message: '产品经理智能体未连接'
+    })
+  }
+  
+  // Create requirement record
+  const requirement = {
+    id: uuidv4(),
+    content,
+    project_id: project_id || null,
+    status: 'pending',
+    assigned_agent_id: pmAgent.id,
+    created_at: new Date().toISOString()
+  }
+  
+  // In a real implementation, this would queue the requirement for the PM agent to process
+  // For now, we just acknowledge receipt
+  res.json({
+    requirement,
+    pm_agent: pmAgent,
+    message: `需求已发送给产品经理智能体: ${pmAgent.name}`
+  })
+})
+
+// Get requirements for a project
+app.get('/api/requirements', (req, res) => {
+  const { project_id } = req.query
+  // In a real implementation, this would fetch from a requirements table
+  // For demo, return empty array
+  res.json([])
+})
+
+// Update requirement status
+app.put('/api/requirements/:id', (req, res) => {
+  res.json({ message: 'Requirement updated' })
 })
 
 // ==================== Dashboard Stats ====================

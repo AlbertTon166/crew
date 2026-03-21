@@ -33,7 +33,7 @@ const config = {
 }
 
 // PostgreSQL Pool
-let pgPool: Pool | null = null
+let pgPool = null
 
 export async function initPostgres() {
   pgPool = new Pool(config.postgres)
@@ -110,6 +110,33 @@ export async function initPostgres() {
     )
   `)
   
+  // Users table
+  await pgPool.query(`
+    CREATE TABLE IF NOT EXISTS users (
+      id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+      username VARCHAR(255) UNIQUE NOT NULL,
+      email VARCHAR(255) UNIQUE,
+      password_hash VARCHAR(255) NOT NULL,
+      role VARCHAR(50) DEFAULT 'user',
+      created_at TIMESTAMP DEFAULT NOW(),
+      updated_at TIMESTAMP DEFAULT NOW()
+    )
+  `)
+  
+  // Project requirements table
+  await pgPool.query(`
+    CREATE TABLE IF NOT EXISTS project_requirements (
+      id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+      project_id UUID REFERENCES projects(id) ON DELETE CASCADE,
+      title VARCHAR(500),
+      content TEXT,
+      file_name VARCHAR(255),
+      file_size INT,
+      file_type VARCHAR(100),
+      created_at TIMESTAMP DEFAULT NOW()
+    )
+  `)
+  
   console.log('✅ PostgreSQL initialized')
   return pgPool
 }
@@ -120,7 +147,7 @@ export function getPgPool() {
 }
 
 // Redis Client
-let redisClient: ReturnType<typeof createClient> | null = null
+let redisClient = null
 
 export async function initRedis() {
   redisClient = createClient({
@@ -144,29 +171,29 @@ export function getRedis() {
 }
 
 // Redis Helper Functions
-export async function cacheSet(key: string, value: any, ttlSeconds = 3600) {
+export async function cacheSet(key, value, ttlSeconds = 3600) {
   const redis = getRedis()
   await redis.setEx(key, ttlSeconds, JSON.stringify(value))
 }
 
-export async function cacheGet(key: string): Promise<any | null> {
+export async function cacheGet(key) {
   const redis = getRedis()
   const data = await redis.get(key)
   return data ? JSON.parse(data) : null
 }
 
-export async function cacheDelete(key: string) {
+export async function cacheDelete(key) {
   const redis = getRedis()
   await redis.del(key)
 }
 
 // Redis Pub/Sub for Agent Communication
-export async function publishEvent(channel: string, message: any) {
+export async function publishEvent(channel, message) {
   const redis = getRedis()
   await redis.publish(channel, JSON.stringify(message))
 }
 
-export async function subscribeChannel(channel: string, callback: (message: any) => void) {
+export async function subscribeChannel(channel, callback) {
   const redis = getRedis()
   const subscriber = redis.duplicate()
   await subscriber.connect()
@@ -177,7 +204,7 @@ export async function subscribeChannel(channel: string, callback: (message: any)
 }
 
 // ChromaDB Client
-let chromaClient: ChromaClient | null = null
+let chromaClient = null
 
 export async function initChromaDB() {
   chromaClient = new ChromaClient({
@@ -198,7 +225,7 @@ export function getChroma() {
 }
 
 // Vector Search for Code
-export async function addCodeEmbedding(projectId: string, filePath: string, code: string, language: string) {
+export async function addCodeEmbedding(projectId, filePath, code, language) {
   const chroma = getChroma()
   const collection = await chroma.getCollection({ name: 'code_snippets' })
   
@@ -213,7 +240,7 @@ export async function addCodeEmbedding(projectId: string, filePath: string, code
   return id
 }
 
-export async function searchCode(projectId: string, query: string, topK = 5) {
+export async function searchCode(projectId, query, topK = 5) {
   const chroma = getChroma()
   const collection = await chroma.getCollection({ name: 'code_snippets' })
   
@@ -227,7 +254,7 @@ export async function searchCode(projectId: string, query: string, topK = 5) {
 }
 
 // Knowledge Base RAG
-export async function addKnowledge(title: string, content: string, metadata: any = {}) {
+export async function addKnowledge(title, content, metadata = {}) {
   const chroma = getChroma()
   const collection = await chroma.getCollection({ name: 'knowledge_base' })
   
@@ -242,7 +269,7 @@ export async function addKnowledge(title: string, content: string, metadata: any
   return id
 }
 
-export async function searchKnowledge(query: string, topK = 3) {
+export async function searchKnowledge(query, topK = 3) {
   const chroma = getChroma()
   const collection = await chroma.getCollection({ name: 'knowledge_base' })
   
@@ -255,34 +282,34 @@ export async function searchKnowledge(query: string, topK = 3) {
 }
 
 // Session Management with Redis
-export async function createSession(sessionId: string, data: any, ttlSeconds = 86400) {
+export async function createSession(sessionId, data, ttlSeconds = 86400) {
   await cacheSet(`session:${sessionId}`, data, ttlSeconds)
 }
 
-export async function getSession(sessionId: string): Promise<any | null> {
+export async function getSession(sessionId) {
   return cacheGet(`session:${sessionId}`)
 }
 
-export async function updateSession(sessionId: string, data: Partial<any>) {
+export async function updateSession(sessionId, data) {
   const current = await getSession(sessionId)
   if (current) {
     await createSession(sessionId, { ...current, ...data })
   }
 }
 
-export async function deleteSession(sessionId: string) {
+export async function deleteSession(sessionId) {
   await cacheDelete(`session:${sessionId}`)
 }
 
 // Agent Heartbeat with Redis
-export async function updateAgentHeartbeat(agentId: string, status: string) {
+export async function updateAgentHeartbeat(agentId, status) {
   await cacheSet(`agent:heartbeat:${agentId}`, {
     status,
     lastSeen: new Date().toISOString()
   }, 300) // 5 min TTL
 }
 
-export async function getAgentHeartbeat(agentId: string) {
+export async function getAgentHeartbeat(agentId) {
   return cacheGet(`agent:heartbeat:${agentId}`)
 }
 

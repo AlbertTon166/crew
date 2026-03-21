@@ -37,10 +37,13 @@ export interface Project {
   nameZh?: string
   description: string
   descZh?: string
-  status: 'pending' | 'in_progress' | 'testing' | 'completed' | 'error'
+  status: 'pending' | 'in_progress' | 'testing' | 'completed' | 'error' | 'deleted' | 'evaluating' | 'pending_dev' | 'subtask_pending' | 'needs_review' | 'review_passed' | 'review_failed'
   tasks: Task[]
   createdAt: string
   updatedAt: string
+  dueDate?: string
+  deletedAt?: string
+  version?: string
 }
 
 export interface Task {
@@ -93,6 +96,7 @@ export interface ResourceUsage {
   cpu: number
   memory: number
   disk: number
+  totalTokens?: number
 }
 
 interface DashboardStore {

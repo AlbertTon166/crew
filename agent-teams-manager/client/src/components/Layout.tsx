@@ -2,10 +2,66 @@ import { useState } from 'react'
 import { Outlet } from 'react-router-dom'
 import Sidebar from './Sidebar'
 import LoginModal from './LoginModal'
-import StatusIndicator from './StatusIndicator'
-import { Menu, X, ArrowRight, ArrowLeft, Check, Sparkles, Lock, Globe } from 'lucide-react'
+//import StatusIndicator from './StatusIndicator'
+import { Menu, X, ArrowRight, ArrowLeft, Check, Sparkles, Lock, Globe, WifiOff } from 'lucide-react'
 import { useAuth } from '../context/AuthContext'
 import { useLanguage } from '../context/LanguageContext'
+import { useDeployMode } from '../context/DeployModeContext'
+
+// Not Connected Overlay - only covers main content area, not sidebar or top-right buttons
+function NotConnectedOverlay() {
+  const { language } = useLanguage()
+  const { isConnected } = useDeployMode()
+
+  if (isConnected) return null
+
+  return (
+    <div style={{
+      position: 'absolute',
+      top: 0,
+      left: 0,
+      right: 0,
+      bottom: 0,
+      background: 'rgba(0, 0, 0, 0.75)',
+      backdropFilter: 'blur(12px)',
+      display: 'flex',
+      flexDirection: 'column',
+      alignItems: 'center',
+      justifyContent: 'center',
+      zIndex: 100,
+      borderRadius: '0'
+    }}>
+      <div style={{
+        width: '80px',
+        height: '80px',
+        borderRadius: '50%',
+        background: 'rgba(248, 113, 113, 0.1)',
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        marginBottom: '24px'
+      }}>
+        <WifiOff size={40} style={{ color: '#F87171' }} />
+      </div>
+      <h2 style={{
+        fontSize: '20px',
+        fontWeight: '600',
+        color: 'var(--text-primary)',
+        marginBottom: '8px'
+      }}>
+        {language === 'zh' ? '未连接到 Teams 服务器' : 'Not Connected to Teams Server'}
+      </h2>
+      <p style={{
+        fontSize: '14px',
+        color: 'var(--text-secondary)',
+        maxWidth: '400px',
+        textAlign: 'center'
+      }}>
+        {language === 'zh' ? '仪表盘功能暂时不可用，请稍后再试' : 'Dashboard is temporarily unavailable, please try again later'}
+      </p>
+    </div>
+  )
+}
 
 export default function Layout() {
   const { user, isAuthenticated } = useAuth()
@@ -176,7 +232,7 @@ export default function Layout() {
 
       {/* Deploy Status Indicator */}
       <div style={{ position: 'fixed', top: '20px', right: '140px', zIndex: 997 }}>
-        <StatusIndicator />
+        // <StatusIndicator />
       </div>
 
       {/* Login/User Button */}
@@ -410,6 +466,9 @@ export default function Layout() {
             zIndex: 0
           }}
         />
+
+        {/* Not Connected Overlay - covers only main content area */}
+        <NotConnectedOverlay />
         
         <div style={{ position: 'relative', zIndex: 1 }}>
           <Outlet />

@@ -42,7 +42,7 @@ const statusConfigZh = {
 
 export default function Requirements() {
   const { language } = useLanguage()
-  const { setProjects } = useDashboardStore()
+  const { projects } = useDashboardStore()
   const { isConnected } = useDeployMode()
   const [selectedProject, setSelectedProject] = useState<Project | null>(null)
   const [messages, setMessages] = useState<Requirement[]>([])
@@ -54,54 +54,21 @@ export default function Requirements() {
   const [evaluationResult, setEvaluationResult] = useState<string | null>(null)
   const messagesEndRef = useRef<HTMLDivElement>(null)
 
-  const mockProjects: Project[] = [
-    { id: '1', name: 'E-commerce Platform', nameZh: '电商平台', description: 'Full-stack e-commerce', descZh: '全栈电商平台', status: 'in_progress', createdAt: '2026-03-10T08:00:00Z', updatedAt: '2026-03-18T10:00:00Z' },
-    { id: '2', name: 'Mobile App', nameZh: '移动端App', description: 'React Native development', descZh: 'React Native 开发', status: 'pending', createdAt: '2026-03-15T08:00:00Z', updatedAt: '2026-03-15T08:00:00Z' },
-  ]
-
-  const mockMessages: Record<string, Requirement[]> = {
-    '1': [
-      { id: 'm1', projectId: '1', content: 'I want a user registration and login feature with phone and email support', contentZh: '我想要一个用户注册登录功能，支持手机号和邮箱', status: 'confirmed', source: 'user', createdAt: '2026-03-10T08:00:00Z', updatedAt: '2026-03-10T08:00:00Z' },
-      { id: 'm2', projectId: '1', content: 'Got it! Your requirement has been confirmed. I will create tasks: User registration API, SMS/Email verification, Login authentication, Token management', contentZh: '收到！您的需求已确认。我会创建以下任务：用户注册API、短信/邮箱验证码、登录验证、Token管理', status: 'pending', source: 'pm', createdAt: '2026-03-10T08:05:00Z', updatedAt: '2026-03-10T08:05:00Z' },
-    ],
-    '2': [
-      { id: 'm3', projectId: '2', content: 'Need to develop a chat feature', contentZh: '需要开发一个聊天功能', status: 'clarifying', source: 'user', createdAt: '2026-03-15T09:00:00Z', updatedAt: '2026-03-15T09:00:00Z' },
-      { id: 'm4', projectId: '2', content: 'Got it! For the chat feature, I need to clarify: 1. Single chat or group chat? 2. Need to support images/files? 3. Message encryption required?', contentZh: '好的，关于聊天功能，我需要确认：1. 是单聊还是群聊？2. 需要支持图片/文件吗？3. 消息需要加密吗？', status: 'pending', source: 'pm', createdAt: '2026-03-15T09:05:00Z', updatedAt: '2026-03-15T09:05:00Z' },
-    ],
-  }
-
-  // Mock project documentation
-  const projectDocs: Record<string, { title: string; titleZh: string; content: string; contentZh: string }> = {
-    '1': {
-      title: 'E-commerce Platform - Project Specification',
-      titleZh: '电商平台 - 项目规格说明书',
-      content: `# Project Overview\n\nA full-stack e-commerce platform with user authentication, product management, and payment processing.\n\n## Core Features\n\n1. **User Authentication**\n   - Phone and email registration\n   - Social login (Google, Facebook)\n   - Two-factor authentication\n\n2. **Product Management**\n   - Product catalog with categories\n   - Search and filtering\n   - Inventory tracking\n\n3. **Shopping Cart**\n   - Persistent cart\n   - Wishlist functionality\n   - Price calculation\n\n4. **Payment Processing**\n   - Stripe integration\n   - Multiple payment methods\n   - Invoice generation\n\n## Technical Stack\n\n- Frontend: React 18, TypeScript, TailwindCSS\n- Backend: Node.js, Express, PostgreSQL\n- Cache: Redis\n- Search: Elasticsearch`,
-      contentZh: `# 项目概述\n\n一个全栈电商平台，包含用户认证、商品管理和支付处理。\n\n## 核心功能\n\n1. **用户认证**\n   - 手机号和邮箱注册\n   - 社交登录（Google、Facebook）\n   - 双因素认证\n\n2. **商品管理**\n   - 商品目录和分类\n   - 搜索和筛选\n   - 库存跟踪\n\n3. **购物车**\n   - 持久化购物车\n   - 愿望清单功能\n   - 价格计算\n\n4. **支付处理**\n   - Stripe集成\n   - 多种支付方式\n   - 发票生成\n\n## 技术栈\n\n- 前端：React 18、TypeScript、TailwindCSS\n- 后端：Node.js、Express、PostgreSQL\n- 缓存：Redis\n- 搜索：Elasticsearch`
-    },
-    '2': {
-      title: 'Mobile App - Project Specification',
-      titleZh: '移动端App - 项目规格说明书',
-      content: `# Mobile App Specification\n\nA React Native mobile application for...`,
-      contentZh: `# 移动端App规格说明书\n\n一个React Native移动应用...`
-    }
-  }
+  // Project documentation
+  const projectDocs: Record<string, { title: string; titleZh: string; content: string; contentZh: string }> = {}
 
   useEffect(() => {
-    setProjects(mockProjects as any)
-    setSelectedProject(mockProjects[0])
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []) // Empty deps - only run once on mount
+    // Auto-select first project if available
+    if (projects.length > 0 && !selectedProject) {
+      setSelectedProject(projects[0] as Project)
+    }
+  }, [projects, selectedProject])
 
   useEffect(() => {
     if (selectedProject) {
-      const projectMessages = mockMessages[selectedProject.id] || []
-      setMessages(projectMessages)
-      const s = { pending: 0, clarifying: 0, confirmed: 0, rejected: 0, total: 0 }
-      projectMessages.filter(m => m.source === 'user').forEach(m => {
-        s[m.status as keyof typeof s]++
-        s.total++
-      })
-      setStats(s)
+      // Reset messages when project changes
+      setMessages([])
+      setStats({ pending: 0, clarifying: 0, confirmed: 0, rejected: 0, total: 0 })
     }
   }, [selectedProject])
 
@@ -140,15 +107,6 @@ export default function Requirements() {
     const confirmedCount = messages.filter(m => m.source === 'user' && m.status === 'confirmed').length
     if (confirmedCount > 0) {
       setEvaluationResult('pass')
-      // Auto move project to pending_dev
-      if (selectedProject.status === 'evaluating') {
-        const updated = mockProjects.map(p => 
-          p.id === selectedProject.id ? { ...p, status: 'pending_dev' } : p
-        )
-        setProjects(updated as any)
-        // Update selected project
-        setSelectedProject({ ...selectedProject, status: 'pending_dev' })
-      }
     } else {
       setEvaluationResult('fail')
     }
@@ -173,37 +131,6 @@ export default function Requirements() {
         backgroundSize: '40px 40px'
       }}
     >
-      {/* Not Connected State */}
-      {!isConnected && (
-        <div style={{ 
-          display: 'flex', 
-          flexDirection: 'column', 
-          alignItems: 'center', 
-          justifyContent: 'center', 
-          padding: '80px 20px',
-          textAlign: 'center'
-        }}>
-          <div style={{ 
-            width: '80px', 
-            height: '80px', 
-            borderRadius: '50%', 
-            background: 'rgba(248, 113, 113, 0.1)', 
-            display: 'flex', 
-            alignItems: 'center', 
-            justifyContent: 'center',
-            marginBottom: '24px'
-          }}>
-            <WifiOff size={40} style={{ color: '#F87171' }} />
-          </div>
-          <h2 style={{ fontSize: '20px', fontWeight: '600', color: 'var(--text-primary)', marginBottom: '8px' }}>
-            {language === 'zh' ? '未连接到 Teams 服务器' : 'Not Connected to Teams Server'}
-          </h2>
-          <p style={{ fontSize: '14px', color: 'var(--text-secondary)', maxWidth: '400px' }}>
-            {language === 'zh' ? '需求功能暂时不可用，请稍后再试' : 'Requirements feature is temporarily unavailable, please try again later'}
-          </p>
-        </div>
-      )}
-
       {/* Header */}
       <div style={{ marginBottom: '24px' }}>
         <h1 style={{ fontSize: '28px', fontWeight: '700', color: 'var(--text-primary)', marginBottom: '4px' }}>
@@ -228,49 +155,61 @@ export default function Requirements() {
             ))}
           </div>
 
-          {/* Project List */}
+          {/* Project List - Empty State */}
           <div style={{ flex: 1, overflow: 'auto' }}>
             <div style={{ fontSize: '11px', fontWeight: '600', color: 'var(--text-tertiary)', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: '10px', padding: '0 8px' }}>
               {language === 'zh' ? '项目列表' : 'Projects'}
             </div>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
-              {mockProjects.map(project => (
-                <button
-                  key={project.id}
-                  onClick={() => { setSelectedProject(project); setShowDoc(false); setEvaluationResult(null) }}
-                  style={{ width: '100%', textAlign: 'left', padding: '14px', borderRadius: '12px', background: selectedProject?.id === project.id ? 'linear-gradient(135deg, rgba(99, 102, 241, 0.2), rgba(139, 92, 246, 0.15))' : 'transparent', border: selectedProject?.id === project.id ? '1px solid rgba(99, 102, 241, 0.3)' : '1px solid transparent', cursor: 'pointer', transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)' }}
-                  className="project-btn"
-                >
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-                    <div style={{ width: '36px', height: '36px', borderRadius: '10px', display: 'flex', alignItems: 'center', justifyContent: 'center', background: selectedProject?.id === project.id ? 'rgba(99, 102, 241, 0.3)' : 'var(--bg-tertiary)' }}>
-                      <FolderKanban size={16} style={{ color: selectedProject?.id === project.id ? '#818CF8' : '#64748B' }} />
+            {projects.length === 0 ? (
+              <div style={{ textAlign: 'center', padding: '32px 16px' }}>
+                <FolderKanban size={40} style={{ color: 'var(--text-tertiary)', margin: '0 auto 12px' }} />
+                <p style={{ fontSize: '14px', color: 'var(--text-secondary)', marginBottom: '4px' }}>
+                  {language === 'zh' ? '暂无项目' : 'No projects yet'}
+                </p>
+                <p style={{ fontSize: '12px', color: 'var(--text-tertiary)' }}>
+                  {language === 'zh' ? '创建项目后添加需求' : 'Create a project to add requirements'}
+                </p>
+              </div>
+            ) : (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                {projects.map(project => (
+                  <button
+                    key={project.id}
+                    onClick={() => { setSelectedProject(project as Project); setShowDoc(false); setEvaluationResult(null) }}
+                    style={{ width: '100%', textAlign: 'left', padding: '14px', borderRadius: '12px', background: selectedProject?.id === project.id ? 'linear-gradient(135deg, rgba(99, 102, 241, 0.2), rgba(139, 92, 246, 0.15))' : 'transparent', border: selectedProject?.id === project.id ? '1px solid rgba(99, 102, 241, 0.3)' : '1px solid transparent', cursor: 'pointer', transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)' }}
+                    className="project-btn"
+                  >
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                      <div style={{ width: '36px', height: '36px', borderRadius: '10px', display: 'flex', alignItems: 'center', justifyContent: 'center', background: selectedProject?.id === project.id ? 'rgba(99, 102, 241, 0.3)' : 'var(--bg-tertiary)' }}>
+                        <FolderKanban size={16} style={{ color: selectedProject?.id === project.id ? '#818CF8' : '#64748B' }} />
+                      </div>
+                      <div style={{ flex: 1, minWidth: 0 }}>
+                        <div style={{ fontWeight: '600', fontSize: '14px', color: 'var(--text-primary)' }}>{getProjectName(project as Project)}</div>
+                        <div style={{ fontSize: '12px', color: 'var(--text-tertiary)', marginTop: '2px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{getProjectDesc(project as Project)}</div>
+                      </div>
                     </div>
-                    <div style={{ flex: 1, minWidth: 0 }}>
-                      <div style={{ fontWeight: '600', fontSize: '14px', color: 'var(--text-primary)' }}>{getProjectName(project)}</div>
-                      <div style={{ fontSize: '12px', color: 'var(--text-tertiary)', marginTop: '2px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{getProjectDesc(project)}</div>
+                    {/* Action Icons */}
+                    <div style={{ display: 'flex', gap: '6px', marginTop: '10px', paddingTop: '10px', borderTop: '1px solid var(--border)' }}>
+                      <button 
+                        onClick={(e) => { e.stopPropagation(); setShowDoc(!showDoc); setEvaluationResult(null) }}
+                        style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '4px', padding: '6px', borderRadius: '6px', background: showDoc ? 'rgba(99, 102, 241, 0.2)' : 'var(--bg-tertiary)', border: 'none', cursor: 'pointer', fontSize: '10px', color: showDoc ? '#818CF8' : 'var(--text-tertiary)' }}
+                        title={language === 'zh' ? '查看文档' : 'View Doc'}
+                      >
+                        <FileText size={12} />
+                      </button>
+                      <button 
+                        onClick={(e) => { e.stopPropagation(); handleEvaluate() }}
+                        disabled={evaluating}
+                        style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '4px', padding: '6px', borderRadius: '6px', background: evaluationResult === 'pass' ? 'rgba(52, 211, 153, 0.2)' : evaluationResult === 'fail' ? 'rgba(248, 113, 113, 0.2)' : 'var(--bg-tertiary)', border: 'none', cursor: evaluating ? 'wait' : 'pointer', fontSize: '10px', color: evaluationResult === 'pass' ? '#34D399' : evaluationResult === 'fail' ? '#F87171' : 'var(--text-tertiary)' }}
+                        title={language === 'zh' ? '评估项目' : 'Evaluate'}
+                      >
+                        <ClipboardCheck size={12} />
+                      </button>
                     </div>
-                  </div>
-                  {/* Action Icons */}
-                  <div style={{ display: 'flex', gap: '6px', marginTop: '10px', paddingTop: '10px', borderTop: '1px solid var(--border)' }}>
-                    <button 
-                      onClick={(e) => { e.stopPropagation(); setShowDoc(!showDoc); setEvaluationResult(null) }}
-                      style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '4px', padding: '6px', borderRadius: '6px', background: showDoc ? 'rgba(99, 102, 241, 0.2)' : 'var(--bg-tertiary)', border: 'none', cursor: 'pointer', fontSize: '10px', color: showDoc ? '#818CF8' : 'var(--text-tertiary)' }}
-                      title={language === 'zh' ? '查看文档' : 'View Doc'}
-                    >
-                      <FileText size={12} />
-                    </button>
-                    <button 
-                      onClick={(e) => { e.stopPropagation(); handleEvaluate() }}
-                      disabled={evaluating}
-                      style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '4px', padding: '6px', borderRadius: '6px', background: evaluationResult === 'pass' ? 'rgba(52, 211, 153, 0.2)' : evaluationResult === 'fail' ? 'rgba(248, 113, 113, 0.2)' : 'var(--bg-tertiary)', border: 'none', cursor: evaluating ? 'wait' : 'pointer', fontSize: '10px', color: evaluationResult === 'pass' ? '#34D399' : evaluationResult === 'fail' ? '#F87171' : 'var(--text-tertiary)' }}
-                      title={language === 'zh' ? '评估项目' : 'Evaluate'}
-                    >
-                      <ClipboardCheck size={12} />
-                    </button>
-                  </div>
-                </button>
-              ))}
-            </div>
+                  </button>
+                ))}
+              </div>
+            )}
           </div>
         </div>
 
@@ -331,33 +270,52 @@ export default function Requirements() {
             </div>
           )}
 
-          {/* Messages */}
+          {/* Messages - Empty State */}
           <div style={{ flex: 1, overflow: 'auto', padding: '20px', display: 'flex', flexDirection: 'column', gap: '16px' }}>
-            {messages.map(msg => (
-              <div key={msg.id} style={{ display: 'flex', gap: '12px' }}>
-                <div style={{ width: '36px', height: '36px', borderRadius: '12px', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, background: msg.source === 'user' ? 'linear-gradient(135deg, #6366F1, #8B5CF6)' : 'linear-gradient(135deg, #10B981, #14B8A6)', boxShadow: msg.source === 'user' ? '0 4px 12px rgba(99, 102, 241, 0.3)' : '0 4px 12px rgba(16, 185, 129, 0.3)' }}>
-                  <span style={{ color: 'white', fontSize: '12px', fontWeight: '700' }}>{msg.source === 'user' ? 'U' : 'AI'}</span>
-                </div>
-                <div style={{ flex: 1, maxWidth: '80%' }}>
-                  <div style={{ padding: '14px 18px', borderRadius: '16px', borderTopLeftRadius: '4px', background: msg.source === 'user' ? 'linear-gradient(135deg, #6366F1, #8B5CF6)' : 'var(--bg-tertiary)', color: '#F8FAFC', fontSize: '14px', lineHeight: '1.6' }}>
-                    {language === 'zh' && msg.contentZh ? msg.contentZh : msg.content}
-                  </div>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginTop: '8px', paddingLeft: '4px' }}>
-                    <span style={{ fontSize: '11px', color: 'var(--text-tertiary)' }}>{new Date(msg.createdAt).toLocaleString(language === 'zh' ? 'zh-CN' : 'en-US')}</span>
-                    {msg.source === 'user' && (
-                      <span style={{ fontSize: '11px', fontWeight: '600', padding: '4px 10px', borderRadius: '100px', background: getStatusConfig(msg.status).bg, color: getStatusConfig(msg.status).color }}>
-                        {getStatusConfig(msg.status).label}
-                      </span>
-                    )}
-                  </div>
-                </div>
+            {messages.length === 0 ? (
+              <div style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', textAlign: 'center' }}>
+                <FileText size={48} style={{ color: 'var(--text-tertiary)', marginBottom: '16px' }} />
+                <p style={{ fontSize: '16px', color: 'var(--text-secondary)', marginBottom: '8px' }}>
+                  {language === 'zh' ? '暂无需求' : 'No requirements yet'}
+                </p>
+                <p style={{ fontSize: '14px', color: 'var(--text-tertiary)' }}>
+                  {language === 'zh' ? '在下方输入您的第一个需求' : 'Enter your first requirement below'}
+                </p>
               </div>
-            ))}
+            ) : (
+              <>
+                {messages.map(msg => (
+                  <div key={msg.id} style={{ display: 'flex', gap: '12px' }}>
+                    <div style={{ width: '36px', height: '36px', borderRadius: '12px', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, background: msg.source === 'user' ? 'linear-gradient(135deg, #6366F1, #8B5CF6)' : 'linear-gradient(135deg, #10B981, #14B8A6)', boxShadow: msg.source === 'user' ? '0 4px 12px rgba(99, 102, 241, 0.3)' : '0 4px 12px rgba(16, 185, 129, 0.3)' }}>
+                      <span style={{ color: 'white', fontSize: '12px', fontWeight: '700' }}>{msg.source === 'user' ? 'U' : 'AI'}</span>
+                    </div>
+                    <div style={{ flex: 1, maxWidth: '80%' }}>
+                      <div style={{ padding: '14px 18px', borderRadius: '16px', borderTopLeftRadius: '4px', background: msg.source === 'user' ? 'linear-gradient(135deg, #6366F1, #8B5CF6)' : 'var(--bg-tertiary)', color: '#F8FAFC', fontSize: '14px', lineHeight: '1.6' }}>
+                        {language === 'zh' && msg.contentZh ? msg.contentZh : msg.content}
+                      </div>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginTop: '8px', paddingLeft: '4px' }}>
+                        <span style={{ fontSize: '11px', color: 'var(--text-tertiary)' }}>{new Date(msg.createdAt).toLocaleString(language === 'zh' ? 'zh-CN' : 'en-US')}</span>
+                        {msg.source === 'user' && (
+                          <span style={{ fontSize: '11px', fontWeight: '600', padding: '4px 10px', borderRadius: '100px', background: getStatusConfig(msg.status).bg, color: getStatusConfig(msg.status).color }}>
+                            {getStatusConfig(msg.status).label}
+                          </span>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </>
+            )}
             <div ref={messagesEndRef} />
           </div>
 
           {/* Input */}
           <div style={{ padding: '16px 20px', borderTop: '1px solid var(--border)' }}>
+            {!isConnected && (
+              <div style={{ fontSize: '13px', color: '#F87171', marginBottom: '10px', textAlign: 'center', fontWeight: '500' }}>
+                {language === 'zh' ? '⚠️ 产品经理智能体未连接' : '⚠️ Product Manager Agent Not Connected'}
+              </div>
+            )}
             <div style={{ display: 'flex', gap: '12px' }}>
               <input
                 type="text"
@@ -365,10 +323,11 @@ export default function Requirements() {
                 onChange={(e) => setInputMessage(e.target.value)}
                 onKeyDown={(e) => e.key === 'Enter' && handleSend()}
                 placeholder={language === 'zh' ? '输入您的需求...' : 'Type your requirement...'}
-                style={{ flex: 1, padding: '14px 18px', background: 'var(--bg-secondary)', border: '1px solid var(--border)', borderRadius: '14px', fontSize: '14px', color: 'var(--text-primary)', transition: 'all 0.2s' }}
+                disabled={!isConnected}
+                style={{ flex: 1, padding: '14px 18px', background: 'var(--bg-secondary)', border: '1px solid var(--border)', borderRadius: '14px', fontSize: '14px', color: 'var(--text-primary)', transition: 'all 0.2s', opacity: isConnected ? 1 : 0.5, cursor: isConnected ? 'text' : 'not-allowed' }}
                 className="requirement-input"
               />
-              <button onClick={handleSend} disabled={sending || !inputMessage.trim()} className="btn-primary" style={{ padding: '14px 20px' }}>
+              <button onClick={handleSend} disabled={sending || !inputMessage.trim() || !isConnected} className="btn-primary" style={{ padding: '14px 20px', opacity: isConnected ? 1 : 0.5 }}>
                 {sending ? <Loader2 size={18} style={{ animation: 'spin 1s linear infinite' }} /> : <Send size={18} />}
               </button>
             </div>

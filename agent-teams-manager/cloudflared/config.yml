@@ -1,41 +1,7 @@
-# Cloudflare Tunnel Configuration
-# 
-# 使用方式:
-#   1. 本地安装 cloudflared: https://developers.cloudflare.com/cloudflare-one/connections/connect-networks/downloads/
-#   2. 获取 Cloudflare API Token: https://dash.cloudflare.com/profile/api-tokens
-#   3. 创建 Tunnel: cloudflared tunnel create <name>
-#   4. 填写下方配置
-#   5. 运行: cloudflared tunnel run
+tunnel: 759c8a01-39dd-4e9c-aa00-04c1252d08f9
+credentials-file: /root/.cloudflared/759c8a01-39dd-4e9c-aa00-04c1252d08f9.json
 
-# Tunnel 名称
-tunnel: agent-teams-tunnel
-
-# Tunnel 凭证文件路径 (创建后生成)
-credentials-file: /root/.cloudflared/credentials.json
-
-# Cloudflare 域名 (可选，留空则使用随机域名)
-# domain: team.yourdomain.com
-
-# 入口点
 ingress:
-
-  # 本地 Backend API
-  - hostname: api.yourdomain.com
-    service: http://localhost:3001
-    originRequest:
-      noTLSVerify: false
-
-  # 本地 ChromaDB RAG
-  - hostname: rag.yourdomain.com
-    service: http://localhost:8000
-    originRequest:
-      noTLSVerify: false
-
-  # 本地 Frontend (可选)
-  - hostname: team.yourdomain.com
-    service: http://localhost:5173
-    originRequest:
-      noTLSVerify: false
-
-  # 默认 Catch-all
+  - hostname: agent-teams.aiteamsvr.work
+    service: http://frontend:80
   - service: http_status:404

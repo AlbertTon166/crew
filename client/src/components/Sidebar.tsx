@@ -198,7 +198,7 @@ export default function Sidebar({ isOpen = false, onClose, openSettingsTab }: Si
         }} />
         
         <div className="flex items-center justify-between" style={{ position: 'relative', zIndex: 1 }}>
-          <div className="flex items-center gap-4">
+          <div className="flex items-center gap-10" style={{ marginLeft: '20px' }}>
             <div 
               style={{ 
                 width: '48px', 
@@ -221,27 +221,29 @@ export default function Sidebar({ isOpen = false, onClose, openSettingsTab }: Si
                 pointerEvents: 'none'
               }} />
               <span style={{ 
-                color: 'white', 
-                fontSize: '22px', 
-                fontWeight: '800', 
-                fontFamily: 'Cabinet Grotesk',
+                fontSize: '26px',
                 position: 'relative'
-              }}>A</span>
+              }}>🦞</span>
             </div>
             <div>
               <h1 style={{ 
-                fontSize: '18px', 
+                fontSize: '22px', 
                 fontWeight: '700', 
-                color: 'var(--text-primary)', 
                 fontFamily: 'Cabinet Grotesk', 
                 letterSpacing: '-0.02em',
-                margin: 0
+                margin: 0,
+                background: 'linear-gradient(90deg, #FF10F0, #00FFFF, #A855F7, #39FF14)',
+                backgroundSize: '300% 100%',
+                WebkitBackgroundClip: 'text',
+                WebkitTextFillColor: 'transparent',
+                backgroundClip: 'text',
+                animation: 'neonRainbow 3s ease infinite'
               }}>AI.PM</h1>
               <p style={{ 
-                fontSize: '12px', 
+                fontSize: '13px', 
                 color: 'var(--text-tertiary)',
-                margin: '2px 0 0 0'
-              }}>AI Project Manager</p>
+                margin: '4px 0 0 0'
+              }}>AI Project Manager of Tangzexian</p>
             </div>
           </div>
           <button 
@@ -544,6 +546,11 @@ export default function Sidebar({ isOpen = false, onClose, openSettingsTab }: Si
 
       {/* Nav item hover styles */}
       <style>{`
+        @keyframes neonRainbow {
+          0%, 100% { background-position: 0% 50%; }
+          50% { background-position: 100% 50%; }
+        }
+        
         .nav-item:hover .nav-icon {
           transform: scale(1.05);
         }

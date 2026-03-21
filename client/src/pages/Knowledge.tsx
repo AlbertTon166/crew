@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import { Search, Shield, BookOpen, X, CheckCircle, Users, Zap, GripVertical, Bot, Plus, WifiOff } from 'lucide-react'
+import { Search, Shield, BookOpen, X, CheckCircle, Users, Zap, GripVertical, Bot, Plus, WifiOff, Wrench } from 'lucide-react'
 import { useLanguage } from '../context/LanguageContext'
 import { useDeployMode } from '../context/DeployModeContext'
 
@@ -12,6 +12,7 @@ interface JobTemplate {
   role: { title: string; titleZh: string; content: string; contentZh: string }
   skills: { title: string; titleZh: string; content: string; contentZh: string }
   knowledge: { title: string; titleZh: string; content: string; contentZh: string }
+  tools?: { title: string; titleZh: string; content: string; contentZh: string; links?: string[] }
 }
 
 const jobTemplates: JobTemplate[] = [
@@ -38,6 +39,17 @@ const jobTemplates: JobTemplate[] = [
       titleZh: '前端开发规范',
       content: 'File Structure, Naming Conventions, Git Workflow...',
       contentZh: '文件结构、命名规范、Git工作流...'
+    },
+    tools: {
+      title: 'Frontend Tools',
+      titleZh: '前端工具',
+      content: '开发工具链和资源链接',
+      contentZh: '开发工具链和资源链接',
+      links: [
+        'https://react.dev',
+        'https://typescriptlang.org',
+        'https://tailwindcss.com'
+      ]
     }
   },
   {
@@ -63,6 +75,17 @@ const jobTemplates: JobTemplate[] = [
       titleZh: '后端开发规范',
       content: 'REST Conventions, Response Format, Error Handling...',
       contentZh: 'REST约定、响应格式、错误处理...'
+    },
+    tools: {
+      title: 'Backend Tools',
+      titleZh: '后端工具',
+      content: '后端开发工具链和资源链接',
+      contentZh: '后端开发工具链和资源链接',
+      links: [
+        'https://nodejs.org',
+        'https://expressjs.com',
+        'https://postman.com'
+      ]
     }
   },
   {
@@ -88,6 +111,17 @@ const jobTemplates: JobTemplate[] = [
       titleZh: '测试规范',
       content: 'Bug Report Template, Severity Definitions...',
       contentZh: 'Bug报告模板、严重性定义...'
+    },
+    tools: {
+      title: 'QA Tools',
+      titleZh: '测试工具',
+      content: '测试工具和平台链接',
+      contentZh: '测试工具和平台链接',
+      links: [
+        'https://www.selenium.dev',
+        'https://www.cypress.io',
+        'https://playwright.dev'
+      ]
     }
   },
   {
@@ -113,6 +147,17 @@ const jobTemplates: JobTemplate[] = [
       titleZh: '产品管理规范',
       content: 'PRD Template, Sprint Planning...',
       contentZh: 'PRD模板、迭代计划...'
+    },
+    tools: {
+      title: 'PM Tools',
+      titleZh: '产品工具',
+      content: '产品管理工具和平台链接',
+      contentZh: '产品管理工具和平台链接',
+      links: [
+        'https://figma.com',
+        'https://miro.com',
+        'https://notion.so'
+      ]
     }
   },
   {
@@ -138,6 +183,17 @@ const jobTemplates: JobTemplate[] = [
       titleZh: '运维规范',
       content: 'CI/CD Pipeline, Infrastructure as Code...',
       contentZh: 'CI/CD流水线、基础设施即代码...'
+    },
+    tools: {
+      title: 'DevOps Tools',
+      titleZh: '运维工具',
+      content: '运维工具和平台链接',
+      contentZh: '运维工具和平台链接',
+      links: [
+        'https://docker.com',
+        'https://kubernetes.io',
+        'https://jenkins.io'
+      ]
     }
   }
 ]
@@ -162,6 +218,13 @@ export default function Knowledge() {
   const [draggedJob, setDraggedJob] = useState<JobTemplate | null>(null)
   const [isDragOver, setIsDragOver] = useState(false)
   const [showCreateModal, setShowCreateModal] = useState(false)
+  const [editingSkills, setEditingSkills] = useState(false)
+  const [editingKnowledge, setEditingKnowledge] = useState(false)
+  const [editingTools, setEditingTools] = useState(false)
+  const [tempSkillsContent, setTempSkillsContent] = useState('')
+  const [tempKnowledgeContent, setTempKnowledgeContent] = useState('')
+  const [tempToolsContent, setTempToolsContent] = useState('')
+  const [editedJobs, setEditedJobs] = useState<Record<string, { skills?: string; knowledge?: string; tools?: string[] }>>({})
   const [newJobForm, setNewJobForm] = useState({
     title: '',
     titleZh: '',
@@ -172,10 +235,22 @@ export default function Knowledge() {
     knowledge: { title: '', titleZh: '', content: '', contentZh: '' }
   })
 
-  // Simulate some jobs already assigned to agents
+  // Persist addedJobs to localStorage and manage defaults based on connection status
   useEffect(() => {
-    setAddedJobs(['frontend-dev'])
-  }, [])
+    const saved = localStorage.getItem('knowledge_addedJobs')
+    if (saved) {
+      setAddedJobs(JSON.parse(saved))
+    } else if (isConnected) {
+      // Only set defaults when connected to Teams backend and no saved state
+      setAddedJobs(['frontend-dev', 'backend-dev', 'qa-engineer', 'product-manager'])
+    }
+    // When NOT connected, keep empty (no pre-assigned agents)
+  }, [isConnected])
+
+  // Save to localStorage whenever addedJobs changes
+  useEffect(() => {
+    localStorage.setItem('knowledge_addedJobs', JSON.stringify(addedJobs))
+  }, [addedJobs])
 
   const filteredJobs = jobs.filter(job => {
     const matchesSearch = 
@@ -194,7 +269,7 @@ export default function Knowledge() {
     return language === 'zh' ? (ind?.label || industry) : (ind?.labelEn || industry)
   }
 
-  const isJobAssignedToAgent = (jobId: string) => jobId === 'frontend-dev'
+  const isJobAssignedToAgent = (_jobId: string) => false // TODO: implement real check with backend
 
   const handleAddJob = (job: JobTemplate) => {
     if (!addedJobs.includes(job.id)) {
@@ -248,37 +323,6 @@ export default function Knowledge() {
         backgroundSize: '40px 40px'
       }}
     >
-      {/* Not Connected State */}
-      {!isConnected && (
-        <div style={{ 
-          display: 'flex', 
-          flexDirection: 'column', 
-          alignItems: 'center', 
-          justifyContent: 'center', 
-          padding: '80px 20px',
-          textAlign: 'center'
-        }}>
-          <div style={{ 
-            width: '80px', 
-            height: '80px', 
-            borderRadius: '50%', 
-            background: 'rgba(248, 113, 113, 0.1)', 
-            display: 'flex', 
-            alignItems: 'center', 
-            justifyContent: 'center',
-            marginBottom: '24px'
-          }}>
-            <WifiOff size={40} style={{ color: '#F87171' }} />
-          </div>
-          <h2 style={{ fontSize: '20px', fontWeight: '600', color: 'var(--text-primary)', marginBottom: '8px' }}>
-            {language === 'zh' ? '未连接到 Teams 服务器' : 'Not Connected to Teams Server'}
-          </h2>
-          <p style={{ fontSize: '14px', color: 'var(--text-secondary)', maxWidth: '400px' }}>
-            {language === 'zh' ? '知识库功能暂时不可用，请稍后再试' : 'Knowledge base is temporarily unavailable, please try again later'}
-          </p>
-        </div>
-      )}
-
       {/* Header */}
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '24px', flexWrap: 'wrap', gap: '12px' }}>
         <div>
@@ -501,46 +545,50 @@ export default function Knowledge() {
                   </span>
                 )}
               </div>
-              <h2 style={{ fontSize: '24px', fontWeight: '700', color: 'var(--text-primary)', margin: 0, fontFamily: 'Cabinet Grotesk' }}>
+              <h2 style={{ fontSize: '28px', fontWeight: '700', color: 'var(--text-primary)', margin: 0, fontFamily: 'Cabinet Grotesk', lineHeight: '1.3' }}>
                 {getJobTitle(selectedJob)}
               </h2>
+              <p style={{ fontSize: '13px', color: '#8B5CF6', margin: '6px 0 0 0', fontWeight: '500' }}>
+                {language === 'zh' ? selectedJob.role.titleZh : selectedJob.role.title}
+              </p>
             </div>
 
             {/* Three Column Config */}
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '16px' }} className="config-grid">
-              {/* Role */}
-              <div style={{ padding: '16px', borderRadius: '14px', background: 'rgba(139, 92, 246, 0.08)', border: '1px solid rgba(139, 92, 246, 0.2)' }}>
+              {/* Skills - Blue */}
+              <div style={{ padding: '16px', borderRadius: '14px', background: 'rgba(59, 130, 246, 0.08)', border: '1px solid rgba(59, 130, 246, 0.2)' }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '14px' }}>
-                  <div style={{ width: '36px', height: '36px', borderRadius: '10px', background: 'linear-gradient(135deg, #8B5CF6, #A78BFA)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                    <Shield size={18} style={{ color: '#FFFFFF' }} />
-                  </div>
-                  <div>
-                    <div style={{ fontSize: '13px', fontWeight: '600', color: 'var(--text-primary)' }}>{language === 'zh' ? '角色' : 'Role'}</div>
-                    <div style={{ fontSize: '11px', color: '#8B5CF6' }}>{language === 'zh' ? selectedJob.role.titleZh : selectedJob.role.title}</div>
-                  </div>
-                </div>
-                <div style={{ padding: '12px', borderRadius: '10px', background: 'var(--bg-primary)', fontSize: '12px', color: 'var(--text-secondary)', lineHeight: '1.6', maxHeight: '180px', overflow: 'auto', whiteSpace: 'pre-wrap' }}>
-                  {language === 'zh' ? selectedJob.role.contentZh : selectedJob.role.content}
-                </div>
-              </div>
-
-              {/* Skills */}
-              <div style={{ padding: '16px', borderRadius: '14px', background: 'rgba(251, 191, 36, 0.08)', border: '1px solid rgba(251, 191, 36, 0.2)' }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '14px' }}>
-                  <div style={{ width: '36px', height: '36px', borderRadius: '10px', background: 'linear-gradient(135deg, #FBBF24, #F59E0B)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                  <div style={{ width: '36px', height: '36px', borderRadius: '10px', background: 'linear-gradient(135deg, #3B82F6, #60A5FA)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                     <Zap size={18} style={{ color: '#FFFFFF' }} />
                   </div>
                   <div>
                     <div style={{ fontSize: '13px', fontWeight: '600', color: 'var(--text-primary)' }}>{language === 'zh' ? '技能' : 'Skills'}</div>
-                    <div style={{ fontSize: '11px', color: '#FBBF24' }}>{language === 'zh' ? selectedJob.skills.titleZh : selectedJob.skills.title}</div>
+                    <div style={{ fontSize: '11px', color: '#3B82F6' }}>{language === 'zh' ? selectedJob.skills.titleZh : selectedJob.skills.title}</div>
                   </div>
                 </div>
-                <div style={{ padding: '12px', borderRadius: '10px', background: 'var(--bg-primary)', fontSize: '12px', color: 'var(--text-secondary)', lineHeight: '1.6', maxHeight: '180px', overflow: 'auto', whiteSpace: 'pre-wrap' }}>
-                  {language === 'zh' ? selectedJob.skills.contentZh : selectedJob.skills.content}
+                <div style={{ padding: '12px', borderRadius: '10px', background: 'var(--bg-primary)', fontSize: '12px', color: 'var(--text-secondary)', lineHeight: '1.6', minHeight: '120px', overflow: 'auto', whiteSpace: 'pre-wrap' }}>
+                  {editingSkills ? (
+                    <textarea
+                      value={tempSkillsContent}
+                      onChange={(e) => setTempSkillsContent(e.target.value)}
+                      style={{ width: '100%', minHeight: '200px', background: 'var(--bg-tertiary)', border: '1px solid var(--primary)', borderRadius: '8px', padding: '10px', fontSize: '12px', color: 'var(--text-primary)', resize: 'vertical', fontFamily: 'inherit' }}
+                    />
+                  ) : (
+                    editedJobs[selectedJob.id]?.skills || (language === 'zh' ? selectedJob.skills.contentZh : selectedJob.skills.content)
+                  )}
                 </div>
+                {editingSkills && (
+                  <div style={{ display: 'flex', gap: '8px', marginTop: '10px' }}>
+                    <button onClick={() => { setEditingSkills(false); setTempSkillsContent('') }} style={{ flex: 1, padding: '8px', background: 'var(--bg-tertiary)', border: '1px solid var(--border)', borderRadius: '8px', fontSize: '12px', cursor: 'pointer' }}>取消</button>
+                    <button onClick={() => { setEditingSkills(false); setEditedJobs(prev => ({ ...prev, [selectedJob.id]: { ...prev[selectedJob.id], skills: tempSkillsContent } })); setTempSkillsContent('') }} style={{ flex: 1, padding: '8px', background: 'var(--primary)', border: 'none', borderRadius: '8px', fontSize: '12px', color: '#fff', cursor: 'pointer' }}>保存</button>
+                  </div>
+                )}
+                {!editingSkills && (
+                  <button onClick={() => { setEditingSkills(true); setTempSkillsContent(language === 'zh' ? selectedJob.skills.contentZh : selectedJob.skills.content) }} style={{ marginTop: '10px', padding: '6px 12px', background: 'var(--primary)', border: '1px solid var(--primary)', borderRadius: '8px', fontSize: '11px', color: '#fff', cursor: 'pointer' }}>编辑</button>
+                )}
               </div>
 
-              {/* Knowledge */}
+              {/* Knowledge - Green */}
               <div style={{ padding: '16px', borderRadius: '14px', background: 'rgba(16, 185, 129, 0.08)', border: '1px solid rgba(16, 185, 129, 0.2)' }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '14px' }}>
                   <div style={{ width: '36px', height: '36px', borderRadius: '10px', background: 'linear-gradient(135deg, #10B981, #14B8A6)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
@@ -551,23 +599,81 @@ export default function Knowledge() {
                     <div style={{ fontSize: '11px', color: '#10B981' }}>{language === 'zh' ? selectedJob.knowledge.titleZh : selectedJob.knowledge.title}</div>
                   </div>
                 </div>
-                <div style={{ padding: '12px', borderRadius: '10px', background: 'var(--bg-primary)', fontSize: '12px', color: 'var(--text-secondary)', lineHeight: '1.6', maxHeight: '180px', overflow: 'auto', whiteSpace: 'pre-wrap' }}>
-                  {language === 'zh' ? selectedJob.knowledge.contentZh : selectedJob.knowledge.content}
+                <div style={{ padding: '12px', borderRadius: '10px', background: 'var(--bg-primary)', fontSize: '12px', color: 'var(--text-secondary)', lineHeight: '1.6', minHeight: '120px', overflow: 'auto', whiteSpace: 'pre-wrap' }}>
+                  {editingKnowledge ? (
+                    <textarea
+                      value={tempKnowledgeContent}
+                      onChange={(e) => setTempKnowledgeContent(e.target.value)}
+                      style={{ width: '100%', minHeight: '200px', background: 'var(--bg-tertiary)', border: '1px solid var(--primary)', borderRadius: '8px', padding: '10px', fontSize: '12px', color: 'var(--text-primary)', resize: 'vertical', fontFamily: 'inherit' }}
+                    />
+                  ) : (
+                    editedJobs[selectedJob.id]?.knowledge || (language === 'zh' ? selectedJob.knowledge.contentZh : selectedJob.knowledge.content)
+                  )}
                 </div>
+                {editingKnowledge && (
+                  <div style={{ display: 'flex', gap: '8px', marginTop: '10px' }}>
+                    <button onClick={() => { setEditingKnowledge(false); setTempKnowledgeContent('') }} style={{ flex: 1, padding: '8px', background: 'var(--bg-tertiary)', border: '1px solid var(--border)', borderRadius: '8px', fontSize: '12px', cursor: 'pointer' }}>取消</button>
+                    <button onClick={() => { setEditingKnowledge(false); setEditedJobs(prev => ({ ...prev, [selectedJob.id]: { ...prev[selectedJob.id], knowledge: tempKnowledgeContent } })); setTempKnowledgeContent('') }} style={{ flex: 1, padding: '8px', background: 'var(--primary)', border: 'none', borderRadius: '8px', fontSize: '12px', color: '#fff', cursor: 'pointer' }}>保存</button>
+                  </div>
+                )}
+                {!editingKnowledge && (
+                  <button onClick={() => { setEditingKnowledge(true); setTempKnowledgeContent(language === 'zh' ? selectedJob.knowledge.contentZh : selectedJob.knowledge.content) }} style={{ marginTop: '10px', padding: '6px 12px', background: 'var(--primary)', border: '1px solid var(--primary)', borderRadius: '8px', fontSize: '11px', color: '#fff', cursor: 'pointer' }}>编辑</button>
+                )}
+              </div>
+
+              {/* Tools - Yellow */}
+              <div style={{ padding: '16px', borderRadius: '14px', background: 'rgba(251, 191, 36, 0.08)', border: '1px solid rgba(251, 191, 36, 0.2)' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '14px' }}>
+                  <div style={{ width: '36px', height: '36px', borderRadius: '10px', background: 'linear-gradient(135deg, #FBBF24, #F59E0B)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                    <Wrench size={18} style={{ color: '#FFFFFF' }} />
+                  </div>
+                  <div>
+                    <div style={{ fontSize: '13px', fontWeight: '600', color: 'var(--text-primary)' }}>{language === 'zh' ? '工具' : 'Tools'}</div>
+                    <div style={{ fontSize: '11px', color: '#FBBF24' }}>{language === 'zh' ? (selectedJob.tools?.titleZh || '工具链接') : (selectedJob.tools?.title || 'Tool Links')}</div>
+                  </div>
+                </div>
+                <div style={{ padding: '12px', borderRadius: '10px', background: 'var(--bg-primary)', fontSize: '12px', color: 'var(--text-secondary)', lineHeight: '1.6', minHeight: '120px', overflow: 'auto' }}>
+                  {editingTools ? (
+                    <textarea
+                      value={tempToolsContent}
+                      onChange={(e) => setTempToolsContent(e.target.value)}
+                      style={{ width: '100%', minHeight: '150px', background: 'var(--bg-tertiary)', border: '1px solid var(--primary)', borderRadius: '8px', padding: '10px', fontSize: '12px', color: 'var(--text-primary)', resize: 'vertical', fontFamily: 'inherit' }}
+                      placeholder={language === 'zh' ? '每行一个链接...' : 'One link per line...'}
+                    />
+                  ) : (
+                    <>
+                      <div style={{ fontSize: '12px', marginBottom: '8px' }}>
+                        {language === 'zh' ? selectedJob.tools?.contentZh : selectedJob.tools?.content}
+                      </div>
+                      {(editedJobs[selectedJob.id]?.tools || selectedJob.tools?.links || []).length > 0 && (
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', marginTop: '8px' }}>
+                          {(editedJobs[selectedJob.id]?.tools || selectedJob.tools?.links || []).map((link, idx) => (
+                            <a key={idx} href={link} target="_blank" rel="noopener noreferrer" style={{ fontSize: '11px', color: '#3B82F6', textDecoration: 'none', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                              → {link.replace('https://', '')}
+                            </a>
+                          ))}
+                        </div>
+                      )}
+                    </>
+                  )}
+                </div>
+                {editingTools && (
+                  <div style={{ display: 'flex', gap: '8px', marginTop: '10px' }}>
+                    <button onClick={() => { setEditingTools(false); setTempToolsContent('') }} style={{ flex: 1, padding: '8px', background: 'var(--bg-tertiary)', border: '1px solid var(--border)', borderRadius: '8px', fontSize: '12px', cursor: 'pointer' }}>取消</button>
+                    <button onClick={() => { setEditingTools(false); setEditedJobs(prev => ({ ...prev, [selectedJob.id]: { ...prev[selectedJob.id], tools: tempToolsContent.split('\n').filter(l => l.trim()) } })); setTempToolsContent('') }} style={{ flex: 1, padding: '8px', background: 'var(--primary)', border: 'none', borderRadius: '8px', fontSize: '12px', color: '#fff', cursor: 'pointer' }}>保存</button>
+                  </div>
+                )}
+                {!editingTools && (
+                  <button onClick={() => { setEditingTools(true); setTempToolsContent(selectedJob.tools?.links?.join('\n') || '') }} style={{ marginTop: '10px', padding: '6px 12px', background: 'var(--primary)', border: '1px solid var(--primary)', borderRadius: '8px', fontSize: '11px', color: '#fff', cursor: 'pointer' }}>编辑</button>
+                )}
               </div>
             </div>
 
             {/* Action Buttons */}
             <div style={{ display: 'flex', gap: '12px', marginTop: '20px' }}>
-              {!isJobAssignedToAgent(selectedJob.id) && (
-                <button
-                  onClick={() => handleRemoveJob(selectedJob.id)}
-                  className="btn-secondary"
-                  style={{ flex: 1 }}
-                >
-                  {language === 'zh' ? '移除此岗位' : 'Remove This Job'}
-                </button>
-              )}
+              <button onClick={() => { setEditingSkills(false); setEditingKnowledge(false); setEditingTools(false); setTempSkillsContent(''); setTempKnowledgeContent(''); setTempToolsContent(''); setEditedJobs(prev => { const next = {...prev}; delete next[selectedJob.id]; return next; }) }} className="btn-secondary" style={{ flex: 1 }}>
+                {language === 'zh' ? '重置' : 'Reset'}
+              </button>
               <button onClick={() => setShowConfig(false)} className="btn-secondary">
                 {language === 'zh' ? '关闭' : 'Close'}
               </button>

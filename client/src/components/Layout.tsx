@@ -2,7 +2,6 @@ import { useState } from 'react'
 import { Outlet } from 'react-router-dom'
 import Sidebar from './Sidebar'
 import LoginModal from './LoginModal'
-import StatusIndicator from './StatusIndicator'
 import { Menu, X, ArrowRight, ArrowLeft, Check, Sparkles, Lock, Globe } from 'lucide-react'
 import { useAuth } from '../context/AuthContext'
 import { useLanguage } from '../context/LanguageContext'
@@ -174,11 +173,6 @@ export default function Layout() {
         <span>引导</span>
       </button>
 
-      {/* Deploy Status Indicator */}
-      <div style={{ position: 'fixed', top: '20px', right: '140px', zIndex: 997 }}>
-        <StatusIndicator />
-      </div>
-
       {/* Login/User Button */}
       {isAuthenticated ? (
         <button
@@ -216,7 +210,7 @@ export default function Layout() {
           onClick={() => setLoginOpen(true)}
           style={{
             position: 'fixed',
-            top: '20px',
+            top: '16px',
             right: '20px',
             zIndex: 997,
             display: 'flex',
