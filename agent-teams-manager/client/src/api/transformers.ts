@@ -35,6 +35,7 @@ export function transformProject(apiProject: any) {
     dueDate: '',
     totalTokens: 0,
     agentCount: 0,
+    recommendedAgents: apiProject.recommended_agents || 1,
   }
 }
 

@@ -7,7 +7,6 @@ import {
 import { useDashboardStore } from '../stores/dashboardStore'
 import { useLanguage } from '../context/LanguageContext'
 import { useDeployMode } from '../context/DeployModeContext'
-import TeamWizard from '../components/TeamWizard'
 import { projectsApi, tasksApi } from '../api'
 import { transformProject, transformTask } from '../api/transformers'
 import { exportProject } from '../utils/projectExport'
@@ -79,13 +78,10 @@ export default function Projects() {
   const [showCreateModal, setShowCreateModal] = useState(false)
   const [newProjectName, setNewProjectName] = useState('')
   const [newProjectDesc, setNewProjectDesc] = useState('')
-  const [showTeamWizard, setShowTeamWizard] = useState(false)
-  const [teamComposition, setTeamComposition] = useState<any[]>([])
   
   // Agent Assignment Modal
   const [showAgentModal, setShowAgentModal] = useState(false)
   const [selectedProjectForAgent, setSelectedProjectForAgent] = useState<any>(null)
-  const [agentCount, setAgentCount] = useState(2)
   const [selectedRoles, setSelectedRoles] = useState<string[]>(['planner', 'frontend', 'backend'])
   const [selectedChannels, setSelectedChannels] = useState<string[]>(['email'])
   const [showApiDoc, setShowApiDoc] = useState(false)
@@ -93,10 +89,10 @@ export default function Projects() {
   const [editingDoc, setEditingDoc] = useState<string | null>(null)
 
   const mockProjects = [
-    { id: '1', name: 'E-commerce Platform', nameZh: '电商平台', description: 'Build a full-stack e-commerce platform', descZh: '构建全栈电商平台', status: 'in_progress', tasks: [], createdAt: '2026-03-10T08:00:00Z', updatedAt: '2026-03-18T10:00:00Z', totalTokens: 450000, agentCount: 3, version: 'V1.0.0' },
-    { id: '2', name: 'Mobile App Redesign', nameZh: '移动端改版', description: 'Redesign the mobile app UI/UX', descZh: '重新设计移动端UI/UX', status: 'completed', tasks: [], createdAt: '2026-03-05T08:00:00Z', updatedAt: '2026-03-15T16:00:00Z', totalTokens: 280000, agentCount: 2, version: 'V1.0.0' },
-    { id: '3', name: 'API Integration', nameZh: 'API集成', description: 'Third-party API integration', descZh: '第三方API集成', status: 'evaluating', tasks: [], createdAt: '2026-03-19T08:00:00Z', updatedAt: '2026-03-19T08:00:00Z', totalTokens: 0, agentCount: 0, version: 'V1.0.0' },
-    { id: '4', name: 'Data Analytics', nameZh: '数据分析', description: 'Analytics dashboard', descZh: '数据看板', status: 'pending_dev', tasks: [], createdAt: '2026-03-19T08:00:00Z', updatedAt: '2026-03-19T08:00:00Z', totalTokens: 0, agentCount: 0, version: 'V1.0.0' },
+    { id: '1', name: 'E-commerce Platform', nameZh: '电商平台', description: 'Build a full-stack e-commerce platform', descZh: '构建全栈电商平台', status: 'in_progress', tasks: [], createdAt: '2026-03-10T08:00:00Z', updatedAt: '2026-03-18T10:00:00Z', totalTokens: 450000, agentCount: 3, recommendedAgents: 3, version: 'V1.0.0' },
+    { id: '2', name: 'Mobile App Redesign', nameZh: '移动端改版', description: 'Redesign the mobile app UI/UX', descZh: '重新设计移动端UI/UX', status: 'completed', tasks: [], createdAt: '2026-03-05T08:00:00Z', updatedAt: '2026-03-15T16:00:00Z', totalTokens: 280000, agentCount: 2, recommendedAgents: 2, version: 'V1.0.0' },
+    { id: '3', name: 'API Integration', nameZh: 'API集成', description: 'Third-party API integration', descZh: '第三方API集成', status: 'evaluating', tasks: [], createdAt: '2026-03-19T08:00:00Z', updatedAt: '2026-03-19T08:00:00Z', totalTokens: 0, agentCount: 0, recommendedAgents: 1, version: 'V1.0.0' },
+    { id: '4', name: 'Data Analytics', nameZh: '数据分析', description: 'Analytics dashboard', descZh: '数据看板', status: 'pending_dev', tasks: [], createdAt: '2026-03-19T08:00:00Z', updatedAt: '2026-03-19T08:00:00Z', totalTokens: 0, agentCount: 0, recommendedAgents: 2, version: 'V1.0.0' },
   ]
 
   // Project Build Documentation (same as Requirements page)
@@ -662,48 +658,6 @@ export default function Projects() {
                 </span>
               </div>
               
-              {/* Team Composition */}
-              <div>
-                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '8px' }}>
-                  <label style={{ fontSize: '13px', fontWeight: '600', color: 'var(--text-secondary)' }}>
-                    {language === 'zh' ? '🤖 团队配置' : '🤖 Team Composition'}
-                  </label>
-                  <button
-                    onClick={() => setShowTeamWizard(true)}
-                    style={{
-                      display: 'flex',
-                      alignItems: 'center',
-                      gap: '4px',
-                      padding: '6px 12px',
-                      background: 'linear-gradient(135deg, var(--primary), var(--accent-violet))',
-                      border: 'none',
-                      borderRadius: '6px',
-                      color: '#fff',
-                      fontSize: '11px',
-                      fontWeight: '600',
-                      cursor: 'pointer',
-                    }}
-                  >
-                    <Sparkles size={12} />
-                    {language === 'zh' ? '智能组建' : 'Smart Build'}
-                  </button>
-                </div>
-                {teamComposition.length > 0 ? (
-                  <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px', padding: '12px', background: 'var(--bg-secondary)', borderRadius: '8px' }}>
-                    {teamComposition.map((member, i) => (
-                      <div key={i} style={{ display: 'flex', alignItems: 'center', gap: '4px', padding: '4px 10px', background: 'var(--bg-tertiary)', borderRadius: '6px', fontSize: '12px' }}>
-                        <span>{member.certified ? '✅' : '⚠️'}</span>
-                        <span style={{ color: 'var(--text-primary)' }}>{member.roleName}</span>
-                      </div>
-                    ))}
-                  </div>
-                ) : (
-                  <div style={{ padding: '12px', textAlign: 'center', background: 'var(--bg-secondary)', borderRadius: '8px', fontSize: '12px', color: 'var(--text-tertiary)' }}>
-                    {language === 'zh' ? '点击"智能组建"快速配置团队角色' : 'Click "Smart Build" to quickly configure team roles'}
-                  </div>
-                )}
-              </div>
-              
               <div style={{ display: 'flex', gap: '12px', paddingTop: '8px' }}>
                 <button onClick={() => setShowCreateModal(false)} className="btn-secondary" style={{ flex: 1 }}>{language === 'zh' ? '取消' : 'Cancel'}</button>
                 <button 
@@ -756,7 +710,7 @@ export default function Projects() {
                 </div>
               </div>
               <div style={{ display: 'flex', gap: '8px' }}>
-                <button onClick={() => { setAgentCount(3); setSelectedRoles(['planner', 'frontend', 'backend']); setSelectedChannels(['email']); }} style={{ padding: '8px', background: 'var(--bg-tertiary)', border: 'none', borderRadius: '10px', cursor: 'pointer' }}>
+                <button onClick={() => { setSelectedRoles(['planner', 'frontend', 'backend']); setSelectedChannels(['email']); }} style={{ padding: '8px', background: 'var(--bg-tertiary)', border: 'none', borderRadius: '10px', cursor: 'pointer' }}>
                   <RotateCw size={18} style={{ color: 'var(--text-secondary)' }} />
                 </button>
                 <button onClick={() => setShowAgentModal(false)} style={{ padding: '8px', background: 'var(--bg-tertiary)', border: 'none', borderRadius: '10px', cursor: 'pointer' }}>
@@ -765,55 +719,41 @@ export default function Projects() {
               </div>
             </div>
 
-            {/* Agent Count Selection */}
-            <div style={{ marginBottom: '24px' }}>
-              <label style={{ display: 'block', fontSize: '13px', fontWeight: '600', color: 'var(--text-secondary)', marginBottom: '12px' }}>
-                {language === 'zh' ? '🎯 推荐智能体个数' : '🎯 Recommended Agent Count'}
-              </label>
-              <div style={{ display: 'flex', gap: '10px' }}>
-                {[2, 3, 4, 5, 6].map(num => (
-                  <button
-                    key={num}
-                    onClick={() => {
-                      setAgentCount(num)
-                      // Auto-select roles based on count
-                      const defaults = [['planner', 'frontend'], ['planner', 'frontend', 'backend'], ['planner', 'frontend', 'backend', 'reviewer'], ['planner', 'frontend', 'backend', 'tester'], ['planner', 'frontend', 'backend', 'reviewer', 'tester']]
-                      setSelectedRoles(defaults[num - 2] || ['planner'])
-                    }}
-                    style={{
-                      flex: 1,
-                      padding: '14px 8px',
-                      borderRadius: '12px',
-                      border: agentCount === num ? '2px solid var(--primary)' : '1px solid var(--border)',
-                      background: agentCount === num ? 'linear-gradient(135deg, rgba(99, 102, 241, 0.15), rgba(139, 92, 246, 0.1))' : 'var(--bg-tertiary)',
-                      color: agentCount === num ? 'var(--primary)' : 'var(--text-secondary)',
-                      fontSize: '16px',
-                      fontWeight: '700',
-                      cursor: 'pointer',
-                      transition: 'all 0.2s'
-                    }}
-                  >
-                    {num}
-                  </button>
-                ))}
-              </div>
-            </div>
-
             {/* Agent Roles Selection */}
             <div style={{ marginBottom: '24px' }}>
-              <label style={{ display: 'block', fontSize: '13px', fontWeight: '600', color: 'var(--text-secondary)', marginBottom: '12px' }}>
-                {language === 'zh' ? '👥 智能体职位' : '👥 Agent Roles'}
-              </label>
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '12px' }}>
+                <label style={{ fontSize: '13px', fontWeight: '600', color: 'var(--text-secondary)' }}>
+                  {language === 'zh' ? '👥 智能体职员' : '👥 Agent Staff'}
+                </label>
+                <div style={{ 
+                  padding: '6px 12px', 
+                  borderRadius: '20px', 
+                  background: selectedRoles.length >= (selectedProjectForAgent.recommendedAgents || 1) 
+                    ? 'rgba(52, 211, 153, 0.15)' 
+                    : 'rgba(248, 113, 113, 0.15)',
+                  border: `1px solid ${selectedRoles.length >= (selectedProjectForAgent.recommendedAgents || 1) ? '#34D399' : '#F87171'}`,
+                }}>
+                  <span style={{ 
+                    fontSize: '12px', 
+                    fontWeight: '700',
+                    color: selectedRoles.length >= (selectedProjectForAgent.recommendedAgents || 1) ? '#34D399' : '#F87171'
+                  }}>
+                    {selectedRoles.length} / {selectedProjectForAgent.recommendedAgents || 1}
+                  </span>
+                </div>
+              </div>
+              
               <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '10px' }}>
-                {agentRoles.map(role => {
+                {agentRoles.map((role, index) => {
                   const isSelected = selectedRoles.includes(role.id)
                   const RoleIcon = role.icon
+                  const isPlanner = role.id === 'planner'
                   return (
                     <button
                       key={role.id}
                       onClick={() => {
                         // Planner cannot be deselected
-                        if (role.id === 'planner') return
+                        if (isPlanner) return
                         if (isSelected) {
                           setSelectedRoles(selectedRoles.filter(r => r !== role.id))
                         } else {
@@ -828,17 +768,33 @@ export default function Projects() {
                         borderRadius: '12px',
                         border: isSelected ? `2px solid ${role.color}` : '1px solid var(--border)',
                         background: isSelected ? `${role.color}15` : 'var(--bg-tertiary)',
-                        cursor: role.id === 'planner' ? 'default' : 'pointer',
+                        cursor: isPlanner ? 'default' : 'pointer',
                         transition: 'all 0.2s',
                         textAlign: 'left'
                       }}
                     >
+                      <div style={{ 
+                        width: '24px', 
+                        height: '24px', 
+                        borderRadius: '6px', 
+                        background: isSelected ? role.color : 'var(--bg-tertiary)',
+                        border: isSelected ? 'none' : '1px solid var(--border)',
+                        display: 'flex', 
+                        alignItems: 'center', 
+                        justifyContent: 'center',
+                        flexShrink: 0,
+                        fontSize: '11px',
+                        fontWeight: '700',
+                        color: isSelected ? '#fff' : 'var(--text-tertiary)'
+                      }}>
+                        {isSelected ? '1' : '0'}
+                      </div>
                       <div style={{ width: '32px', height: '32px', borderRadius: '8px', background: role.color, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
                         <RoleIcon size={16} style={{ color: '#fff' }} />
                       </div>
                       <div style={{ flex: 1 }}>
                         <div style={{ fontSize: '12px', fontWeight: '600', color: 'var(--text-primary)', display: 'flex', alignItems: 'center', gap: '6px' }}>
-                          {role.id === 'planner' && <Lock size={10} style={{ color: '#8B5CF6' }} />}
+                          {isPlanner && <Lock size={10} style={{ color: '#8B5CF6' }} />}
                           {language === 'zh' ? role.label : role.labelEn}
                         </div>
                         <div style={{ fontSize: '10px', color: 'var(--text-tertiary)', marginTop: '2px' }}>
@@ -851,6 +807,15 @@ export default function Projects() {
                     </button>
                   )
                 })}
+              </div>
+              
+              {/* Minimum constraint hint */}
+              <div style={{ marginTop: '12px', padding: '10px 12px', borderRadius: '8px', background: 'rgba(139, 92, 246, 0.1)', border: '1px solid rgba(139, 92, 246, 0.2)' }}>
+                <span style={{ fontSize: '11px', color: '#8B5CF6' }}>
+                  {language === 'zh' 
+                    ? `📋 最少需要 ${selectedProjectForAgent.recommendedAgents || 1} 个智能体（产品经理推荐）`
+                    : `📋 Minimum ${selectedProjectForAgent.recommendedAgents || 1} agents required (PM recommended)`}
+                </span>
               </div>
             </div>
 
@@ -1038,17 +1003,6 @@ export default function Projects() {
           }
         }
       `}</style>
-
-      {/* Team Wizard Modal */}
-      {showTeamWizard && (
-        <TeamWizard
-          onComplete={(team) => {
-            setTeamComposition(team.roles)
-            setShowTeamWizard(false)
-          }}
-          onCancel={() => setShowTeamWizard(false)}
-        />
-      )}
     </div>
   )
 }
