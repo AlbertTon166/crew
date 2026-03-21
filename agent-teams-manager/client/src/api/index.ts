@@ -4,7 +4,7 @@
 
 /* eslint-disable @typescript-eslint/no-explicit-any */
 
-const API_BASE = import.meta.env.VITE_API_URL || 'http://localhost:3001'
+const API_BASE = import.meta.env.VITE_API_URL || '/api'
 
 // Helper function for API calls
 async function apiCall(endpoint: string, options: RequestInit = {}): Promise<any> {
