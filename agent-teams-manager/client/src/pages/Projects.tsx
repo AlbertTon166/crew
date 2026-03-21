@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react'
 import { 
   Plus, Search, FolderKanban, Clock, 
   CheckCircle, Loader2, X, Bot, Users, ArrowRight, Coins,
-  Settings, MessageSquare, Zap, Code, TestTube, Shield, FileText, ChevronDown, Lock, RotateCw, WifiOff, Sparkles, Download
+  Settings, MessageSquare, Zap, Code, TestTube, Shield, FileText, ChevronDown, Lock, RotateCw, Sparkles, Download
 } from 'lucide-react'
 import { useDashboardStore } from '../stores/dashboardStore'
 import { useLanguage } from '../context/LanguageContext'
@@ -706,7 +706,30 @@ export default function Projects() {
               
               <div style={{ display: 'flex', gap: '12px', paddingTop: '8px' }}>
                 <button onClick={() => setShowCreateModal(false)} className="btn-secondary" style={{ flex: 1 }}>{language === 'zh' ? '取消' : 'Cancel'}</button>
-                <button className="btn-primary" style={{ flex: 1 }}>{language === 'zh' ? '创建项目' : 'Create Project'}</button>
+                <button 
+                  onClick={async () => {
+                    if (!newProjectName.trim()) return
+                    try {
+                      const newProject = await projectsApi.create({
+                        name: newProjectName,
+                        description: newProjectDesc,
+                        status: 'pending'
+                      })
+                      // Refresh list
+                      const projectsData = await projectsApi.getAll()
+                      setProjects((projectsData as any[]).map(transformProject))
+                      setShowCreateModal(false)
+                      setNewProjectName('')
+                      setNewProjectDesc('')
+                    } catch (error) {
+                      console.error('Failed to create project:', error)
+                    }
+                  }}
+                  className="btn-primary" 
+                  style={{ flex: 1 }}
+                >
+                  {language === 'zh' ? '创建项目' : 'Create Project'}
+                </button>
               </div>
             </div>
           </div>

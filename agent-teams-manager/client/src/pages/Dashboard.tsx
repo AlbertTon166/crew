@@ -460,19 +460,137 @@ export default function Dashboard() {
                 </div>
               )}
               
-              {/* Agent List */}
-              {!agentsLoading && !agentsError && agents.length > 0 && agents.map(agent => (
-                <div key={agent.id} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '12px 14px', borderRadius: '12px', background: 'var(--bg-tertiary)', border: '1px solid var(--border)', transition: 'all 0.2s' }} className="agent-item">
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-                    <div className="avatar" style={{ width: '36px', height: '36px', fontSize: '12px' }}><Bot size={16} /></div>
-                    <div>
-                      <p style={{ fontWeight: '600', fontSize: '14px', color: 'var(--text-primary)', margin: 0 }}>{agent.name}</p>
-                      <p style={{ fontSize: '12px', color: 'var(--text-tertiary)', margin: '2px 0 0 0' }}>{agent.modelName}</p>
-                    </div>
-                  </div>
-                  <div style={{ width: '10px', height: '10px', borderRadius: '50%', background: agent.status === 'online' ? '#34D399' : agent.status === 'busy' ? '#FBBF24' : agent.status === 'error' ? '#F87171' : '#475569', boxShadow: agent.status === 'online' ? '0 0 12px rgba(52, 211, 153, 0.6)' : agent.status === 'busy' ? '0 0 12px rgba(251, 191, 36, 0.6)' : agent.status === 'error' ? '0 0 12px rgba(248, 113, 113, 0.6)' : 'none' }} />
+              {/* Agent List - Enhanced with agency-agents personas */}
+              {!agentsLoading && !agentsError && agents.length > 0 && (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                  {agents.map(agent => {
+                    // Role emoji mapping from agency-agents
+                    const roleEmoji: Record<string, string> = {
+                      pm: '📋',
+                      planner: '📝',
+                      architect: '🏗️',
+                      frontend: '🖥️',
+                      backend: '⚙️',
+                      coder: '💻',
+                      reviewer: '👁️',
+                      tester: '🧪',
+                      deployer: '🚀',
+                      'game-dev': '🎮',
+                    }
+                    
+                    // Role color mapping
+                    const roleColors: Record<string, string> = {
+                      pm: '#F59E0B',
+                      planner: '#8B5CF6',
+                      architect: '#6366F1',
+                      frontend: '#3B82F6',
+                      backend: '#10B981',
+                      coder: '#22C55E',
+                      reviewer: '#EC4899',
+                      tester: '#F97316',
+                      deployer: '#06B6D4',
+                      'game-dev': '#E11D48',
+                    }
+                    
+                    // Status display config
+                    const statusConfig: Record<string, { label: string; labelZh: string; color: string; glow: string }> = {
+                      online: { label: 'Online', labelZh: '在线', color: '#34D399', glow: '0 0 12px rgba(52, 211, 153, 0.6)' },
+                      busy: { label: 'Busy', labelZh: '忙碌', color: '#FBBF24', glow: '0 0 12px rgba(251, 191, 36, 0.6)' },
+                      idle: { label: 'Idle', labelZh: '空闲', color: '#94A3B8', glow: '0 0 8px rgba(148, 163, 184, 0.4)' },
+                      offline: { label: 'Offline', labelZh: '离线', color: '#475569', glow: 'none' },
+                      error: { label: 'Error', labelZh: '错误', color: '#F87171', glow: '0 0 12px rgba(248, 113, 113, 0.6)' },
+                    }
+                    
+                    const agentStatus = statusConfig[agent.status] || statusConfig.offline
+                    const agentColor = roleColors[agent.role] || '#6366F1'
+                    const agentEmoji = roleEmoji[agent.role] || '🤖'
+                    
+                    return (
+                      <div 
+                        key={agent.id} 
+                        style={{ 
+                          display: 'flex', 
+                          alignItems: 'center', 
+                          justifyContent: 'space-between', 
+                          padding: '14px 16px', 
+                          borderRadius: '12px', 
+                          background: 'var(--bg-tertiary)', 
+                          border: '1px solid var(--border)',
+                          transition: 'all 0.2s',
+                          cursor: 'pointer',
+                        }} 
+                        className="agent-item"
+                        onClick={() => navigate('/agents')}
+                      >
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '14px' }}>
+                          {/* Avatar with emoji */}
+                          <div style={{ 
+                            width: '44px', 
+                            height: '44px', 
+                            borderRadius: '12px', 
+                            background: `linear-gradient(135deg, ${agentColor}20, ${agentColor}10)`,
+                            border: `1px solid ${agentColor}30`,
+                            display: 'flex', 
+                            alignItems: 'center', 
+                            justifyContent: 'center',
+                            fontSize: '22px',
+                          }}>
+                            {agentEmoji}
+                          </div>
+                          
+                          {/* Agent Info */}
+                          <div>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '4px' }}>
+                              <span style={{ fontWeight: '600', fontSize: '14px', color: 'var(--text-primary)' }}>{agent.name}</span>
+                              <span style={{ 
+                                fontSize: '10px', 
+                                padding: '2px 6px', 
+                                borderRadius: '4px', 
+                                background: `${agentColor}20`,
+                                color: agentColor,
+                                fontWeight: '600',
+                                textTransform: 'uppercase',
+                              }}>
+                                {agent.role}
+                              </span>
+                            </div>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                              <span style={{ fontSize: '12px', color: 'var(--text-tertiary)' }}>{agent.modelName}</span>
+                              <span style={{ fontSize: '12px', color: 'var(--text-tertiary)', opacity: 0.5 }}>•</span>
+                              <span style={{ fontSize: '12px', color: 'var(--text-tertiary)' }}>
+                                {agent.enabled ? (language === 'zh' ? '已启用' : 'Enabled') : (language === 'zh' ? '已禁用' : 'Disabled')}
+                              </span>
+                            </div>
+                          </div>
+                        </div>
+                        
+                        {/* Status Indicator */}
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                          <div style={{ 
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: '6px',
+                            padding: '4px 10px',
+                            borderRadius: '20px',
+                            background: `${agentStatus.color}15`,
+                          }}>
+                            <div style={{ 
+                              width: '8px', 
+                              height: '8px', 
+                              borderRadius: '50%', 
+                              background: agentStatus.color, 
+                              boxShadow: agentStatus.glow,
+                            }} />
+                            <span style={{ fontSize: '11px', fontWeight: '600', color: agentStatus.color }}>
+                              {language === 'zh' ? agentStatus.labelZh : agentStatus.label}
+                            </span>
+                          </div>
+                        </div>
+                      </div>
+                    )
+                  })}
                 </div>
-              ))}
+              )}
             </div>
           </div>
 

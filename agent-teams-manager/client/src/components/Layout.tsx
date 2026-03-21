@@ -232,7 +232,6 @@ export default function Layout() {
 
       {/* Deploy Status Indicator */}
       <div style={{ position: 'fixed', top: '20px', right: '140px', zIndex: 997 }}>
-        // <StatusIndicator />
       </div>
 
       {/* Login/User Button */}

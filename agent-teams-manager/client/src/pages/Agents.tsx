@@ -154,16 +154,57 @@ export default function Agents() {
     setPendingModel(prev => ({ ...prev, [agentId]: model }))
   }
 
-  const handleApplyModel = (agentId: string) => {
+  const handleApplyModel = async (agentId: string) => {
     const newModel = pendingModel[agentId]
     if (newModel && newModel !== selectedModel[agentId]) {
-      setSelectedModel(prev => ({ ...prev, [agentId]: newModel }))
-      // In real app, would call API here
+      const agent = agents.find(a => a.id === agentId)
+      if (!agent) return
+      
+      try {
+        // Optimistic update
+        setAgents(agents.map(a => 
+          a.id === agentId ? { ...a, modelName: newModel } : a
+        ))
+        setSelectedModel(prev => ({ ...prev, [agentId]: newModel }))
+        
+        // Call API to update
+        await agentsApi.update(agentId, { model_name: newModel })
+        console.log(`Agent ${agentId} model updated to ${newModel}`)
+      } catch (error) {
+        console.error('Failed to update model:', error)
+        // Revert on error
+        setAgents(agents.map(a => 
+          a.id === agentId ? { ...a, modelName: agent.modelName } : a
+        ))
+      }
     }
   }
 
   const handleKnowledgeConfig = (agentName: string) => {
     navigate(`/knowledge?agent=${encodeURIComponent(agentName)}`)
+  }
+
+  // Toggle agent enabled/disabled
+  const handleToggleEnabled = async (agentId: string, currentEnabled: boolean) => {
+    try {
+      const newEnabled = !currentEnabled
+      // Optimistic update
+      setAgents(agents.map(a => 
+        a.id === agentId ? { ...a, enabled: newEnabled } : a
+      ))
+      
+      // Call API to update
+      await agentsApi.update(agentId, { enabled: newEnabled })
+      
+      // Show feedback
+      console.log(`Agent ${agentId} ${newEnabled ? 'enabled' : 'disabled'}`)
+    } catch (error) {
+      console.error('Failed to toggle agent:', error)
+      // Revert on error
+      setAgents(agents.map(a => 
+        a.id === agentId ? { ...a, enabled: currentEnabled } : a
+      ))
+    }
   }
 
   const formatToken = (token: number) => {
@@ -471,7 +512,11 @@ export default function Agents() {
 
               {/* Actions */}
               <div style={{ display: 'flex', gap: '10px', paddingTop: '12px' }}>
-                <button style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px', padding: '12px', borderRadius: '12px', fontSize: '14px', fontWeight: '600', border: 'none', cursor: 'pointer', transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)', background: agent.enabled ? 'linear-gradient(135deg, #DC2626, #F43F5E)' : 'linear-gradient(135deg, #059669, #10B981)', color: 'white', boxShadow: agent.enabled ? '0 4px 16px rgba(220, 38, 38, 0.3)' : '0 4px 16px rgba(5, 150, 105, 0.3)' }} className="power-btn">
+                <button 
+                  onClick={() => handleToggleEnabled(agent.id, agent.enabled)}
+                  style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px', padding: '12px', borderRadius: '12px', fontSize: '14px', fontWeight: '600', border: 'none', cursor: 'pointer', transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)', background: agent.enabled ? 'linear-gradient(135deg, #DC2626, #F43F5E)' : 'linear-gradient(135deg, #059669, #10B981)', color: 'white', boxShadow: agent.enabled ? '0 4px 16px rgba(220, 38, 38, 0.3)' : '0 4px 16px rgba(5, 150, 105, 0.3)' }} 
+                  className="power-btn"
+                >
                   <Power size={16} />
                   {agent.enabled ? (language === 'zh' ? '禁用' : 'Disable') : (language === 'zh' ? '启用' : 'Enable')}
                 </button>
