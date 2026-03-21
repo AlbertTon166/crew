@@ -1,0 +1,10 @@
+# Prometheus Configuration
+
+global:
+  scrape_interval: 15s
+  evaluation_interval: 15s
+
+scrape_configs:
+  - job_name: 'agent-teams-backend'
+    static_configs:
+      - targets: ['backend:3001']

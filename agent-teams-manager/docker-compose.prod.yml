@@ -1,0 +1,148 @@
+#===========================================
+# 生产环境 Docker Compose
+# 使用 Cloudflare Tunnel 实现内网穿透
+#===========================================
+
+services:
+  # ========== 数据库服务 ==========
+  
+  postgres:
+    image: postgres:16-alpine
+    container_name: ${PROJECT_NAME:-agent-teams}-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: agent_teams
+      POSTGRES_USER: ${PG_USER:-postgres}
+      POSTGRES_PASSWORD: ${PG_PASSWORD:-postgres}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    ports:
+      - "${PG_PORT:-5432}:5432"
+    networks:
+      - agent-network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d agent_teams"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    deploy:
+      resources:
+        limits:
+          memory: 1G
+
+  redis:
+    image: redis:7-alpine
+    container_name: ${PROJECT_NAME:-agent-teams}-redis
+    restart: unless-stopped
+    command: redis-server --appendonly yes --maxmemory 256mb --maxmemory-policy allkeys-lru
+    volumes:
+      - redis_data:/data
+    ports:
+      - "${REDIS_PORT:-6379}:6379"
+    networks:
+      - agent-network
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    deploy:
+      resources:
+        limits:
+          memory: 512M
+
+  # ========== RAG 知识库 (本地部署) ==========
+  chromadb:
+    image: chromadb/chroma:latest
+    container_name: ${PROJECT_NAME:-agent-teams}-chromadb
+    restart: unless-stopped
+    environment:
+      IS_PERSISTENT: TRUE
+      ANONYMIZED_TELEMETRY: FALSE
+    volumes:
+      - chroma_data:/chroma/chroma
+    ports:
+      - "${CHROMA_PORT:-8000}:8000"
+    networks:
+      - agent-network
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/api/v1/heartbeat"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+    deploy:
+      resources:
+        limits:
+          memory: 2G
+
+  # ========== Backend API ==========
+  backend:
+    build:
+      context: ./server
+      dockerfile: Dockerfile
+    container_name: ${PROJECT_NAME:-agent-teams}-backend
+    restart: unless-stopped
+    environment:
+      NODE_ENV: production
+      PORT: 3001
+      DEPLOY_MODE: ${DEPLOY_MODE:-cloud}
+      PG_HOST: postgres
+      PG_PORT: 5432
+      PG_DATABASE: agent_teams
+      PG_USER: ${PG_USER:-postgres}
+      PG_PASSWORD: ${PG_PASSWORD:-postgres}
+      REDIS_HOST: redis
+      REDIS_PORT: 6379
+      REDIS_PASSWORD: ${REDIS_PASSWORD:-}
+      CHROMA_HOST: chromadb
+      CHROMA_PORT: 8000
+      CORS_ORIGIN: ${CORS_ORIGIN:-https://your-domain.com}
+    ports:
+      - "${SERVER_PORT:-3001}:3001"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      chromadb:
+        condition: service_healthy
+    networks:
+      - agent-network
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+    deploy:
+      resources:
+        limits:
+          cpus: '2'
+          memory: 2G
+
+  # ========== Frontend (云端模式) ==========
+  frontend:
+    profiles: [cloud]
+    build:
+      context: ./client
+      dockerfile: Dockerfile
+    container_name: ${PROJECT_NAME:-agent-teams}-frontend
+    restart: unless-stopped
+    environment:
+      VITE_API_URL: ${API_URL:-https://api.your-domain.com}
+    volumes:
+      # Let's Encrypt SSL 证书 (可选)
+      - ./data/certbot/conf:/etc/letsencrypt:ro
+      - ./data/certbot/www:/var/www/certbot:ro
+    ports:
+      - "${FRONTEND_HTTP_PORT:-80}:80"
+      - "${FRONTEND_HTTPS_PORT:-443}:443"
+    depends_on:
+      - backend
+    networks:
+      - agent-network
+
+networks:
+  agent-network:
+    driver: bridge
+
+volumes:
+  postgres_data:
+  redis_data:
+  chroma_data:
