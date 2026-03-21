@@ -220,65 +220,82 @@ export async function initChromaDB() {
 }
 
 export function getChroma() {
-  if (!chromaClient) throw new Error('ChromaDB not initialized')
+  if (!chromaClient) {
+    console.warn('ChromaDB not initialized, returning null')
+    return null
+  }
   return chromaClient
 }
 
 // Vector Search for Code
 export async function addCodeEmbedding(projectId, filePath, code, language) {
   const chroma = getChroma()
-  const collection = await chroma.getCollection({ name: 'code_snippets' })
-  
-  const id = `${projectId}-${Date.now()}`
-  
-  await collection.add({
-    id,
-    documents: [code],
-    metadatas: [{ projectId, filePath, language }],
-  })
-  
-  return id
+  if (!chroma) return null
+  try {
+    const collection = await chroma.getCollection({ name: 'code_snippets' })
+    const id = `${projectId}-${Date.now()}`
+    await collection.add({
+      id,
+      documents: [code],
+      metadatas: [{ projectId, filePath, language }],
+    })
+    return id
+  } catch (error) {
+    console.warn('Failed to add code embedding:', error.message)
+    return null
+  }
 }
 
 export async function searchCode(projectId, query, topK = 5) {
   const chroma = getChroma()
-  const collection = await chroma.getCollection({ name: 'code_snippets' })
-  
-  const results = await collection.query({
-    queryTexts: [query],
-    nResults: topK,
-    where: { projectId }
-  })
-  
-  return results
+  if (!chroma) return []
+  try {
+    const collection = await chroma.getCollection({ name: 'code_snippets' })
+    const results = await collection.query({
+      queryTexts: [query],
+      nResults: topK,
+      where: { projectId }
+    })
+    return results
+  } catch (error) {
+    console.warn('Failed to search code:', error.message)
+    return []
+  }
 }
 
 // Knowledge Base RAG
 export async function addKnowledge(title, content, metadata = {}) {
   const chroma = getChroma()
-  const collection = await chroma.getCollection({ name: 'knowledge_base' })
-  
-  const id = `kb-${Date.now()}`
-  
-  await collection.add({
-    id,
-    documents: [`${title}\n\n${content}`],
-    metadatas: [metadata],
-  })
-  
-  return id
+  if (!chroma) return null
+  try {
+    const collection = await chroma.getCollection({ name: 'knowledge_base' })
+    const id = `kb-${Date.now()}`
+    await collection.add({
+      id,
+      documents: [`${title}\n\n${content}`],
+      metadatas: [metadata],
+    })
+    return id
+  } catch (error) {
+    console.warn('Failed to add knowledge:', error.message)
+    return null
+  }
 }
 
 export async function searchKnowledge(query, topK = 3) {
   const chroma = getChroma()
-  const collection = await chroma.getCollection({ name: 'knowledge_base' })
-  
-  const results = await collection.query({
-    queryTexts: [query],
-    nResults: topK,
-  })
-  
-  return results
+  if (!chroma) return []
+  try {
+    const collection = await chroma.getCollection({ name: 'knowledge_base' })
+    const results = await collection.query({
+      queryTexts: [query],
+      nResults: topK,
+    })
+    return results
+  } catch (error) {
+    console.warn('Failed to search knowledge:', error.message)
+    return []
+  }
 }
 
 // Session Management with Redis
@@ -317,8 +334,16 @@ export async function getAgentHeartbeat(agentId) {
 export async function initAllDatabases() {
   try {
     await initPostgres()
+    console.log('✅ PostgreSQL initialized')
     await initRedis()
-    await initChromaDB()
+    console.log('✅ Redis initialized')
+    try {
+      await initChromaDB()
+      console.log('✅ ChromaDB initialized')
+    } catch (chromaError) {
+      console.warn('⚠️ ChromaDB initialization failed (optional):', chromaError.message)
+      console.warn('⚠️ Running without vector database support')
+    }
     console.log('✅ All databases initialized')
   } catch (error) {
     console.error('❌ Database initialization failed:', error)
