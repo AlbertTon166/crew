@@ -1,0 +1,45 @@
+#===========================================
+# Git Ignore - Agent Teams Manager
+#===========================================
+
+# SSL Certificates
+*.pem
+*.key
+data/certbot/
+
+# Environment files
+.env
+.env.local
+.env.production
+
+# Node modules
+node_modules/
+*/node_modules/
+
+# Build outputs
+dist/
+build/
+
+# Docker volumes
+postgres_data/
+redis_data/
+chroma_data/
+
+# Logs
+*.log
+npm-debug.log*
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# IDE
+.idea/
+.vscode/
+
+# OpenClaw workspace files
+.openclaw/
+
+# Temporary files
+*.tmp
+*.temp
