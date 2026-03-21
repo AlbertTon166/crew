@@ -110,8 +110,7 @@ export default function Requirements() {
         }
       } catch (error) {
         console.error('Failed to load projects:', error)
-        setProjects(mockProjects as any)
-        setSelectedProject(mockProjects[0])
+        // Don't fallback to mockProjects - keep existing data in store
       }
     }
     
