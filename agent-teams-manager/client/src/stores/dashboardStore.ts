@@ -37,10 +37,21 @@ export interface Project {
   nameZh?: string
   description: string
   descZh?: string
-  status: 'pending' | 'in_progress' | 'testing' | 'completed' | 'error'
+  status: 'pending' | 'pending_dev' | 'in_progress' | 'testing' | 'completed' | 'error'
   tasks: Task[]
   createdAt: string
   updatedAt: string
+  totalTokens?: number
+  agentCount?: number
+  version?: string
+  recommendedAgents?: number
+  recommendedRoles?: Array<{
+    roleId: string
+    roleName: string
+    roleNameEn: string
+    minCount: number
+    description: string
+  }>
 }
 
 export interface Task {

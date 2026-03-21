@@ -71,7 +71,7 @@ const statusConfigZh: Record<string, { label: string; class: string; color: stri
 
 export default function Projects() {
   const { language } = useLanguage()
-  const { setProjects, setTasks } = useDashboardStore()
+  const { projects, setProjects, setTasks } = useDashboardStore()
   const { isConnected } = useDeployMode()
   const [filter, setFilter] = useState<string>('all')
   const [search, setSearch] = useState('')
@@ -168,10 +168,10 @@ export default function Projects() {
     loadData()
   }, [])
 
-  const getProjectName = (p: typeof mockProjects[0]) => language === 'zh' ? p.nameZh : p.name
-  const getProjectDesc = (p: typeof mockProjects[0]) => language === 'zh' ? p.descZh : p.description
+  const getProjectName = (p: any) => language === 'zh' ? (p.nameZh || p.name) : p.name
+  const getProjectDesc = (p: any) => language === 'zh' ? (p.descZh || p.description) : (p.description || '')
 
-  const filteredProjects = mockProjects.filter(project => {
+  const filteredProjects = projects.filter((project: any) => {
     const projName = getProjectName(project)
     const projDesc = getProjectDesc(project)
     const matchesFilter = filter === 'all' || project.status === filter
@@ -327,12 +327,12 @@ export default function Projects() {
                     </span>
                     <span style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
                       <Users size={14} />
-                      {project.agentCount} {language === 'zh' ? '个智能体' : 'agents'}
+                      {project.agentCount || 0} {language === 'zh' ? '个智能体' : 'agents'}
                     </span>
-                    {project.totalTokens > 0 && (
+                    {(project.totalTokens || 0) > 0 && (
                       <span style={{ display: 'flex', alignItems: 'center', gap: '6px', color: '#34D399' }}>
                         <Coins size={14} />
-                        {formatToken(project.totalTokens)} Token
+                        {formatToken(project.totalTokens || 0)} Token
                       </span>
                     )}
                   </div>
@@ -360,7 +360,7 @@ export default function Projects() {
                       // Initialize agent counts from recommended roles or defaults
                       const counts: Record<string, number> = { planner: 1 }
                       if (project.recommendedRoles && Array.isArray(project.recommendedRoles)) {
-                        project.recommendedRoles.forEach((r: any) => {
+                        project.recommendedRoles.forEach((r) => {
                           counts[r.roleId] = r.minCount || 1
                         })
                       } else {
