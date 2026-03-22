@@ -6,14 +6,19 @@
 import express from 'express'
 import cors from 'cors'
 import { v4 as uuidv4 } from 'uuid'
-import { 
-  initAllDatabases, 
-  getPgPool, 
-  getRedis, 
+import {
+  initAllDatabases,
+  getPgPool,
+  getRedis,
   getChroma,
   cacheSet,
-  cacheGet 
+  cacheGet
 } from './databases.js'
+import {
+  notifyProjectStatusChange,
+  notifyTaskAssignment,
+  notifyTaskCompletion
+} from './feishu-notify.js'
 
 const app = express()
 const PORT = process.env.PORT || 3001
@@ -596,6 +601,9 @@ app.post('/api/tasks/:id/execute', async (req, res) => {
       agentName: agentInfo.name,
       message: `Task dispatched to ${agentInfo.name}`
     })
+
+    // Send Feishu notification (async, don't wait)
+    notifyTaskAssignment(task, agentInfo).catch(err => console.warn('Feishu notification failed:', err.message))
   } catch (error) {
     console.error('Task execution error:', error)
     res.status(500).json({ error: 'Failed to execute task' })
@@ -637,7 +645,10 @@ app.post('/api/tasks/:id/complete', async (req, res) => {
     if (result.error) {
       return res.status(404).json({ error: result.error })
     }
-    
+
+    // Send Feishu notification (async, don't wait)
+    notifyTaskCompletion({ id, title: task?.title, title_zh: task?.title_zh }, output).catch(err => console.warn('Feishu notification failed:', err.message))
+
     res.json(result)
   } catch (error) {
     console.error('Task complete error:', error)
