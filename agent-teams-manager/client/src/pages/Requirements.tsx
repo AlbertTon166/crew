@@ -3,7 +3,8 @@ import { Send, CheckCircle, XCircle, Loader2, Filter, FolderKanban, FileText, Cl
 import { useDashboardStore } from '../stores/dashboardStore'
 import { useLanguage } from '../context/LanguageContext'
 import { useDeployMode } from '../context/DeployModeContext'
-import { requirementsApi } from '../api'
+import { requirementsApi, projectsApi } from '../api'
+import { transformProject } from '../api/transformers'
 import FileUpload from '../components/FileUpload'
 
 interface Requirement {
@@ -270,26 +271,61 @@ export default function Requirements() {
     if (!selectedProject) return
     setEvaluating(true)
     setEvaluationResult(null)
-    
-    // Simulate evaluation process
-    await new Promise(r => setTimeout(r, 2000))
-    
-    // Mock evaluation result - passes if confirmed requirements > 0
-    const confirmedCount = messages.filter(m => m.source === 'user' && m.status === 'confirmed').length
-    if (confirmedCount > 0) {
-      setEvaluationResult('pass')
-      // Auto move project to pending_dev
-      if (selectedProject.status === 'evaluating') {
-        const updated = mockProjects.map(p => 
-          p.id === selectedProject.id ? { ...p, status: 'pending_dev' } : p
-        )
-        setProjects(updated as any)
-        // Update selected project
-        setSelectedProject({ ...selectedProject, status: 'pending_dev' })
+
+    try {
+      // Simulate evaluation process
+      await new Promise(r => setTimeout(r, 2000))
+
+      // Mock evaluation result - passes if confirmed requirements > 0
+      const confirmedCount = messages.filter(m => m.source === 'user' && m.status === 'confirmed').length
+      if (confirmedCount > 0) {
+        setEvaluationResult('pass')
+
+        // Call API to transition project to pending_dev
+        if (selectedProject.status === 'evaluating') {
+          try {
+            const result = await projectsApi.transition(selectedProject.id, 'pending_dev')
+            if (result.error) {
+              console.error('Transition failed:', result.error)
+              // Fallback to local update
+              const updated = mockProjects.map(p =>
+                p.id === selectedProject.id ? { ...p, status: 'pending_dev' } : p
+              )
+              setProjects(updated as any)
+              setSelectedProject({ ...selectedProject, status: 'pending_dev' })
+            } else {
+              // Refresh projects from API
+              const projectsData = await projectsApi.getAll()
+              const transformedProjects = (projectsData as any[]).map(transformProject)
+              setProjects(transformedProjects as any)
+              setSelectedProject({ ...selectedProject, status: 'pending_dev' })
+
+              // Auto-generate tasks based on PM recommendations
+              try {
+                const tasksResult = await projectsApi.generateTasks(selectedProject.id)
+                console.log('Generated tasks:', tasksResult.totalTasks)
+              } catch (taskError) {
+                console.error('Failed to generate tasks:', taskError)
+              }
+            }
+          } catch (apiError) {
+            console.error('API call failed:', apiError)
+            // Fallback to local update
+            const updated = mockProjects.map(p =>
+              p.id === selectedProject.id ? { ...p, status: 'pending_dev' } : p
+            )
+            setProjects(updated as any)
+            setSelectedProject({ ...selectedProject, status: 'pending_dev' })
+          }
+        }
+      } else {
+        setEvaluationResult('fail')
       }
-    } else {
+    } catch (error) {
+      console.error('Evaluation error:', error)
       setEvaluationResult('fail')
     }
+
     setEvaluating(false)
   }
 

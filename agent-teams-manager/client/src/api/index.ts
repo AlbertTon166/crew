@@ -36,21 +36,32 @@ async function apiCall(endpoint: string, options: RequestInit = {}): Promise<any
 
 export const projectsApi = {
   getAll: () => apiCall('/api/projects'),
-  
+
   getById: (id: string) => apiCall(`/api/projects/${id}`),
-  
+
   create: (data: any) => apiCall('/api/projects', {
     method: 'POST',
     body: JSON.stringify(data),
   }),
-  
+
   update: (id: string, data: any) => apiCall(`/api/projects/${id}`, {
     method: 'PUT',
     body: JSON.stringify(data),
   }),
-  
+
   delete: (id: string) => apiCall(`/api/projects/${id}`, {
     method: 'DELETE',
+  }),
+
+  // Project status transition with validation
+  transition: (id: string, newStatus: string) => apiCall(`/api/projects/${id}/transition`, {
+    method: 'POST',
+    body: JSON.stringify({ newStatus }),
+  }),
+
+  // Generate tasks from PM recommendations
+  generateTasks: (id: string) => apiCall(`/api/projects/${id}/generate-tasks`, {
+    method: 'POST',
   }),
 }
 

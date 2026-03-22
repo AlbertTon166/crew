@@ -219,6 +219,167 @@ app.put('/api/projects/:id', async (req, res) => {
   }
 })
 
+// Project Status Transition with Validation
+app.post('/api/projects/:id/transition', async (req, res) => {
+  try {
+    const pool = getPgPool()
+    const { id } = req.params
+    const { newStatus } = req.body
+    
+    if (!newStatus) {
+      return res.status(400).json({ error: 'newStatus is required' })
+    }
+    
+    // Get current project
+    const current = await pool.query('SELECT * FROM projects WHERE id = $1', [id])
+    if (current.rows.length === 0) {
+      return res.status(404).json({ error: 'Project not found' })
+    }
+    
+    const project = current.rows[0]
+    const oldStatus = project.status
+    
+    // Valid state transitions
+    const validTransitions = {
+      'pending': ['evaluating'],
+      'evaluating': ['pending_dev', 'pending'],
+      'pending_dev': ['in_progress'],
+      'in_progress': ['testing', 'pending_dev'],
+      'testing': ['completed', 'in_progress'],
+      'completed': [],
+      'error': ['pending_dev', 'pending']
+    }
+    
+    if (!validTransitions[oldStatus]?.includes(newStatus)) {
+      return res.status(400).json({ 
+        error: 'Invalid status transition',
+        current: oldStatus,
+        requested: newStatus,
+        allowed: validTransitions[oldStatus] || []
+      })
+    }
+    
+    // Update status
+    const result = await pool.query(
+      `UPDATE projects SET status = $1, updated_at = NOW() WHERE id = $2 RETURNING *`,
+      [newStatus, id]
+    )
+    
+    await cacheDelete('projects:all')
+    
+    // If transitioning to pending_dev, check if recommended_roles is set
+    if (newStatus === 'pending_dev' && (!project.recommended_roles || project.recommended_roles.length === 0)) {
+      return res.status(400).json({ 
+        error: 'Cannot transition to pending_dev without recommended_roles',
+        hint: 'Please communicate with PM Agent first to generate recommended team configuration'
+      })
+    }
+    
+    res.json({
+      project: result.rows[0],
+      previousStatus: oldStatus,
+      newStatus: newStatus,
+      transition: 'success'
+    })
+  } catch (error) {
+    console.error('Status transition error:', error)
+    res.status(500).json({ error: 'Failed to transition project status' })
+  }
+})
+
+// Generate Tasks from Requirements
+app.post('/api/projects/:id/generate-tasks', async (req, res) => {
+  try {
+    const pool = getPgPool()
+    const { id } = req.params
+    
+    // Get project with recommended_roles
+    const projectResult = await pool.query('SELECT * FROM projects WHERE id = $1', [id])
+    if (projectResult.rows.length === 0) {
+      return res.status(404).json({ error: 'Project not found' })
+    }
+    
+    const project = projectResult.rows[0]
+    
+    if (!project.recommended_roles || project.recommended_roles.length === 0) {
+      return res.status(400).json({ 
+        error: 'No recommended_roles found',
+        hint: 'Please ensure PM Agent has analyzed requirements first'
+      })
+    }
+    
+    // Generate tasks based on recommended roles
+    const recommendedRoles = typeof project.recommended_roles === 'string' 
+      ? JSON.parse(project.recommended_roles) 
+      : project.recommended_roles
+    
+    const generatedTasks = []
+    
+    // Common development tasks template
+    const taskTemplates = [
+      { title: '项目初始化', titleZh: 'Project Initialization', description: '初始化项目结构、配置开发环境、创建基础架构', priority: 'high', estimatedHours: 4 },
+      { title: '数据库设计', titleZh: 'Database Design', description: '设计数据库Schema、创建表结构、编写迁移脚本', priority: 'high', estimatedHours: 8 },
+      { title: 'API接口开发', titleZh: 'API Development', description: '实现后端API接口，包括CRUD和业务逻辑', priority: 'high', estimatedHours: 16 },
+      { title: '前端页面开发', titleZh: 'Frontend Development', description: '实现前端界面和交互功能', priority: 'medium', estimatedHours: 12 },
+      { title: '集成测试', titleZh: 'Integration Testing', description: '编写并执行集成测试', priority: 'medium', estimatedHours: 8 },
+      { title: '代码审查', titleZh: 'Code Review', description: '代码审查并修复发现的问题', priority: 'medium', estimatedHours: 4 },
+      { title: '部署上线', titleZh: 'Deployment', description: '部署到生产环境并验证', priority: 'high', estimatedHours: 4 },
+    ]
+    
+    // Create tasks based on roles
+    for (const roleConfig of recommendedRoles) {
+      const role = roleConfig.roleId
+      const count = roleConfig.minCount || 1
+      
+      for (let i = 0; i < count; i++) {
+        // Assign tasks based on role
+        let task = null
+        
+        if (role === 'planner') {
+          task = taskTemplates[0] // Project initialization
+        } else if (role === 'frontend') {
+          task = taskTemplates[3] // Frontend development
+        } else if (role === 'backend') {
+          task = taskTemplates[1] // Database design
+          // Also add API task for backend
+          const apiTask = taskTemplates[2]
+          const apiResult = await pool.query(
+            `INSERT INTO tasks (project_id, title, title_zh, description, status, priority, assigned_role, estimated_hours)
+             VALUES ($1, $2, $3, $4, $5, $6, $7, $8) RETURNING *`,
+            [id, apiTask.title, apiTask.titleZh, apiTask.description, 'pending', apiTask.priority, role, apiTask.estimatedHours]
+          )
+          generatedTasks.push(apiResult.rows[0])
+        } else if (role === 'reviewer') {
+          task = taskTemplates[5] // Code review
+        } else if (role === 'tester') {
+          task = taskTemplates[4] // Integration testing
+        } else if (role === 'deployer') {
+          task = taskTemplates[6] // Deployment
+        }
+        
+        if (task) {
+          const result = await pool.query(
+            `INSERT INTO tasks (project_id, title, title_zh, description, status, priority, assigned_role, estimated_hours)
+             VALUES ($1, $2, $3, $4, $5, $6, $7, $8) RETURNING *`,
+            [id, task.title, task.titleZh, task.description, 'pending', task.priority, role, task.estimatedHours]
+          )
+          generatedTasks.push(result.rows[0])
+        }
+      }
+    }
+    
+    res.json({
+      project: project,
+      generatedTasks: generatedTasks,
+      totalTasks: generatedTasks.length,
+      message: `Successfully generated ${generatedTasks.length} tasks based on PM recommendations`
+    })
+  } catch (error) {
+    console.error('Generate tasks error:', error)
+    res.status(500).json({ error: 'Failed to generate tasks' })
+  }
+})
+
 app.delete('/api/projects/:id', async (req, res) => {
   try {
     const pool = getPgPool()
