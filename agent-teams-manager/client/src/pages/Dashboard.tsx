@@ -88,7 +88,7 @@ const formatToken = (token: number) => {
 export default function Dashboard() {
   const navigate = useNavigate()
   const { language } = useLanguage()
-  const { agents, stats, setAgents, setStats, setProjects } = useDashboardStore()
+  const { agents, stats, projects, setAgents, setStats, setProjects } = useDashboardStore()
   const { isConnected } = useDeployMode()
   const [agentsLoading, setAgentsLoading] = useState(false)
   const [agentsError, setAgentsError] = useState<string | null>(null)
@@ -366,7 +366,7 @@ export default function Dashboard() {
                 </tr>
               </thead>
               <tbody>
-                {mockProjects.map(project => (
+                {projects.slice(0, 5).map((project: any) => (
                   <tr key={project.id} className="table-row" style={{ borderBottom: '1px solid var(--border)' }}>
                     <td style={{ padding: '14px 16px', verticalAlign: 'middle' }}>
                       <span style={{ fontWeight: '600', color: 'var(--text-primary)' }}>{getProjectName(project)}</span>

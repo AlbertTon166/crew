@@ -140,31 +140,27 @@ export default function Projects() {
         const projectsData = await projectsApi.getAll()
         const transformedProjects = (projectsData as any[]).map(transformProject)
         setProjects(transformedProjects)
-        
+
         // Load tasks for each project
         const allTasks: Record<string, any[]> = {}
         for (const project of projectsData as any[]) {
-          const tasksData = await tasksApi.getAll(project.id)
-          allTasks[project.id] = (tasksData as any[]).map(transformTask)
+          try {
+            const tasksData = await tasksApi.getAll(project.id)
+            allTasks[project.id] = (tasksData as any[]).map(transformTask)
+          } catch (taskError) {
+            console.warn(`Failed to load tasks for project ${project.id}:`, taskError)
+            allTasks[project.id] = []
+          }
         }
         setTasks(allTasks)
       } catch (error) {
-        console.error('Failed to load from API, using mock data:', error)
-        // Fallback to mock data
-        setProjects(mockProjects as any)
-        setTasks({
-          '1': [
-            { id: 't1', projectId: '1', title: 'User Module', titleZh: '用户模块', description: 'Implement user registration and login', status: 'completed', assignedAgentId: '3', executions: [], createdAt: '2026-03-10T08:00:00Z', updatedAt: '2026-03-18T10:00:00Z' },
-            { id: 't2', projectId: '1', title: 'Product Module', titleZh: '商品模块', description: 'Product list and details', status: 'in_progress', assignedAgentId: '3', executions: [], dependsOn: ['t1'], createdAt: '2026-03-10T09:00:00Z', updatedAt: '2026-03-10T09:00:00Z' },
-            { id: 't3', projectId: '1', title: 'Code Review', titleZh: '代码审查', description: 'Review user module code', status: 'needs_review', assignedAgentId: '5', executions: [], dependsOn: ['t1'], createdAt: '2026-03-10T10:00:00Z', updatedAt: '2026-03-10T10:00:00Z' },
-          ],
-          '2': [{ id: 't4', projectId: '2', title: 'UI Redesign', titleZh: 'UI改版', description: 'Redesign all screens', status: 'completed', assignedAgentId: '3', executions: [], createdAt: '2026-03-05T09:00:00Z', updatedAt: '2026-03-15T16:00:00Z' }],
-          '3': [],
-          '4': [],
-        })
+        console.error('Failed to load from API:', error)
+        // Don't fallback to mock data - show empty state instead
+        setProjects([])
+        setTasks({})
       }
     }
-    
+
     loadData()
   }, [])
 

@@ -57,16 +57,52 @@ export async function initPostgres() {
       id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
       project_id UUID REFERENCES projects(id) ON DELETE CASCADE,
       title VARCHAR(255) NOT NULL,
+      title_zh VARCHAR(255),
       description TEXT,
       status VARCHAR(50) DEFAULT 'pending',
+      priority VARCHAR(20) DEFAULT 'medium',
       assigned_agent_id VARCHAR(100),
+      assigned_role VARCHAR(50),
       depends_on UUID[],
+      agent_session_id VARCHAR(255),
+      execution_status VARCHAR(50) DEFAULT 'pending',
+      estimated_hours INT,
       execution_count INT DEFAULT 0,
       created_at TIMESTAMP DEFAULT NOW(),
       updated_at TIMESTAMP DEFAULT NOW()
     )
   `)
+
+  // Migration: Add new columns to tasks table if they don't exist
+  // This handles existing databases that were created before these fields were added
+  const migrations = [
+    { column: 'title_zh', type: 'VARCHAR(255)' },
+    { column: 'priority', type: 'VARCHAR(20) DEFAULT medium' },
+    { column: 'assigned_role', type: 'VARCHAR(50)' },
+    { column: 'agent_session_id', type: 'VARCHAR(255)' },
+    { column: 'execution_status', type: "VARCHAR(50) DEFAULT 'pending'" },
+    { column: 'estimated_hours', type: 'INT' },
+  ];
   
+  for (const migration of migrations) {
+    try {
+      await pgPool.query(`
+        DO $$
+        BEGIN
+          IF NOT EXISTS (
+            SELECT 1 FROM information_schema.columns 
+            WHERE table_name = 'tasks' AND column_name = '${migration.column}'
+          ) THEN
+            ALTER TABLE tasks ADD COLUMN ${migration.column} ${migration.type};
+          END IF;
+        END $$;
+      `);
+    } catch (err) {
+      // Ignore errors from migration (column might already exist)
+      console.log(`Migration note: ${migration.column} - ${err.message}`);
+    }
+  }
+
   await pgPool.query(`
     CREATE TABLE IF NOT EXISTS agents (
       id UUID PRIMARY KEY DEFAULT gen_random_uuid(),

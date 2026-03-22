@@ -504,6 +504,159 @@ app.delete('/api/tasks/:id', async (req, res) => {
   }
 })
 
+// ==================== Task Execution APIs (OpenClaw Integration) ====================
+
+// Import OpenClaw integration (lazy import to avoid circular deps)
+let openclawIntegration = null
+async function getOpenClawIntegration() {
+  if (!openclawIntegration) {
+    openclawIntegration = await import('./openclaw-integration.js')
+  }
+  return openclawIntegration
+}
+
+// POST /api/tasks/:id/execute - Dispatch task to an agent
+app.post('/api/tasks/:id/execute', async (req, res) => {
+  try {
+    const { id } = req.params
+    const { agentId, agentRole, context } = req.body
+    
+    if (!agentId && !agentRole) {
+      return res.status(400).json({ 
+        error: 'Either agentId or agentRole is required' 
+      })
+    }
+    
+    const pool = getPgPool()
+    
+    // Get task details
+    const taskResult = await pool.query(
+      'SELECT * FROM tasks WHERE id = $1',
+      [id]
+    )
+    
+    if (taskResult.rows.length === 0) {
+      return res.status(404).json({ error: 'Task not found' })
+    }
+    
+    const task = taskResult.rows[0]
+    
+    // If no agentId provided, find an available agent by role
+    let targetAgentId = agentId
+    if (!targetAgentId && agentRole) {
+      const agentResult = await pool.query(
+        `SELECT id FROM agents WHERE role = $1 AND enabled = true AND status != 'offline' LIMIT 1`,
+        [agentRole]
+      )
+      if (agentResult.rows.length === 0) {
+        return res.status(400).json({ 
+          error: `No available agent found for role: ${agentRole}` 
+        })
+      }
+      targetAgentId = agentResult.rows[0].id
+    }
+    
+    // Get agent info
+    const agentInfoResult = await pool.query(
+      'SELECT * FROM agents WHERE id = $1',
+      [targetAgentId]
+    )
+    
+    if (agentInfoResult.rows.length === 0) {
+      return res.status(404).json({ error: 'Agent not found' })
+    }
+    
+    const agentInfo = agentInfoResult.rows[0]
+    
+    // Build task description
+    const taskDescription = `${task.title_zh || task.title}\n\n${task.description || ''}`
+    
+    // Dispatch task via OpenClaw
+    const { dispatchTask } = await getOpenClawIntegration()
+    const result = await dispatchTask({
+      taskId: id,
+      agentId: targetAgentId,
+      agentRole: agentRole || agentInfo.role,
+      task: taskDescription,
+      context: context
+    })
+    
+    if (!result.success) {
+      return res.status(500).json({ 
+        error: 'Failed to dispatch task',
+        details: result.error
+      })
+    }
+    
+    res.json({
+      success: true,
+      taskId: id,
+      sessionId: result.sessionId,
+      agentId: targetAgentId,
+      agentName: agentInfo.name,
+      message: `Task dispatched to ${agentInfo.name}`
+    })
+  } catch (error) {
+    console.error('Task execution error:', error)
+    res.status(500).json({ error: 'Failed to execute task' })
+  }
+})
+
+// GET /api/tasks/:id/status - Get task execution status
+app.get('/api/tasks/:id/status', async (req, res) => {
+  try {
+    const { id } = req.params
+    
+    const { getTaskExecutionStatus } = await getOpenClawIntegration()
+    const status = await getTaskExecutionStatus(id)
+    
+    if (status.error) {
+      return res.status(404).json({ error: status.error })
+    }
+    
+    res.json(status)
+  } catch (error) {
+    console.error('Task status error:', error)
+    res.status(500).json({ error: 'Failed to get task status' })
+  }
+})
+
+// POST /api/tasks/:id/complete - Mark task as complete
+app.post('/api/tasks/:id/complete', async (req, res) => {
+  try {
+    const { id } = req.params
+    const { success, output, error } = req.body
+    
+    const { completeTaskExecution } = await getOpenClawIntegration()
+    const result = await completeTaskExecution(id, {
+      success: success !== false,
+      output: output || '',
+      error: error || null
+    })
+    
+    if (result.error) {
+      return res.status(404).json({ error: result.error })
+    }
+    
+    res.json(result)
+  } catch (error) {
+    console.error('Task complete error:', error)
+    res.status(500).json({ error: 'Failed to complete task' })
+  }
+})
+
+// GET /api/agents/available - List available agents for dispatch
+app.get('/api/agents/available', async (req, res) => {
+  try {
+    const { listAvailableAgents } = await getOpenClawIntegration()
+    const agents = await listAvailableAgents()
+    res.json(agents)
+  } catch (error) {
+    console.error('List available agents error:', error)
+    res.status(500).json({ error: 'Failed to list available agents' })
+  }
+})
+
 // ==================== Agents APIs ====================
 
 app.get('/api/agents', async (req, res) => {
