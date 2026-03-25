@@ -567,6 +567,27 @@ interface JobKnowledge {
 
 ---
 
+### ⭐ 新功能计划：StarOffice 3D 可视化（CSS 3D）
+
+**参考项目**：[naolnegassa/StarOffice-UI](https://github.com/naolnegassa/StarOffice-UI)
+
+**功能描述**：把 Agent 工作状态可视化成 3D 科技风办公室，Agent 在不同工作站区域（工作区/休息区/bug区）实时展示。
+
+**技术方案**：CSS 3D Transforms + 科技风 UI（不用 Three.js）
+
+**科技风元素**：
+- 霓虹边框线条
+- 扫描线动效
+- 状态用发光圆点 + 脉冲
+- 工作站用六边形/网格背景
+- 顶部状态栏显示整体概况
+
+**预估工时**：2-4 周（1 个前端）
+
+**优先级**：P2（核心功能稳定后再做）
+
+---
+
 ## 七、竞品参考
 
 - **Linear** — 极简项目管理，状态流转设计参考
