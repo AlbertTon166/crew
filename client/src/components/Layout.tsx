@@ -145,9 +145,9 @@ export default function Layout() {
         {sidebarOpen ? <X size={20} /> : <Menu size={20} />}
       </button>
 
-      {/* Tour Button - Desktop */}
+      {/* Quick Start Button - Desktop */}
       <button 
-        onClick={() => setTourOpen(true)}
+        onClick={() => window.location.href = '/quickstart'}
         style={{
           position: 'fixed',
           top: '20px',
@@ -170,7 +170,7 @@ export default function Layout() {
         title={tourSteps[0].title}
       >
         <Sparkles size={16} />
-        <span>引导</span>
+        <span>快速上手</span>
       </button>
 
       {/* Login/User Button */}

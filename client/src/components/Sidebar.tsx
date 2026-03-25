@@ -26,7 +26,8 @@ import {
   AlertCircle,
   Users,
   FileText,
-  Rocket
+  Rocket,
+  TrendingUp
 } from 'lucide-react'
 import { useDashboardStore } from '../stores/dashboardStore'
 import { useLanguage } from '../context/LanguageContext'
@@ -47,6 +48,7 @@ const navItems = [
   { path: '/knowledge', icon: BookOpen, color: '#FBBF24', cloudOnly: false },
   { path: '/api-keys', icon: Key, color: '#6366F1', cloudOnly: false },
   { path: '/quickstart', icon: Rocket, color: '#F59E0B', cloudOnly: false },
+  { path: '/usage', icon: TrendingUp, color: '#34D399', cloudOnly: false },
 ]
 
 const navLabels: Record<string, { en: string; zh: string }> = {
@@ -57,6 +59,7 @@ const navLabels: Record<string, { en: string; zh: string }> = {
   '/knowledge': { en: 'Knowledge', zh: '知识库' },
   '/api-keys': { en: 'API Keys', zh: 'API密钥' },
   '/quickstart': { en: 'Quick Start', zh: '快速上手' },
+  '/usage': { en: 'Usage Stats', zh: '使用统计' },
 }
 
 const navDescs: Record<string, { en: string; zh: string }> = {
@@ -67,6 +70,7 @@ const navDescs: Record<string, { en: string; zh: string }> = {
   '/knowledge': { en: 'Knowledge base', zh: '知识库' },
   '/api-keys': { en: 'API keys management', zh: '管理AI模型密钥' },
   '/quickstart': { en: 'Get started guide', zh: '5分钟快速上手' },
+  '/usage': { en: 'Token & cost analytics', zh: 'Token消耗与成本分析' },
 }
 
 export default function Sidebar({ isOpen = false, onClose, openSettingsTab }: SidebarProps) {
