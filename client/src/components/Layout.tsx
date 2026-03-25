@@ -207,7 +207,8 @@ import SettingsModal from './SettingsModal'
             <Globe size={14} style={{ color: 'var(--text-secondary)' }} />
             {language === 'zh' ? 'EN' : '中文'}
           </button>
-        </div>
+        <SettingsModal isOpen={isSettingsOpen} onClose={() => setSettingsOpen(false)} />
+      </div>
       )}
 
       {/* Main Content */}
@@ -251,7 +252,8 @@ import SettingsModal from './SettingsModal'
         
         <div style={{ position: 'relative', zIndex: 1 }}>
           <Outlet />
-        </div>
+        <SettingsModal isOpen={isSettingsOpen} onClose={() => setSettingsOpen(false)} />
+      </div>
       </main>
 
       {/* Tour Modal */}
@@ -302,7 +304,8 @@ import SettingsModal from './SettingsModal'
                   }}
                 />
               ))}
-            </div>
+            <SettingsModal isOpen={isSettingsOpen} onClose={() => setSettingsOpen(false)} />
+      </div>
 
             {/* Step number */}
             <div style={{
@@ -317,7 +320,8 @@ import SettingsModal from './SettingsModal'
               boxShadow: '0 8px 24px var(--primary-glow)'
             }}>
               <span style={{ color: '#fff', fontSize: '20px', fontWeight: '700' }}>{tourStep + 1}</span>
-            </div>
+            <SettingsModal isOpen={isSettingsOpen} onClose={() => setSettingsOpen(false)} />
+      </div>
 
             {/* Title */}
             <h2 style={{
@@ -371,9 +375,11 @@ import SettingsModal from './SettingsModal'
                     {step}
                   </span>
                   {idx < 6 && <ArrowRight size={12} style={{ color: 'var(--text-tertiary)' }} />}
-                </div>
+                <SettingsModal isOpen={isSettingsOpen} onClose={() => setSettingsOpen(false)} />
+      </div>
               ))}
-            </div>
+            <SettingsModal isOpen={isSettingsOpen} onClose={() => setSettingsOpen(false)} />
+      </div>
 
             {/* Navigation buttons */}
             <div style={{ display: 'flex', gap: '12px' }}>
@@ -437,7 +443,8 @@ import SettingsModal from './SettingsModal'
                   </>
                 )}
               </button>
-            </div>
+            <SettingsModal isOpen={isSettingsOpen} onClose={() => setSettingsOpen(false)} />
+      </div>
 
             {/* Skip button */}
             <button
@@ -457,8 +464,10 @@ import SettingsModal from './SettingsModal'
             >
               <X size={18} />
             </button>
-          </div>
-        </div>
+          <SettingsModal isOpen={isSettingsOpen} onClose={() => setSettingsOpen(false)} />
+      </div>
+        <SettingsModal isOpen={isSettingsOpen} onClose={() => setSettingsOpen(false)} />
+      </div>
       )}
 
       {/* Mobile styles */}
