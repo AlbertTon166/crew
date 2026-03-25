@@ -1,6 +1,6 @@
 # Agent Teams Manager - 产品需求文档
 
-> 版本：V2.1.0  
+> 版本：V2.2.0  
 > 更新：2026-03-25  
 > 负责人：马楼（PM + 技术文档工程师）
 
@@ -86,21 +86,36 @@
 - 支持自定义工作日（5天/6天/弹性）
 
 **任务属性**：
-```
+```typescript
 任务 = {
   id,
   title,
   description,
-  status,
+  status: 'pending' | 'running' | 'waiting_retry' | 'waiting_human' | 'fallback' | 'failed' | 'completed' | 'skipped',
   assignee: AgentId,
-  dependsOn: TaskId[],    // 依赖任务
-  blockedBy: TaskId[],   // 阻塞此任务的任务
+  dependsOn: TaskId[],      // 前置依赖任务
+  blockedBy: TaskId[],     // 阻塞此任务的任务
   estimatedHours,
   actualHours,
   priority: P0/P1/P2/P3,
   sprintId,
   milestoneId,
   executions: TaskExecution[],
+
+  // ========== 异常处理（新增）==========
+  timeoutSeconds: 300,       // 超时时间（秒），默认 300
+  maxRetries: 3,            // 最大重试次数
+  retryInterval: 1,          // 重试间隔（秒）
+  timeoutStrategy: 'retry' | 'fallback' | 'interrupt',
+  fallbackTaskId?: TaskId,  // 降级任务 ID
+  fallbackOutput?: string,    // 降级输出内容
+  interruptOnFailure: false, // 失败是否中断工作流
+  notificationUsers: string[],// 异常通知用户列表
+  isHumanInterruptPoint: false, // 是否为人类中断点
+
+  // ========== 工作流视图（新增）==========
+  workflowPosition?: { x: number, y: number },  // 画布坐标
+  nodeType: 'task' | 'agent' | 'interrupt' | 'condition' | 'parallel' | 'join',
   createdAt,
   updatedAt
 }
@@ -110,6 +125,143 @@
 - `Ctrl+K`：快速创建任务
 - 右键菜单：直接拖入相邻状态
 - 批量选择：多选 → 批量分配/移动/删除
+
+---
+
+### 2.2.1 工作流视图（Workflow Canvas）
+
+**功能**：可视化的任务流水线画布，任务为节点，连线表示依赖关系和执行顺序。
+
+**核心价值**：让复杂的多 Agent 协作任务不再是扁平列表，而是**有向无环图（DAG）**。
+
+**布局**：
+
+```
+┌─────────────────────────────────────────────────────────────┐
+│  [看板] [时间线] [甘特图] [工作流]  ← 视图切换 Tab          │
+└─────────────────────────────────────────────────────────────┘
+
+┌─────────────────────────────────────────────────────────────┐
+│  工作流画布                                                  │
+│                                                              │
+│  [需求确认] ──→ [任务拆解] ──→ [代码实现] ──→ [审查] ──→ [测试] │
+│       │              │              │          │          │
+│       ↓              ↓              ↓          ↓          ↓    │
+│  [PM Agent]      [Planner]      [Coder]    [Reviewer]  [Tester] │
+│                                                              │
+│  节点说明：                                                   │
+│  ● 任务节点：可拖拽，显示状态、负责人、执行时间                    │
+│  → 执行连线：箭头表示执行顺序，虚线表示软依赖，实线表示强依赖          │
+│  ■ 中断点：红色节点表示需要人类确认才能继续                        │
+│                                                              │
+│  操作：                                                       │
+│  - 拖拽节点到画布 → 创建任务                                    │
+│  - 拖拽节点之间的连线 → 建立依赖关系                             │
+│  - 双击节点 → 打开任务详情                                      │
+│  - 右键节点 → 设置异常处理策略                                   │
+└─────────────────────────────────────────────────────────────┘
+```
+
+**节点类型**：
+
+| 节点类型 | 图标 | 说明 |
+|---------|------|------|
+| 任务节点 | ● | 普通执行单元 |
+| Agent 节点 | 🤖 | 指定 Agent 执行 |
+| 中断节点 | ⏸️ | 等待人类确认 |
+| 条件节点 | ◇ | 根据条件分流 |
+| 并行节点 | ⇉ | 多任务并行执行 |
+| 汇聚节点 | ◎ | 等待前置任务全部完成 |
+
+**依赖连线属性**：
+```
+连线 = {
+  from: TaskId,
+  to: TaskId,
+  type: 'sequential' | 'conditional' | 'parallel',
+  condition?: string,        // 条件节点的判断条件
+  softDependency: boolean,   // true=虚线，false=实线
+}
+```
+
+**执行状态可视化**：
+- 待执行：灰色虚线
+- 执行中：蓝色实线 + 流动动画
+- 已完成：绿色实线
+- 失败/阻塞：红色实线 + 警示图标
+- 等待人类确认：黄色闪烁
+
+---
+
+### 2.2.2 异常处理策略（Exception Handling）
+
+**功能**：每个任务/节点可配置独立的异常处理策略，防止任务卡死无法恢复。
+
+**参考腾讯云 ADP 节点异常设计**。
+
+**异常处理配置**：
+
+```
+异常处理 = {
+  // 超时控制
+  timeoutSeconds: 300,        // 超时时间，默认 300s（可配置 1-3600s）
+  timeoutStrategy: 'retry' | 'fallback' | 'interrupt',  // 超时后的策略
+
+  // 重试配置
+  maxRetries: 3,             // 最大重试次数，默认 3 次
+  retryIntervalSeconds: 1,   // 重试间隔，默认 1s
+  
+  // 降级处理（fallback）
+  fallbackTaskId?: TaskId,   // 降级到的备选任务
+  fallbackOutput?: string,    // 降级时输出的内容
+  
+  // 中断处理
+  interruptOnFailure: boolean, // 失败时是否中断整个工作流
+  notificationUsers: string[], // 异常通知的用户列表
+}
+```
+
+**超时策略详解**：
+
+| 策略 | 行为 |
+|------|------|
+| `retry` | 等待超时后自动重试，最多 `maxRetries` 次 |
+| `fallback` | 停止当前任务，执行降级任务 |
+| `interrupt` | 直接中断，通知人类处理 |
+
+**降级方案示例**：
+
+```
+任务 A（调用外部 API）
+  ↓ 超时
+任务 A-降级（使用缓存数据）
+  ↓ 缓存也无
+通知项目经理 + 中断工作流
+```
+
+**异常状态**：
+
+| 状态 | 说明 |
+|------|------|
+| `pending` | 等待执行 |
+| `running` | 执行中 |
+| `waiting_retry` | 等待重试 |
+| `waiting_human` | 等待人类确认（中断点） |
+| `fallback` | 执行降级方案 |
+| `failed` | 彻底失败 |
+| `completed` | 成功完成 |
+| `skipped` | 被跳过（前置任务失败） |
+
+**人类中断点设计**：
+
+当任务执行到中断节点时：
+1. 任务状态变为 `waiting_human`
+2. 系统通知指定用户
+3. 用户可以选择：
+   - **确认继续**：任务继续执行
+   - **修改参数**：调整输入后继续
+   - **跳过任务**：跳过此节点继续下游
+   - **终止工作流**：整个工作流停止
 
 ---
 
@@ -351,17 +503,20 @@ interface JobKnowledge {
 
 ---
 
-## 五、优先级排序（V2.1.0）
+## 五、优先级排序（V2.2.0）
 
 | 优先级 | 功能 | 说明 |
 |--------|------|------|
-| P0 | 前端能完整访问，数据不丢 | 先让 demo 可用 |
-| P0 | Dashboard Agent 动效 | 提升视觉体验 |
-| P1 | PM Agent 话术规则 | 提高需求确认质量 |
-| P1 | 项目管理状态流转 + 看板 | 核心功能 |
+| P0 | Dashboard Agent 动效 | ✅ 已完成 |
+| P0 | PM Agent 话术规则 | ✅ 已完成 |
+| P0 | 项目看板 + 状态流转 | 核心功能，任务可拖拽 |
+| P1 | 工作流视图（画布+节点+连线） | 腾讯 ADP 核心能力借鉴 |
+| P1 | 异常处理（超时/重试/降级/中断点） | 腾讯 ADP 节点标准能力借鉴 |
 | P2 | 知识库重构（发现/订阅/贡献） | 提升可用性 |
 | P2 | 项目甘特图/时间线 | 增强管理能力 |
-| P3 | CI/CD + 自动化测试 | 长期质量 |
+| P3 | 应用模式切换（标准/工作流/Multi-Agent） | 适配不同复杂度场景 |
+| P3 | 操作审计日志 | 满足合规要求 |
+| P3 | 模型管理层 | 支持切换不同 LLM |
 
 ---
 

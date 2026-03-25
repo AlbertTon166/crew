@@ -181,101 +181,76 @@ export default function Sidebar({ isOpen = false, onClose, openSettingsTab }: Si
     >
       {/* Logo */}
       <div style={{ 
-        padding: '24px', 
+        padding: '16px 16px 16px 14px', 
         borderBottom: '1px solid var(--border)',
-        position: 'relative'
+        display: 'flex',
+        alignItems: 'center',
+        gap: '12px'
       }}>
-        {/* Subtle glow effect */}
-        <div style={{
-          position: 'absolute',
-          top: '-50%',
-          left: '-50%',
-          width: '200%',
-          height: '200%',
-          background: 'radial-gradient(circle at 30% 30%, var(--primary-glow) 0%, transparent 50%)',
-          opacity: 0.3,
-          pointerEvents: 'none'
-        }} />
-        
-        <div className="flex items-center justify-between" style={{ position: 'relative', zIndex: 1 }}>
-          <div className="flex items-center gap-10" style={{ marginLeft: '20px' }}>
-            <div 
-              style={{ 
-                width: '48px', 
-                height: '48px', 
-                background: 'linear-gradient(135deg, var(--primary), var(--accent-violet))',
-                borderRadius: '14px',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                boxShadow: '0 8px 24px var(--primary-glow)',
-                position: 'relative'
-              }}
-            >
-              {/* Inner highlight */}
-              <div style={{
-                position: 'absolute',
-                inset: '1px',
-                borderRadius: 'inherit',
-                background: 'linear-gradient(135deg, rgba(255,255,255,0.2), transparent)',
-                pointerEvents: 'none'
-              }} />
-              {/* Crew Logo SVG */}
-              <svg width="28" height="28" viewBox="0 0 48 48" fill="none" xmlns="http://www.w3.org/2000/svg">
-                <defs>
-                  <linearGradient id="crewGrad" x1="0%" y1="0%" x2="100%" y2="100%">
-                    <stop offset="0%" stopColor="#34D399"/>
-                    <stop offset="100%" stopColor="#8B5CF6"/>
-                  </linearGradient>
-                </defs>
-                <path d="M24 4L42 14V34L24 44L6 34V14L24 4Z" stroke="url(#crewGrad)" stroke-width="2" fill="none" opacity="0.4"/>
-                <path d="M24 10L36 18V30L24 38L12 30V18L24 10Z" fill="url(#crewGrad)" opacity="0.25"/>
-                <path d="M24 16L30 20V28L24 32L18 28V20L24 16Z" fill="url(#crewGrad)" opacity="0.7"/>
-                <circle cx="24" cy="24" r="3" fill="white"/>
-                <circle cx="24" cy="4" r="2" fill="#34D399"/>
-                <circle cx="42" cy="14" r="2" fill="#34D399"/>
-                <circle cx="42" cy="34" r="2" fill="#34D399"/>
-                <circle cx="24" cy="44" r="2" fill="#34D399"/>
-                <circle cx="6" cy="34" r="2" fill="#34D399"/>
-                <circle cx="6" cy="14" r="2" fill="#34D399"/>
-              </svg>
-            </div>
-            <div>
-              <h1 style={{ 
-                fontSize: '22px', 
-                fontWeight: '700', 
-                fontFamily: 'Cabinet Grotesk', 
-                letterSpacing: '-0.02em',
-                margin: 0,
-                background: 'linear-gradient(90deg, #34D399, #8B5CF6)',
-                backgroundSize: '200% 100%',
-                WebkitBackgroundClip: 'text',
-                WebkitTextFillColor: 'transparent',
-                backgroundClip: 'text',
-                animation: 'gradientShift 3s ease infinite'
-              }}>Crew</h1>
-              <p style={{ 
-                fontSize: '13px', 
-                color: 'var(--text-tertiary)',
-                margin: '4px 0 0 0'
-              }}>Agent Teams Orchestrator</p>
-            </div>
-          </div>
-          <button 
-            onClick={onClose}
-            style={{ 
-              display: 'none',
-              padding: '8px',
-              background: 'var(--bg-tertiary)',
-              border: '1px solid var(--border)',
-              borderRadius: '10px',
-              cursor: 'pointer',
-              transition: 'all 0.2s'
-            }}
-            className="mobile-close-btn"
-          >
-            <X size={18} style={{ color: 'var(--text-secondary)' }} />
-          </button>
+        {/* Logo mark */}
+        <div 
+          style={{ 
+            width: '40px', 
+            height: '40px', 
+            borderRadius: '10px',
+            background: 'linear-gradient(135deg, #0F172A 0%, #1a2332 100%)',
+            border: '1px solid rgba(52, 211, 153, 0.25)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            flexShrink: 0,
+            position: 'relative',
+            boxShadow: '0 0 16px rgba(52, 211, 153, 0.1), inset 0 1px 0 rgba(255,255,255,0.03)'
+          }}
+        >
+          {/* Crew Logo SVG */}
+          <svg width="32" height="32" viewBox="0 0 48 48" fill="none" xmlns="http://www.w3.org/2000/svg">
+            <defs>
+              <linearGradient id="crewGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+                <stop offset="0%" stopColor="#34D399"/>
+                <stop offset="100%" stopColor="#8B5CF6"/>
+              </linearGradient>
+            </defs>
+            {/* Outer hexagon */}
+            <path d="M24 4L42 14V34L24 44L6 34V14L24 4Z" stroke="url(#crewGrad)" strokeWidth="1.5" fill="none" opacity="0.5"/>
+            {/* Middle hexagon */}
+            <path d="M24 10L36 18V30L24 38L12 30V18L24 10Z" fill="url(#crewGrad)" opacity="0.2"/>
+            {/* Inner hexagon */}
+            <path d="M24 15L31 20.5V27.5L24 33L17 27.5V20.5L24 15Z" fill="url(#crewGrad)" opacity="0.65"/>
+            {/* Center dot */}
+            <circle cx="24" cy="24" r="2.5" fill="white"/>
+            {/* Nodes - top, 4 corners */}
+            <circle cx="24" cy="5" r="1.5" fill="#34D399"/>
+            <circle cx="41.5" cy="14" r="1.5" fill="#34D399"/>
+            <circle cx="41.5" cy="34" r="1.5" fill="#8B5CF6"/>
+            <circle cx="24" cy="43" r="1.5" fill="#8B5CF6"/>
+            <circle cx="6.5" cy="34" r="1.5" fill="#34D399"/>
+            <circle cx="6.5" cy="14" r="1.5" fill="#8B5CF6"/>
+          </svg>
+        </div>
+
+        {/* Text */}
+        <div style={{ minWidth: 0 }}>
+          <h1 style={{ 
+            fontSize: '17px', 
+            fontWeight: '700', 
+            fontFamily: 'Cabinet Grotesk, system-ui, sans-serif', 
+            letterSpacing: '-0.02em',
+            margin: 0,
+            background: 'linear-gradient(90deg, #34D399 0%, #8B5CF6 100%)',
+            WebkitBackgroundClip: 'text',
+            WebkitTextFillColor: 'transparent',
+            backgroundClip: 'text',
+          }}>Crew</h1>
+          <p style={{ 
+            fontSize: '10px', 
+            color: 'var(--text-tertiary)',
+            margin: '2px 0 0 0',
+            letterSpacing: '0.02em',
+            whiteSpace: 'nowrap',
+            overflow: 'hidden',
+            textOverflow: 'ellipsis'
+          }}>Agent Teams Orchestrator</p>
         </div>
       </div>
 
