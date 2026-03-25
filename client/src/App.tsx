@@ -5,7 +5,7 @@ import Projects from './pages/Projects'
 import Agents from './pages/Agents'
 import Knowledge from './pages/Knowledge'
 import Requirements from './pages/Requirements'
-import APIDoc from './pages/APIDoc'
+import APIKeys from './pages/APIKeys'
 import { AuthProvider } from './context/AuthContext'
 import { LanguageProvider } from './context/LanguageContext'
 import { DeployModeProvider } from './context/DeployModeContext'
@@ -23,7 +23,7 @@ function App() {
                 <Route path="requirements" element={<Requirements />} />
                 <Route path="agents" element={<Agents />} />
                 <Route path="knowledge" element={<Knowledge />} />
-                <Route path="api-doc" element={<APIDoc />} />
+                <Route path="api-keys" element={<APIKeys />} />
               </Route>
             </Routes>
           </BrowserRouter>

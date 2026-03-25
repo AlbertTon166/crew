@@ -44,7 +44,7 @@ const navItems = [
   { path: '/requirements', icon: MessageCircle, color: '#A78BFA', cloudOnly: false },
   { path: '/agents', icon: Bot, color: '#34D399', cloudOnly: false },
   { path: '/knowledge', icon: BookOpen, color: '#FBBF24', cloudOnly: false },
-  { path: '/api-doc', icon: Code, color: '#6366F1', cloudOnly: true },
+  { path: '/api-keys', icon: Key, color: '#6366F1', cloudOnly: false },
 ]
 
 const navLabels: Record<string, { en: string; zh: string }> = {
@@ -53,7 +53,7 @@ const navLabels: Record<string, { en: string; zh: string }> = {
   '/requirements': { en: 'Requirements', zh: '需求池' },
   '/agents': { en: 'Agents', zh: '智能体' },
   '/knowledge': { en: 'Knowledge', zh: '知识库' },
-  '/api-doc': { en: 'API Doc', zh: 'API文档' },
+  '/api-keys': { en: 'API Keys', zh: 'API密钥' },
 }
 
 const navDescs: Record<string, { en: string; zh: string }> = {
@@ -62,7 +62,7 @@ const navDescs: Record<string, { en: string; zh: string }> = {
   '/requirements': { en: 'Requirement pool', zh: '需求池' },
   '/agents': { en: 'AI agents', zh: 'AI智能体' },
   '/knowledge': { en: 'Knowledge base', zh: '知识库' },
-  '/api-doc': { en: 'API documentation', zh: '开发者文档' },
+  '/api-keys': { en: 'API keys management', zh: '管理AI模型密钥' },
 }
 
 export default function Sidebar({ isOpen = false, onClose, openSettingsTab }: SidebarProps) {
