@@ -52,7 +52,7 @@ const navItems = [
 ]
 
 const navLabels: Record<string, { en: string; zh: string }> = {
-  '/': { en: 'Dashboard', zh: '控制台' },
+  '/': { en: 'Workspace', zh: '工作区' },
   '/projects': { en: 'Projects', zh: '项目' },
   '/requirements': { en: 'Requirements', zh: '需求池' },
   '/agents': { en: 'Agents', zh: '智能体' },
@@ -63,7 +63,7 @@ const navLabels: Record<string, { en: string; zh: string }> = {
 }
 
 const navDescs: Record<string, { en: string; zh: string }> = {
-  '/': { en: 'Overview & stats', zh: '概览与统计' },
+  '/': { en: 'Workspace overview', zh: '工作区概览' },
   '/projects': { en: 'Manage projects', zh: '管理项目' },
   '/requirements': { en: 'Requirement pool', zh: '需求池' },
   '/agents': { en: 'AI agents', zh: 'AI智能体' },
