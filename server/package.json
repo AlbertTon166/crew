@@ -1,7 +1,7 @@
 {
-  "name": "agent-teams-server",
+  "name": "crew-server",
   "version": "1.0.0",
-  "description": "Agent Teams Manager Backend",
+  "description": "Crew Backend",
   "main": "index.js",
   "type": "module",
   "scripts": {

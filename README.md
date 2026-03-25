@@ -1,4 +1,4 @@
-# Agent Teams Manager 🤖
+# Crew 🤖
 
 可视化 Agent Teams 工作流管理平台，让产品需求到软件工程成果验收的全流程可见、可控、可追踪。
 
@@ -29,8 +29,8 @@
 
 ```bash
 # 克隆项目
-git clone https://github.com/AlbertTon166/agent-teams-manager.git
-cd agent-teams-manager
+git clone https://github.com/AlbertTon166/crew.git
+cd crew
 
 # 配置环境
 cp .env.example .env
@@ -129,8 +129,8 @@ cloudflared tunnel create agent-teams
 ### 1. 克隆项目
 
 ```bash
-git clone https://github.com/AlbertTon166/agent-teams-manager.git
-cd agent-teams-manager
+git clone https://github.com/AlbertTon166/crew.git
+cd crew
 ```
 
 ### 2. 配置环境变量
@@ -189,7 +189,7 @@ docker-compose up -d
 ## 📁 项目结构
 
 ```
-agent-teams-manager/
+crew/
 ├── client/                    # 前端应用
 │   ├── src/
 │   │   ├── components/        # React 组件

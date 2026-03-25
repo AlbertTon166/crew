@@ -1,4 +1,4 @@
-# Agent Teams Manager - 项目管理系统
+# Crew - 项目管理系统
 
 ## 1. Concept & Vision
 
@@ -191,7 +191,7 @@ Text Muted: #94A3B8 (Slate 400)
 
 ### 项目结构
 ```
-agent-teams-manager/
+crew/
 ├── client/                 # 前端
 │   ├── src/
 │   │   ├── components/    # 组件

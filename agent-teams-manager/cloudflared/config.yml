@@ -1,7 +1,0 @@
-tunnel: 759c8a01-39dd-4e9c-aa00-04c1252d08f9
-credentials-file: /root/.cloudflared/759c8a01-39dd-4e9c-aa00-04c1252d08f9.json
-
-ingress:
-  - hostname: agent-teams.aiteamsvr.work
-    service: http://frontend:80
-  - service: http_status:404

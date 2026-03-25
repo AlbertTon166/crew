@@ -1,7 +1,7 @@
 {
-  "name": "agent-teams-manager",
+  "name": "crew",
   "version": "1.0.0",
-  "description": "Multi-Agent Teams Management Platform",
+  "description": "Crew - AI Agent Teams Orchestrator",
   "private": true,
   "type": "module",
   "scripts": {

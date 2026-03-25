@@ -55,7 +55,7 @@
 
 ## 当前项目
 
-- **Agent Teams Manager**: AI软件开发团队管理系统
+- **Crew**: AI软件开发团队管理系统
   - 仓库: https://github.com/AlbertTon166/agent-teams-manager
   - 技术栈: React + Node.js + PostgreSQL + Redis + ChromaDB
 

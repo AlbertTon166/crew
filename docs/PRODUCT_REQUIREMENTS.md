@@ -1,4 +1,4 @@
-# Agent Teams Manager - 产品需求文档
+# Crew - 产品需求文档
 
 > 版本：V2.2.0  
 > 更新：2026-03-25  
@@ -606,4 +606,4 @@ interface JobKnowledge {
 
 ---
 
-*本文档由 Agent Teams Manager AI 助手（马楼）生成，仅供参考，实际以 CEO 确认为准。*
+*本文档由 Crew AI 助手（马楼）生成，仅供参考，实际以 CEO 确认为准。*
