@@ -567,7 +567,114 @@ interface JobKnowledge {
 
 ---
 
-### ⭐ 新功能计划：StarOffice 3D 可视化（CSS 3D）
+## 七、多租户隔离架构（商业化核心）
+
+### 架构方案：Docker + Namespace 隔离 + 资源配额
+
+**目标**：每个客户的任务和 Agent 运行在独立隔离环境中，资源可配额控制。
+
+---
+
+### 架构图
+
+```
+┌─────────────────────────────────────────────────────────────┐
+│                    服务器 Host                             │
+│                                                             │
+│  ┌─────────────┐  ┌─────────────┐  ┌─────────────┐         │
+│  │  客户 A     │  │  客户 B     │  │  客户 C     │         │
+│  │  Namespace  │  │  Namespace  │  │  Namespace  │         │
+│  │             │  │             │  │             │         │
+│  │  Agent ×N  │  │  Agent ×N  │  │  Agent ×N  │         │
+│  │  Task Queue│  │  Task Queue│  │  Task Queue│         │
+│  │             │  │             │  │             │         │
+│  │  CPU: 2核  │  │  CPU: 4核  │  │  CPU: 1核  │         │
+│  │  MEM: 4GB │  │  MEM: 8GB  │  │  MEM: 2GB  │         │
+│  └─────────────┘  └─────────────┘  └─────────────┘         │
+│                          ↑                                 │
+│                   共享存储 (NFS)                          │
+└─────────────────────────────────────────────────────────────┘
+```
+
+---
+
+### 隔离级别
+
+| 组件 | 隔离方式 | 说明 |
+|------|---------|------|
+| **进程空间** | Linux Namespace | PID、网络、挂载点隔离 |
+| **CPU** | cgroups quota | 每个租户 CPU 上限 |
+| **内存** | cgroups limit | 每个租户内存上限 |
+| **磁盘** | quota + NFS | 每个租户存储配额 |
+| **网络** | Namespace + VLAN | 租户间网络隔离 |
+| **Agent 通信** | API Gateway | 通过 REST/消息队列 |
+
+---
+
+### 资源配额模型
+
+```typescript
+interface TenantQuota {
+  tenantId: string
+  cpuCores: number         // CPU 核心数
+  memoryMB: number          // 内存 MB
+  diskMB: number           // 磁盘 MB
+  maxAgents: number        // 最大 Agent 数
+  maxConcurrentTasks: number // 最大并发任务数
+  maxStorageGB: number     // 存储 GB
+  gpuAccess: boolean       // 是否支持 GPU
+}
+```
+
+### 套餐对应的配额
+
+| 套餐 | CPU | 内存 | 存储 | Agent 数 | 并发任务 |
+|------|-----|------|------|---------|---------|
+| Free | 1核 | 2GB | 10GB | 3 | 1 |
+| Starter | 2核 | 4GB | 50GB | 10 | 3 |
+| Pro | 4核 | 8GB | 200GB | 30 | 10 |
+| Enterprise | 8核 | 16GB | 1TB | 100 | 50 |
+
+---
+
+### 实施阶段
+
+**Phase 1 - 容器化基础**
+- [ ] Docker Compose 单机部署
+- [ ] 每个租户独立容器
+- [ ] 基础资源配额（CPU/内存）
+
+**Phase 2 - Namespace 隔离**
+- [ ] Linux Namespace 配置
+- [ ] 网络隔离
+- [ ] 存储配额
+
+**Phase 3 - 调度与编排**
+- [ ] Kubernetes 迁移（或轻量调度器）
+- [ ] 自动扩缩容
+- [ ] 配额告警
+
+**Phase 4 - 企业功能**
+- [ ] SSO/LDAP 集成
+- [ ] 审计日志
+- [ ] SLA 保障
+
+---
+
+### 服务器概览信息
+
+资源管理页面服务器 Tab 顶部需显示：
+
+| 指标 | 说明 |
+|------|------|
+| **CPU** | 核心数 |
+| **内存** | 总量 / 已用 |
+| **硬盘** | 总量 / 已用 |
+| **容器** | 运行中 / 总数 |
+
+---
+
+## 八、竞品参考
 
 **参考项目**：[naolnegassa/StarOffice-UI](https://github.com/naolnegassa/StarOffice-UI)
 
