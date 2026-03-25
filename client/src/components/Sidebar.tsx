@@ -220,10 +220,25 @@ export default function Sidebar({ isOpen = false, onClose, openSettingsTab }: Si
                 background: 'linear-gradient(135deg, rgba(255,255,255,0.2), transparent)',
                 pointerEvents: 'none'
               }} />
-              <span style={{ 
-                fontSize: '26px',
-                position: 'relative'
-              }}>🦞</span>
+              {/* Crew Logo SVG */}
+              <svg width="28" height="28" viewBox="0 0 48 48" fill="none" xmlns="http://www.w3.org/2000/svg">
+                <defs>
+                  <linearGradient id="crewGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+                    <stop offset="0%" stopColor="#34D399"/>
+                    <stop offset="100%" stopColor="#8B5CF6"/>
+                  </linearGradient>
+                </defs>
+                <path d="M24 4L42 14V34L24 44L6 34V14L24 4Z" stroke="url(#crewGrad)" stroke-width="2" fill="none" opacity="0.4"/>
+                <path d="M24 10L36 18V30L24 38L12 30V18L24 10Z" fill="url(#crewGrad)" opacity="0.25"/>
+                <path d="M24 16L30 20V28L24 32L18 28V20L24 16Z" fill="url(#crewGrad)" opacity="0.7"/>
+                <circle cx="24" cy="24" r="3" fill="white"/>
+                <circle cx="24" cy="4" r="2" fill="#34D399"/>
+                <circle cx="42" cy="14" r="2" fill="#34D399"/>
+                <circle cx="42" cy="34" r="2" fill="#34D399"/>
+                <circle cx="24" cy="44" r="2" fill="#34D399"/>
+                <circle cx="6" cy="34" r="2" fill="#34D399"/>
+                <circle cx="6" cy="14" r="2" fill="#34D399"/>
+              </svg>
             </div>
             <div>
               <h1 style={{ 
@@ -232,18 +247,18 @@ export default function Sidebar({ isOpen = false, onClose, openSettingsTab }: Si
                 fontFamily: 'Cabinet Grotesk', 
                 letterSpacing: '-0.02em',
                 margin: 0,
-                background: 'linear-gradient(90deg, #FF10F0, #00FFFF, #A855F7, #39FF14)',
-                backgroundSize: '300% 100%',
+                background: 'linear-gradient(90deg, #34D399, #8B5CF6)',
+                backgroundSize: '200% 100%',
                 WebkitBackgroundClip: 'text',
                 WebkitTextFillColor: 'transparent',
                 backgroundClip: 'text',
-                animation: 'neonRainbow 3s ease infinite'
-              }}>AI.PM</h1>
+                animation: 'gradientShift 3s ease infinite'
+              }}>Crew</h1>
               <p style={{ 
                 fontSize: '13px', 
                 color: 'var(--text-tertiary)',
                 margin: '4px 0 0 0'
-              }}>AI Project Manager of Tangzexian</p>
+              }}>Agent Teams Orchestrator</p>
             </div>
           </div>
           <button 

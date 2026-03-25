@@ -17,8 +17,8 @@ export default function Layout() {
 
   const tourSteps = [
     {
-      title: '欢迎使用 AI.PM！',
-      titleZh: '欢迎使用 AI.PM！',
+      title: '欢迎使用 Crew！',
+      titleZh: '欢迎使用 Crew！',
       description: '这是一个智能项目管理助手，帮助您管理项目需求、智能体团队和知识库。',
       descriptionZh: '这是一个智能项目管理助手，帮助您管理项目需求、智能体团队和知识库。',
       target: null,
@@ -292,7 +292,7 @@ export default function Layout() {
               marginBottom: '8px',
             }}
           >
-            AI.PM
+            Crew
           </h1>
           <p
             style={{

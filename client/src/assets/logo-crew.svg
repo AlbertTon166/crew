@@ -1,0 +1,30 @@
+<svg width="48" height="48" viewBox="0 0 48 48" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <linearGradient id="crewGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#6366F1"/>
+      <stop offset="100%" style="stop-color:#8B5CF6"/>
+    </linearGradient>
+  </defs>
+  <!-- Outer hexagon ring -->
+  <path d="M24 4L42 14V34L24 44L6 34V14L24 4Z" stroke="url(#crewGrad)" stroke-width="2" fill="none" opacity="0.3"/>
+  <!-- Middle hexagon -->
+  <path d="M24 10L36 18V30L24 38L12 30V18L24 10Z" stroke="url(#crewGrad)" stroke-width="2" fill="url(#crewGrad)" opacity="0.15"/>
+  <!-- Inner hexagon -->
+  <path d="M24 16L30 20V28L24 32L18 28V20L24 16Z" fill="url(#crewGrad)" opacity="0.6"/>
+  <!-- Center dot -->
+  <circle cx="24" cy="24" r="3" fill="white"/>
+  <!-- Connection nodes -->
+  <circle cx="24" cy="4" r="2.5" fill="#34D399"/>
+  <circle cx="42" cy="14" r="2.5" fill="#34D399"/>
+  <circle cx="42" cy="34" r="2.5" fill="#34D399"/>
+  <circle cx="24" cy="44" r="2.5" fill="#34D399"/>
+  <circle cx="6" cy="34" r="2.5" fill="#34D399"/>
+  <circle cx="6" cy="14" r="2.5" fill="#34D399"/>
+  <!-- Connection lines -->
+  <line x1="24" y1="6.5" x2="24" cy1="16" y2="20" stroke="#34D399" stroke-width="1" opacity="0.5"/>
+  <line x1="39.5" y1="15.5" x2="30" y2="20" stroke="#34D399" stroke-width="1" opacity="0.5"/>
+  <line x1="39.5" y1="32.5" x2="30" y2="28" stroke="#34D399" stroke-width="1" opacity="0.5"/>
+  <line x1="24" y1="41.5" x2="24" y2="32" stroke="#34D399" stroke-width="1" opacity="0.5"/>
+  <line x1="8.5" y1="32.5" x2="18" y2="28" stroke="#34D399" stroke-width="1" opacity="0.5"/>
+  <line x1="8.5" y1="15.5" x2="18" y2="20" stroke="#34D399" stroke-width="1" opacity="0.5"/>
+</svg>
