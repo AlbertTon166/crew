@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { Outlet } from 'react-router-dom'
 import Sidebar from './Sidebar'
 import LoginModal from './LoginModal'
+import SettingsModal from './SettingsModal'
 import { Menu, X, ArrowRight, ArrowLeft, Check, Sparkles, Lock, Globe } from 'lucide-react'
 import { useAuth } from '../context/AuthContext'
 import { useLanguage } from '../context/LanguageContext'
@@ -10,7 +11,7 @@ export default function Layout() {
   const { user, isAuthenticated } = useAuth()
   const { language, setLanguage } = useLanguage()
   const [sidebarOpen, setSidebarOpen] = useState(false)
-import SettingsModal from './SettingsModal'
+  const [isSettingsOpen, setIsSettingsOpen] = useState(false)
   const [tourOpen, setTourOpen] = useState(false)
   const [tourStep, setTourStep] = useState(0)
   const [loginOpen, setLoginOpen] = useState(false)
@@ -142,74 +143,15 @@ import SettingsModal from './SettingsModal'
           backdropFilter: 'blur(10px)'
         }}
         className="mobile-menu-btn"
-              marginBottom: '48px',
-            }}
-          >
-            {language === 'zh' ? '智能项目管理助手' : 'Intelligent Project Management'}
-          </p>
+      >
+        {sidebarOpen ? <X size={20} /> : <Menu size={20} />}
+      </button>
 
-          {/* Login Button */}
-          <button
-            onClick={() => setLoginOpen(true)}
-            style={{
-              padding: '14px 32px',
-              background: 'linear-gradient(135deg, var(--primary), var(--accent-violet))',
-              border: 'none',
-              borderRadius: '14px',
-              color: '#fff',
-              fontSize: '15px',
-              fontWeight: '600',
-              cursor: 'pointer',
-              transition: 'all 0.3s ease',
-              boxShadow: '0 8px 32px var(--primary-glow)',
-              display: 'flex',
-              alignItems: 'center',
-              gap: '10px',
-            }}
-          >
-            <Lock size={18} />
-            {language === 'zh' ? '点击登录' : 'Click to Login'}
-          </button>
-
-          {/* Demo hint */}
-          <p
-            style={{
-              fontSize: '11px',
-              color: 'var(--text-tertiary)',
-              marginTop: '24px',
-            }}
-          >
-            {language === 'zh' ? '演示账号: admin / atm_sk_abc123def456xyz789' : 'Demo: admin / atm_sk_abc123def456xyz789'}
-          </p>
-
-          {/* Language Toggle - Bottom Left */}
-          <button
-            onClick={() => setLanguage(language === 'en' ? 'zh' : 'en')}
-            style={{
-              position: 'fixed',
-              bottom: '24px',
-              left: '24px',
-              padding: '8px 14px',
-              background: 'var(--bg-tertiary)',
-              border: '1px solid var(--border)',
-              borderRadius: '8px',
-              color: 'var(--text-primary)',
-              fontSize: '12px',
-              fontWeight: '600',
-              cursor: 'pointer',
-              display: 'flex',
-              alignItems: 'center',
-              gap: '6px',
-              zIndex: 999,
-              transition: 'all 0.2s',
-            }}
-          >
-            <Globe size={14} style={{ color: 'var(--text-secondary)' }} />
-            {language === 'zh' ? 'EN' : '中文'}
-          </button>
-        <SettingsModal isOpen={isSettingsOpen} onClose={() => setSettingsOpen(false)} />
-      </div>
-      )}
+      {/* Sidebar */}
+      <Sidebar 
+        isOpen={sidebarOpen} 
+        onClose={() => setSidebarOpen(false)} 
+      />
 
       {/* Main Content */}
       <main 
@@ -252,8 +194,7 @@ import SettingsModal from './SettingsModal'
         
         <div style={{ position: 'relative', zIndex: 1 }}>
           <Outlet />
-        <SettingsModal isOpen={isSettingsOpen} onClose={() => setSettingsOpen(false)} />
-      </div>
+        </div>
       </main>
 
       {/* Tour Modal */}
@@ -304,8 +245,7 @@ import SettingsModal from './SettingsModal'
                   }}
                 />
               ))}
-            <SettingsModal isOpen={isSettingsOpen} onClose={() => setSettingsOpen(false)} />
-      </div>
+            </div>
 
             {/* Step number */}
             <div style={{
@@ -320,8 +260,7 @@ import SettingsModal from './SettingsModal'
               boxShadow: '0 8px 24px var(--primary-glow)'
             }}>
               <span style={{ color: '#fff', fontSize: '20px', fontWeight: '700' }}>{tourStep + 1}</span>
-            <SettingsModal isOpen={isSettingsOpen} onClose={() => setSettingsOpen(false)} />
-      </div>
+            </div>
 
             {/* Title */}
             <h2 style={{
@@ -375,11 +314,9 @@ import SettingsModal from './SettingsModal'
                     {step}
                   </span>
                   {idx < 6 && <ArrowRight size={12} style={{ color: 'var(--text-tertiary)' }} />}
-                <SettingsModal isOpen={isSettingsOpen} onClose={() => setSettingsOpen(false)} />
-      </div>
+                </div>
               ))}
-            <SettingsModal isOpen={isSettingsOpen} onClose={() => setSettingsOpen(false)} />
-      </div>
+            </div>
 
             {/* Navigation buttons */}
             <div style={{ display: 'flex', gap: '12px' }}>
@@ -443,8 +380,7 @@ import SettingsModal from './SettingsModal'
                   </>
                 )}
               </button>
-            <SettingsModal isOpen={isSettingsOpen} onClose={() => setSettingsOpen(false)} />
-      </div>
+            </div>
 
             {/* Skip button */}
             <button
@@ -464,10 +400,8 @@ import SettingsModal from './SettingsModal'
             >
               <X size={18} />
             </button>
-          <SettingsModal isOpen={isSettingsOpen} onClose={() => setSettingsOpen(false)} />
-      </div>
-        <SettingsModal isOpen={isSettingsOpen} onClose={() => setSettingsOpen(false)} />
-      </div>
+          </div>
+        </div>
       )}
 
       {/* Mobile styles */}
@@ -512,6 +446,9 @@ import SettingsModal from './SettingsModal'
 
       {/* Login Modal */}
       <LoginModal isOpen={loginOpen} onClose={() => setLoginOpen(false)} />
+
+      {/* Settings Modal */}
+      <SettingsModal isOpen={isSettingsOpen} onClose={() => setIsSettingsOpen(false)} />
     </div>
   )
 }
