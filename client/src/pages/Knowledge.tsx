@@ -1,869 +1,869 @@
-import { useState, useEffect } from 'react'
-import { Search, Shield, BookOpen, X, CheckCircle, Users, Zap, GripVertical, Bot, Plus, WifiOff, Wrench } from 'lucide-react'
+import { useState } from 'react'
+import { 
+  Search, BookOpen, Star, Users, Plus, ChevronRight, 
+  Code, Palette, LineChart, Settings, Shield, Zap,
+  CheckCircle, ExternalLink, Clock, TrendingUp, Filter,
+  Edit2, Eye, Bookmark, BookmarkCheck
+} from 'lucide-react'
 import { useLanguage } from '../context/LanguageContext'
-import { useDeployMode } from '../context/DeployModeContext'
 
-interface JobTemplate {
+// Job knowledge model
+interface JobKnowledge {
   id: string
   title: string
-  titleZh: string
-  industry: string
-  industryZh: string
-  role: { title: string; titleZh: string; content: string; contentZh: string }
-  skills: { title: string; titleZh: string; content: string; contentZh: string }
-  knowledge: { title: string; titleZh: string; content: string; contentZh: string }
-  tools?: { title: string; titleZh: string; content: string; contentZh: string; links?: string[] }
+  titleEn: string
+  category: 'engineering' | 'product' | 'design' | 'operations'
+  summary: string
+  summaryZh: string
+  capabilities: string[]       // 核心能力
+  tools: { name: string; link?: string }[]
+  bestPractices: string[]
+  completeness: number          // 完善度 0-100
+  qualityScore: number          // 质量评分 0-5
+  subscribers: number           // 订阅数
+  lastUpdatedBy: string
+  updatedAt: string
+  tags: string[]
 }
 
-const jobTemplates: JobTemplate[] = [
+// Category config
+const categoryConfig = {
+  engineering: { label: '工程', labelEn: 'Engineering', color: '#3B82F6', icon: Code },
+  product: { label: '产品', labelEn: 'Product', color: '#8B5CF6', icon: LineChart },
+  design: { label: '设计', labelEn: 'Design', color: '#EC4899', icon: Palette },
+  operations: { label: '运营', labelEn: 'Operations', color: '#F59E0B', icon: Settings },
+}
+
+// Mock data - discovered jobs
+const mockJobs: JobKnowledge[] = [
   {
-    id: 'frontend-dev',
-    title: 'Frontend Developer',
-    titleZh: '前端开发工程师',
-    industry: 'Technology',
-    industryZh: '科技',
-    role: {
-      title: 'Frontend Developer Role',
-      titleZh: '前端开发工程师角色',
-      content: 'You are a senior frontend developer with 8+ years of experience...',
-      contentZh: '你是一位拥有8年以上经验的高级前端开发工程师...'
-    },
-    skills: {
-      title: 'Frontend Developer Skills',
-      titleZh: '前端开发技能清单',
-      content: 'React 18+, TypeScript, Tailwind CSS...',
-      contentZh: 'React 18+、TypeScript、Tailwind CSS...'
-    },
-    knowledge: {
-      title: 'Frontend Development Guidelines',
-      titleZh: '前端开发规范',
-      content: 'File Structure, Naming Conventions, Git Workflow...',
-      contentZh: '文件结构、命名规范、Git工作流...'
-    },
-    tools: {
-      title: 'Frontend Tools',
-      titleZh: '前端工具',
-      content: '开发工具链和资源链接',
-      contentZh: '开发工具链和资源链接',
-      links: [
-        'https://react.dev',
-        'https://typescriptlang.org',
-        'https://tailwindcss.com'
-      ]
-    }
+    id: 'job-1',
+    title: '前端开发工程师',
+    titleEn: 'Frontend Engineer',
+    category: 'engineering',
+    summary: '负责 Web 前端开发，构建用户界面和交互体验',
+    summaryZh: '负责Web前端开发，构建用户界面和交互体验',
+    capabilities: ['React 18+', 'TypeScript', 'Tailwind CSS', '性能优化', '组件化开发'],
+    tools: [
+      { name: 'React', link: 'https://react.dev' },
+      { name: 'TypeScript', link: 'https://typescriptlang.org' },
+      { name: 'Vite', link: 'https://vitejs.dev' },
+    ],
+    bestPractices: ['组件单一职责', '状态管理规范', 'Git 提交规范', '代码审查流程'],
+    completeness: 85,
+    qualityScore: 4.5,
+    subscribers: 128,
+    lastUpdatedBy: '张三',
+    updatedAt: '2026-03-20',
+    tags: ['Frontend', 'React', 'TypeScript'],
   },
   {
-    id: 'backend-dev',
-    title: 'Backend Developer',
-    titleZh: '后端开发工程师',
-    industry: 'Technology',
-    industryZh: '科技',
-    role: {
-      title: 'Backend Developer Role',
-      titleZh: '后端开发工程师角色',
-      content: 'You are a senior backend developer with 8+ years of experience...',
-      contentZh: '你是一位拥有8年以上经验的高级后端开发工程师...'
-    },
-    skills: {
-      title: 'Backend Developer Skills',
-      titleZh: '后端开发技能清单',
-      content: 'Node.js/Express, SQL/NoSQL databases, API design...',
-      contentZh: 'Node.js/Express、SQL/NoSQL数据库、API设计...'
-    },
-    knowledge: {
-      title: 'Backend Development Guidelines',
-      titleZh: '后端开发规范',
-      content: 'REST Conventions, Response Format, Error Handling...',
-      contentZh: 'REST约定、响应格式、错误处理...'
-    },
-    tools: {
-      title: 'Backend Tools',
-      titleZh: '后端工具',
-      content: '后端开发工具链和资源链接',
-      contentZh: '后端开发工具链和资源链接',
-      links: [
-        'https://nodejs.org',
-        'https://expressjs.com',
-        'https://postman.com'
-      ]
-    }
+    id: 'job-2',
+    title: '后端开发工程师',
+    titleEn: 'Backend Engineer',
+    category: 'engineering',
+    summary: '负责 API 设计、数据库开发、服务端逻辑',
+    summaryZh: '负责API设计、数据库开发、服务端逻辑',
+    capabilities: ['Node.js', 'Python', 'PostgreSQL', 'Redis', 'API 设计', '微服务'],
+    tools: [
+      { name: 'Node.js', link: 'https://nodejs.org' },
+      { name: 'Express', link: 'https://expressjs.com' },
+      { name: 'PostgreSQL', link: 'https://postgresql.org' },
+    ],
+    bestPractices: ['RESTful 规范', '数据库索引优化', '日志规范', '接口文档化'],
+    completeness: 78,
+    qualityScore: 4.2,
+    subscribers: 156,
+    lastUpdatedBy: '李四',
+    updatedAt: '2026-03-18',
+    tags: ['Backend', 'Node.js', 'Database'],
   },
   {
-    id: 'qa-engineer',
-    title: 'QA Engineer',
-    titleZh: '测试工程师',
-    industry: 'Technology',
-    industryZh: '科技',
-    role: {
-      title: 'QA Engineer Role',
-      titleZh: '测试工程师角色',
-      content: 'You are a QA engineer specializing in automated testing...',
-      contentZh: '你是一位专注于自动化测试的QA工程师...'
-    },
-    skills: {
-      title: 'QA Engineer Skills',
-      titleZh: '测试工程师技能清单',
-      content: 'Test case design, Selenium, Cypress, Playwright...',
-      contentZh: '测试用例设计、Selenium、Cypress、Playwright...'
-    },
-    knowledge: {
-      title: 'QA Testing Guidelines',
-      titleZh: '测试规范',
-      content: 'Bug Report Template, Severity Definitions...',
-      contentZh: 'Bug报告模板、严重性定义...'
-    },
-    tools: {
-      title: 'QA Tools',
-      titleZh: '测试工具',
-      content: '测试工具和平台链接',
-      contentZh: '测试工具和平台链接',
-      links: [
-        'https://www.selenium.dev',
-        'https://www.cypress.io',
-        'https://playwright.dev'
-      ]
-    }
+    id: 'job-3',
+    title: '测试工程师',
+    titleEn: 'QA Engineer',
+    category: 'engineering',
+    summary: '负责质量保障、测试自动化、缺陷追踪',
+    summaryZh: '负责质量保障、测试自动化、缺陷追踪',
+    capabilities: ['测试用例设计', 'Selenium', 'Playwright', 'Cypress', '持续集成'],
+    tools: [
+      { name: 'Playwright', link: 'https://playwright.dev' },
+      { name: 'Cypress', link: 'https://cypress.io' },
+      { name: 'Jest', link: 'https://jestjs.io' },
+    ],
+    bestPractices: ['测试金字塔', 'BDD 规范', '回归测试自动化', '性能测试'],
+    completeness: 65,
+    qualityScore: 3.8,
+    subscribers: 45,
+    lastUpdatedBy: '王五',
+    updatedAt: '2026-03-15',
+    tags: ['QA', 'Testing', 'Automation'],
   },
   {
-    id: 'product-manager',
-    title: 'Product Manager',
-    titleZh: '产品经理',
-    industry: 'Technology',
-    industryZh: '科技',
-    role: {
-      title: 'Product Manager Role',
-      titleZh: '产品经理角色',
-      content: 'You are an experienced product manager with 6+ years...',
-      contentZh: '你是一位拥有6年以上经验的产品经理...'
-    },
-    skills: {
-      title: 'Product Manager Skills',
-      titleZh: '产品经理技能清单',
-      content: 'Market analysis, User research, Wireframing...',
-      contentZh: '市场分析、用户研究、线框图...'
-    },
-    knowledge: {
-      title: 'Product Management Guidelines',
-      titleZh: '产品管理规范',
-      content: 'PRD Template, Sprint Planning...',
-      contentZh: 'PRD模板、迭代计划...'
-    },
-    tools: {
-      title: 'PM Tools',
-      titleZh: '产品工具',
-      content: '产品管理工具和平台链接',
-      contentZh: '产品管理工具和平台链接',
-      links: [
-        'https://figma.com',
-        'https://miro.com',
-        'https://notion.so'
-      ]
-    }
+    id: 'job-4',
+    title: '产品经理',
+    titleEn: 'Product Manager',
+    category: 'product',
+    summary: '负责产品规划、需求管理、跨团队协调',
+    summaryZh: '负责产品规划、需求管理、跨团队协调',
+    capabilities: ['需求分析', 'PRD 撰写', '数据分析', '用户研究', '项目管理'],
+    tools: [
+      { name: 'Figma', link: 'https://figma.com' },
+      { name: 'Notion', link: 'https://notion.so' },
+      { name: 'Miro', link: 'https://miro.com' },
+    ],
+    bestPractices: ['SMART 目标', '用户故事地图', 'KPI 定义', '迭代回顾'],
+    completeness: 72,
+    qualityScore: 4.0,
+    subscribers: 89,
+    lastUpdatedBy: '赵六',
+    updatedAt: '2026-03-22',
+    tags: ['PM', 'Product', 'Management'],
   },
   {
-    id: 'devops-engineer',
-    title: 'DevOps Engineer',
-    titleZh: '运维工程师',
-    industry: 'Technology',
-    industryZh: '科技',
-    role: {
-      title: 'DevOps Engineer Role',
-      titleZh: '运维工程师角色',
-      content: 'You are a DevOps engineer with 6+ years of experience...',
-      contentZh: '你是一位拥有6年以上经验的运维工程师...'
-    },
-    skills: {
-      title: 'DevOps Engineer Skills',
-      titleZh: '运维工程师技能清单',
-      content: 'Docker, Kubernetes, Jenkins, Terraform...',
-      contentZh: 'Docker、Kubernetes、Jenkins、Terraform...'
-    },
-    knowledge: {
-      title: 'DevOps Guidelines',
-      titleZh: '运维规范',
-      content: 'CI/CD Pipeline, Infrastructure as Code...',
-      contentZh: 'CI/CD流水线、基础设施即代码...'
-    },
-    tools: {
-      title: 'DevOps Tools',
-      titleZh: '运维工具',
-      content: '运维工具和平台链接',
-      contentZh: '运维工具和平台链接',
-      links: [
-        'https://docker.com',
-        'https://kubernetes.io',
-        'https://jenkins.io'
-      ]
-    }
-  }
+    id: 'job-5',
+    title: 'UI/UX 设计师',
+    titleEn: 'UI/UX Designer',
+    category: 'design',
+    summary: '负责界面设计、用户体验优化、设计系统维护',
+    summaryZh: '负责界面设计、用户体验优化、设计系统维护',
+    capabilities: ['Figma', 'UI 设计', 'UX 研究', '设计系统', '原型制作'],
+    tools: [
+      { name: 'Figma', link: 'https://figma.com' },
+      { name: 'Framer', link: 'https://framer.com' },
+    ],
+    bestPractices: ['原子设计', '设计 token', '无障碍设计', '响应式布局'],
+    completeness: 58,
+    qualityScore: 4.3,
+    subscribers: 67,
+    lastUpdatedBy: '钱七',
+    updatedAt: '2026-03-10',
+    tags: ['Design', 'UI', 'UX'],
+  },
+  {
+    id: 'job-6',
+    title: '运维工程师',
+    titleEn: 'DevOps Engineer',
+    category: 'operations',
+    summary: '负责 CI/CD 流水线、容器化、监控告警',
+    summaryZh: '负责CI/CD流水线、容器化、监控告警',
+    capabilities: ['Docker', 'Kubernetes', 'CI/CD', 'Terraform', '监控'],
+    tools: [
+      { name: 'Docker', link: 'https://docker.com' },
+      { name: 'Kubernetes', link: 'https://kubernetes.io' },
+      { name: 'GitHub Actions', link: 'https://github.com/features/actions' },
+    ],
+    bestPractices: ['基础设施即代码', 'GitOps', '监控告警规范', '灾备方案'],
+    completeness: 70,
+    qualityScore: 4.1,
+    subscribers: 73,
+    lastUpdatedBy: '孙八',
+    updatedAt: '2026-03-19',
+    tags: ['DevOps', 'Docker', 'Kubernetes'],
+  },
 ]
 
-const industries = [
-  { id: 'all', label: '全部', labelEn: 'All' },
-  { id: 'Technology', label: '科技', labelEn: 'Technology' },
-  { id: 'Finance', label: '金融', labelEn: 'Finance' },
-  { id: 'Healthcare', label: '医疗', labelEn: 'Healthcare' },
-  { id: 'E-commerce', label: '电商', labelEn: 'E-commerce' },
+// Completeness bar
+function CompletenessBar({ value }: { value: number }) {
+  const color = value > 70 ? '#34D399' : value > 40 ? '#FBBF24' : '#F87171'
+  return (
+    <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+      <div style={{ flex: 1, height: 6, background: 'var(--bg-tertiary)', borderRadius: 3, overflow: 'hidden' }}>
+        <div style={{ width: `${value}%`, height: '100%', background: color, borderRadius: 3, transition: 'width 0.3s' }} />
+      </div>
+      <span style={{ fontSize: '11px', fontWeight: '600', color, minWidth: 32 }}>{value}%</span>
+    </div>
+  )
+}
+
+// Quality stars
+function QualityStars({ score }: { score: number }) {
+  return (
+    <div style={{ display: 'flex', alignItems: 'center', gap: '2px' }}>
+      {[1, 2, 3, 4, 5].map(i => (
+        <Star
+          key={i}
+          size={12}
+          style={{ color: i <= Math.round(score) ? '#FBBF24' : 'var(--bg-tertiary)', fill: i <= Math.round(score) ? '#FBBF24' : 'transparent' }}
+        />
+      ))}
+      <span style={{ fontSize: '11px', color: 'var(--text-tertiary)', marginLeft: 4 }}>
+        {score.toFixed(1)}
+      </span>
+    </div>
+  )
+}
+
+// Job card
+function JobCard({ job, onSubscribe, onView, isSubscribed, language }: {
+  job: JobKnowledge
+  onSubscribe: (id: string) => void
+  onView: (job: JobKnowledge) => void
+  isSubscribed: boolean
+  language: 'en' | 'zh'
+}) {
+  const catCfg = categoryConfig[job.category]
+  const CategoryIcon = catCfg.icon
+  
+  return (
+    <div
+      style={{
+        background: 'var(--bg-secondary)',
+        border: '1px solid var(--border)',
+        borderRadius: '16px',
+        padding: '20px',
+        transition: 'all 0.2s ease',
+        cursor: 'pointer',
+      }}
+      className="job-card"
+      onClick={() => onView(job)}
+    >
+      {/* Header */}
+      <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', marginBottom: '12px' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+          <div style={{
+            width: 44, height: 44, borderRadius: '12px',
+            background: `${catCfg.color}15`,
+            border: `1px solid ${catCfg.color}30`,
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+          }}>
+            <CategoryIcon size={20} style={{ color: catCfg.color }} />
+          </div>
+          <div>
+            <h3 style={{ fontSize: '15px', fontWeight: '600', color: 'var(--text-primary)', margin: 0 }}>
+              {language === 'zh' ? job.title : job.titleEn}
+            </h3>
+            <p style={{ fontSize: '12px', color: 'var(--text-tertiary)', margin: '2px 0 0 0' }}>
+              {language === 'zh' ? job.summaryZh : job.summary}
+            </p>
+          </div>
+        </div>
+        
+        <button
+          onClick={(e) => { e.stopPropagation(); onSubscribe(job.id) }}
+          style={{
+            width: 36, height: 36, borderRadius: '10px',
+            background: isSubscribed ? 'rgba(52, 211, 153, 0.1)' : 'var(--bg-tertiary)',
+            border: isSubscribed ? '1px solid rgba(52, 211, 153, 0.3)' : '1px solid var(--border)',
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+            cursor: 'pointer',
+            transition: 'all 0.2s',
+          }}
+        >
+          {isSubscribed ? (
+            <BookmarkCheck size={16} style={{ color: '#34D399' }} />
+          ) : (
+            <Bookmark size={16} style={{ color: 'var(--text-tertiary)' }} />
+          )}
+        </button>
+      </div>
+      
+      {/* Tags */}
+      <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px', marginBottom: '14px' }}>
+        {job.tags.slice(0, 3).map(tag => (
+          <span key={tag} style={{
+            fontSize: '10px',
+            padding: '3px 8px',
+            borderRadius: '6px',
+            background: 'var(--bg-tertiary)',
+            color: 'var(--text-tertiary)',
+          }}>
+            {tag}
+          </span>
+        ))}
+      </div>
+      
+      {/* Capabilities */}
+      <div style={{ marginBottom: '14px' }}>
+        <div style={{ fontSize: '10px', fontWeight: '600', color: 'var(--text-tertiary)', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '6px' }}>
+          {language === 'zh' ? '核心能力' : 'Capabilities'}
+        </div>
+        <div style={{ display: 'flex', flexWrap: 'wrap', gap: '4px' }}>
+          {job.capabilities.slice(0, 4).map(cap => (
+            <span key={cap} style={{
+              fontSize: '11px',
+              padding: '2px 8px',
+              borderRadius: '4px',
+              background: `${catCfg.color}10`,
+              color: catCfg.color,
+            }}>
+              {cap}
+            </span>
+          ))}
+        </div>
+      </div>
+      
+      {/* Stats */}
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', paddingTop: '12px', borderTop: '1px solid var(--border)' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+            <span style={{ fontSize: '11px', color: 'var(--text-tertiary)' }}>
+              {language === 'zh' ? '完善度' : 'Complete'}
+            </span>
+            <CompletenessBar value={job.completeness} />
+          </div>
+        </div>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+          <QualityStars score={job.qualityScore} />
+          <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+            <Users size={12} style={{ color: 'var(--text-tertiary)' }} />
+            <span style={{ fontSize: '11px', color: 'var(--text-tertiary)' }}>{job.subscribers}</span>
+          </div>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+// Job detail modal
+function JobDetailModal({ job, onClose, onSubscribe, isSubscribed, language }: {
+  job: JobKnowledge
+  onClose: () => void
+  onSubscribe: (id: string) => void
+  isSubscribed: boolean
+  language: 'en' | 'zh'
+}) {
+  const catCfg = categoryConfig[job.category]
+  const CategoryIcon = catCfg.icon
+  
+  return (
+    <div
+      style={{
+        position: 'fixed', inset: 0,
+        background: 'rgba(0,0,0,0.6)',
+        backdropFilter: 'blur(4px)',
+        display: 'flex', alignItems: 'center', justifyContent: 'center',
+        zIndex: 1000,
+        padding: '20px',
+      }}
+      onClick={onClose}
+    >
+      <div
+        style={{
+          background: 'var(--bg-secondary)',
+          borderRadius: '20px',
+          border: '1px solid var(--border)',
+          width: '100%',
+          maxWidth: '640px',
+          maxHeight: '85vh',
+          overflow: 'auto',
+        }}
+        onClick={e => e.stopPropagation()}
+      >
+        {/* Header */}
+        <div style={{ padding: '24px', borderBottom: '1px solid var(--border)' }}>
+          <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '14px' }}>
+              <div style={{
+                width: 56, height: 56, borderRadius: '14px',
+                background: `${catCfg.color}15`,
+                border: `1px solid ${catCfg.color}30`,
+                display: 'flex', alignItems: 'center', justifyContent: 'center',
+              }}>
+                <CategoryIcon size={24} style={{ color: catCfg.color }} />
+              </div>
+              <div>
+                <h2 style={{ fontSize: '20px', fontWeight: '700', color: 'var(--text-primary)', margin: 0 }}>
+                  {language === 'zh' ? job.title : job.titleEn}
+                </h2>
+                <p style={{ fontSize: '14px', color: 'var(--text-secondary)', margin: '4px 0 0 0' }}>
+                  {language === 'zh' ? job.summaryZh : job.summary}
+                </p>
+              </div>
+            </div>
+            <button
+              onClick={onClose}
+              style={{
+                width: 36, height: 36, borderRadius: '10px',
+                background: 'var(--bg-tertiary)', border: 'none',
+                display: 'flex', alignItems: 'center', justifyContent: 'center',
+                cursor: 'pointer',
+              }}
+            >
+              ✕
+            </button>
+          </div>
+          
+          {/* Action buttons */}
+          <div style={{ display: 'flex', gap: '10px', marginTop: '16px' }}>
+            <button
+              onClick={() => onSubscribe(job.id)}
+              style={{
+                flex: 1,
+                padding: '12px',
+                borderRadius: '10px',
+                background: isSubscribed ? 'rgba(52, 211, 153, 0.1)' : 'linear-gradient(135deg, #6366F1, #8B5CF6)',
+                border: isSubscribed ? '1px solid rgba(52, 211, 153, 0.3)' : 'none',
+                color: isSubscribed ? '#34D399' : 'white',
+                fontSize: '14px',
+                fontWeight: '600',
+                cursor: 'pointer',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                gap: '8px',
+              }}
+            >
+              {isSubscribed ? (
+                <>
+                  <CheckCircle size={16} />
+                  {language === 'zh' ? '已订阅' : 'Subscribed'}
+                </>
+              ) : (
+                <>
+                  <Plus size={16} />
+                  {language === 'zh' ? '订阅此职业' : 'Subscribe'}
+                </>
+              )}
+            </button>
+          </div>
+        </div>
+        
+        {/* Content */}
+        <div style={{ padding: '24px' }}>
+          {/* Stats row */}
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '12px', marginBottom: '24px' }}>
+            <div style={{ background: 'var(--bg-tertiary)', borderRadius: '12px', padding: '14px', textAlign: 'center' }}>
+              <div style={{ fontSize: '20px', fontWeight: '700', color: catCfg.color }}>
+                {job.completeness}%
+              </div>
+              <div style={{ fontSize: '11px', color: 'var(--text-tertiary)', marginTop: '4px' }}>
+                {language === 'zh' ? '完善度' : 'Completeness'}
+              </div>
+            </div>
+            <div style={{ background: 'var(--bg-tertiary)', borderRadius: '12px', padding: '14px', textAlign: 'center' }}>
+              <div style={{ fontSize: '20px', fontWeight: '700', color: '#FBBF24' }}>
+                {job.qualityScore.toFixed(1)}
+              </div>
+              <div style={{ fontSize: '11px', color: 'var(--text-tertiary)', marginTop: '4px' }}>
+                {language === 'zh' ? '质量评分' : 'Quality'}
+              </div>
+            </div>
+            <div style={{ background: 'var(--bg-tertiary)', borderRadius: '12px', padding: '14px', textAlign: 'center' }}>
+              <div style={{ fontSize: '20px', fontWeight: '700', color: '#8B5CF6' }}>
+                {job.subscribers}
+              </div>
+              <div style={{ fontSize: '11px', color: 'var(--text-tertiary)', marginTop: '4px' }}>
+                {language === 'zh' ? '订阅者' : 'Subscribers'}
+              </div>
+            </div>
+          </div>
+          
+          {/* Capabilities */}
+          <div style={{ marginBottom: '20px' }}>
+            <h4 style={{ fontSize: '12px', fontWeight: '600', color: 'var(--text-tertiary)', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '10px' }}>
+              {language === 'zh' ? '核心能力' : 'Core Capabilities'}
+            </h4>
+            <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px' }}>
+              {job.capabilities.map(cap => (
+                <span key={cap} style={{
+                  fontSize: '12px',
+                  padding: '6px 12px',
+                  borderRadius: '8px',
+                  background: `${catCfg.color}10`,
+                  color: catCfg.color,
+                  border: `1px solid ${catCfg.color}20`,
+                }}>
+                  {cap}
+                </span>
+              ))}
+            </div>
+          </div>
+          
+          {/* Tools */}
+          <div style={{ marginBottom: '20px' }}>
+            <h4 style={{ fontSize: '12px', fontWeight: '600', color: 'var(--text-tertiary)', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '10px' }}>
+              {language === 'zh' ? '常用工具' : 'Tools'}
+            </h4>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+              {job.tools.map((tool, i) => (
+                <a
+                  key={i}
+                  href={tool.link || '#'}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'space-between',
+                    padding: '10px 14px',
+                    borderRadius: '10px',
+                    background: 'var(--bg-tertiary)',
+                    color: 'var(--text-primary)',
+                    textDecoration: 'none',
+                    fontSize: '13px',
+                    transition: 'all 0.2s',
+                  }}
+                  onMouseEnter={e => (e.currentTarget.style.background = 'var(--bg-primary)')}
+                  onMouseLeave={e => (e.currentTarget.style.background = 'var(--bg-tertiary)')}
+                >
+                  {tool.name}
+                  <ExternalLink size={14} style={{ color: 'var(--text-tertiary)' }} />
+                </a>
+              ))}
+            </div>
+          </div>
+          
+          {/* Best practices */}
+          <div>
+            <h4 style={{ fontSize: '12px', fontWeight: '600', color: 'var(--text-tertiary)', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '10px' }}>
+              {language === 'zh' ? '最佳实践' : 'Best Practices'}
+            </h4>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+              {job.bestPractices.map((practice, i) => (
+                <div key={i} style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '10px',
+                  padding: '10px 14px',
+                  borderRadius: '10px',
+                  background: 'var(--bg-tertiary)',
+                }}>
+                  <CheckCircle size={14} style={{ color: '#34D399', flexShrink: 0 }} />
+                  <span style={{ fontSize: '13px', color: 'var(--text-primary)' }}>{practice}</span>
+                </div>
+              ))}
+            </div>
+          </div>
+          
+          {/* Footer */}
+          <div style={{ marginTop: '24px', paddingTop: '16px', borderTop: '1px solid var(--border)', display: 'flex', justifyContent: 'space-between', fontSize: '12px', color: 'var(--text-tertiary)' }}>
+            <span>{language === 'zh' ? '最后更新' : 'Last updated'}: {job.lastUpdatedBy}</span>
+            <span>{job.updatedAt}</span>
+          </div>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+// Tab config
+const tabs = [
+  { id: 'discover', label: '发现', labelEn: 'Discover', icon: BookOpen },
+  { id: 'subscriptions', label: '我的订阅', labelEn: 'My Subscriptions', icon: Star },
+  { id: 'contribute', label: '贡献', labelEn: 'Contribute', icon: Plus },
 ]
 
 export default function Knowledge() {
   const { language } = useLanguage()
-  const { isConnected } = useDeployMode()
-  const [jobs] = useState<JobTemplate[]>(jobTemplates)
-  const [selectedJob, setSelectedJob] = useState<JobTemplate | null>(null)
+  const [activeTab, setActiveTab] = useState<'discover' | 'subscriptions' | 'contribute'>('discover')
   const [search, setSearch] = useState('')
-  const [industryFilter, setIndustryFilter] = useState('all')
-  const [showConfig, setShowConfig] = useState(false)
-  const [addedJobs, setAddedJobs] = useState<string[]>([])
-  const [draggedJob, setDraggedJob] = useState<JobTemplate | null>(null)
-  const [isDragOver, setIsDragOver] = useState(false)
-  const [showCreateModal, setShowCreateModal] = useState(false)
-  const [editingSkills, setEditingSkills] = useState(false)
-  const [editingKnowledge, setEditingKnowledge] = useState(false)
-  const [editingTools, setEditingTools] = useState(false)
-  const [tempSkillsContent, setTempSkillsContent] = useState('')
-  const [tempKnowledgeContent, setTempKnowledgeContent] = useState('')
-  const [tempToolsContent, setTempToolsContent] = useState('')
-  const [editedJobs, setEditedJobs] = useState<Record<string, { skills?: string; knowledge?: string; tools?: string[] }>>({})
-  const [newJobForm, setNewJobForm] = useState({
-    title: '',
-    titleZh: '',
-    industry: 'Technology',
-    industryZh: '科技',
-    role: { title: '', titleZh: '', content: '', contentZh: '' },
-    skills: { title: '', titleZh: '', content: '', contentZh: '' },
-    knowledge: { title: '', titleZh: '', content: '', contentZh: '' }
-  })
-
-  // Persist addedJobs to localStorage and manage defaults based on connection status
-  useEffect(() => {
-    const saved = localStorage.getItem('knowledge_addedJobs')
-    if (saved) {
-      setAddedJobs(JSON.parse(saved))
-    } else if (isConnected) {
-      // Only set defaults when connected to Teams backend and no saved state
-      setAddedJobs(['frontend-dev', 'backend-dev', 'qa-engineer', 'product-manager'])
-    }
-    // When NOT connected, keep empty (no pre-assigned agents)
-  }, [isConnected])
-
-  // Save to localStorage whenever addedJobs changes
-  useEffect(() => {
-    localStorage.setItem('knowledge_addedJobs', JSON.stringify(addedJobs))
-  }, [addedJobs])
-
-  const filteredJobs = jobs.filter(job => {
+  const [selectedCategory, setSelectedCategory] = useState<string>('all')
+  const [selectedJob, setSelectedJob] = useState<JobKnowledge | null>(null)
+  const [subscribedIds, setSubscribedIds] = useState<Set<string>>(new Set(['job-1', 'job-4']))
+  
+  // Filter jobs
+  const filteredJobs = mockJobs.filter(job => {
     const matchesSearch = 
       job.title.toLowerCase().includes(search.toLowerCase()) ||
-      job.titleZh.includes(search)
-    const matchesIndustry = industryFilter === 'all' || job.industry === industryFilter
-    return matchesSearch && matchesIndustry
+      job.titleEn.toLowerCase().includes(search.toLowerCase()) ||
+      job.tags.some(tag => tag.toLowerCase().includes(search.toLowerCase()))
+    const matchesCategory = selectedCategory === 'all' || job.category === selectedCategory
+    return matchesSearch && matchesCategory
   })
-
-  const availableJobs = filteredJobs.filter(job => !addedJobs.includes(job.id))
-  const configuredJobs = jobs.filter(job => addedJobs.includes(job.id))
-
-  const getJobTitle = (job: JobTemplate) => language === 'zh' ? job.titleZh : job.title
-  const getIndustryLabel = (industry: string) => {
-    const ind = industries.find(i => i.id === industry)
-    return language === 'zh' ? (ind?.label || industry) : (ind?.labelEn || industry)
+  
+  const subscribedJobs = mockJobs.filter(job => subscribedIds.has(job.id))
+  
+  const handleSubscribe = (id: string) => {
+    setSubscribedIds(prev => {
+      const next = new Set(prev)
+      if (next.has(id)) {
+        next.delete(id)
+      } else {
+        next.add(id)
+      }
+      return next
+    })
   }
-
-  const isJobAssignedToAgent = (_jobId: string) => false // TODO: implement real check with backend
-
-  const handleAddJob = (job: JobTemplate) => {
-    if (!addedJobs.includes(job.id)) {
-      setAddedJobs([...addedJobs, job.id])
-    }
-    setSelectedJob(job)
-    setShowConfig(true)
-  }
-
-  const handleRemoveJob = (jobId: string) => {
-    if (isJobAssignedToAgent(jobId)) return
-    setAddedJobs(addedJobs.filter(id => id !== jobId))
-    if (selectedJob?.id === jobId) {
-      setSelectedJob(null)
-      setShowConfig(false)
+  
+  const getTabJobs = () => {
+    switch (activeTab) {
+      case 'subscriptions':
+        return subscribedJobs
+      case 'discover':
+      default:
+        return filteredJobs
     }
   }
-
-  const handleDragStart = (e: React.DragEvent, job: JobTemplate) => {
-    setDraggedJob(job)
-    e.dataTransfer.effectAllowed = 'move'
-  }
-
-  const handleDragOver = (e: React.DragEvent) => {
-    e.preventDefault()
-    setIsDragOver(true)
-  }
-
-  const handleDragLeave = () => setIsDragOver(false)
-
-  const handleDrop = (e: React.DragEvent) => {
-    e.preventDefault()
-    setIsDragOver(false)
-    if (draggedJob && !addedJobs.includes(draggedJob.id)) {
-      handleAddJob(draggedJob)
-    }
-    setDraggedJob(null)
-  }
-
-  const handleDragEnd = () => {
-    setDraggedJob(null)
-    setIsDragOver(false)
-  }
-
+  
   return (
     <div 
       className="page-container animate-fade-in"
       style={{ 
         background: 'var(--bg-primary)',
         backgroundImage: 'linear-gradient(rgba(255, 255, 255, 0.015) 1px, transparent 1px), linear-gradient(90deg, rgba(255, 255, 255, 0.015) 1px, transparent 1px)',
-        backgroundSize: '40px 40px'
+        backgroundSize: '40px 40px',
+        height: '100%',
+        display: 'flex',
+        flexDirection: 'column',
       }}
     >
       {/* Header */}
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '24px', flexWrap: 'wrap', gap: '12px' }}>
-        <div>
-          <h1 style={{ fontSize: '28px', fontWeight: '700', color: 'var(--text-primary)', marginBottom: '4px' }}>
-            {language === 'zh' ? '知识库配置' : 'Knowledge Base'}
-          </h1>
-          <p style={{ fontSize: '15px', color: 'var(--text-secondary)' }}>
-            {language === 'zh' ? '选择岗位模板，自动配置角色/技能/知识库' : 'Select job templates to auto-configure role, skills, and knowledge'}
-          </p>
-        </div>
-        <div style={{ display: 'flex', gap: '12px', alignItems: 'center' }}>
-          <button
-            onClick={() => setShowCreateModal(true)}
-            style={{
-              display: 'flex',
-              alignItems: 'center',
-              gap: '8px',
-              padding: '10px 18px',
-              background: 'linear-gradient(135deg, var(--primary), var(--accent-violet))',
-              border: 'none',
-              borderRadius: '12px',
-              color: '#fff',
-              fontSize: '14px',
-              fontWeight: '600',
-              cursor: 'pointer',
-              boxShadow: '0 4px 16px var(--primary-glow)'
-            }}
-          >
-            <Plus size={18} />
-            {language === 'zh' ? '新建岗位' : 'Create Job'}
-          </button>
-          {addedJobs.length > 0 && (
-            <div style={{
-              display: 'flex', alignItems: 'center', gap: '8px', padding: '10px 16px', borderRadius: '12px',
-              background: 'linear-gradient(135deg, rgba(52, 211, 153, 0.15), rgba(16, 185, 129, 0.1))',
-              border: '1px solid rgba(52, 211, 153, 0.3)'
-            }}>
-              <CheckCircle size={18} style={{ color: '#34D399' }} />
-              <span style={{ fontSize: '14px', fontWeight: '600', color: '#34D399' }}>
-                {addedJobs.length} {language === 'zh' ? '个岗位已配置' : 'jobs configured'}
-              </span>
-            </div>
-          )}
-        </div>
+      <div style={{ marginBottom: '24px' }}>
+        <h1 style={{ fontSize: '28px', fontWeight: '700', color: 'var(--text-primary)', marginBottom: '4px' }}>
+          {language === 'zh' ? '知识库' : 'Knowledge Base'}
+        </h1>
+        <p style={{ fontSize: '15px', color: 'var(--text-secondary)' }}>
+          {language === 'zh' ? '探索、订阅、贡献职业能力' : 'Discover, subscribe, and contribute professional capabilities'}
+        </p>
       </div>
-
-      {/* Search & Filter */}
-      <div className="card animate-slide-up stagger-1" style={{ padding: '16px', marginBottom: '20px' }}>
-        <div style={{ display: 'flex', gap: '12px', flexWrap: 'wrap' }}>
-          <div style={{ flex: 1, minWidth: '200px', position: 'relative' }}>
-            <Search style={{ position: 'absolute', left: '14px', top: '50%', transform: 'translateY(-50%)', color: 'var(--text-tertiary)' }} size={18} />
-            <input
-              type="text"
-              placeholder={language === 'zh' ? '搜索岗位...' : 'Search jobs...'}
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-              style={{ width: '100%', padding: '12px 16px 12px 46px', background: 'var(--bg-secondary)', border: '1px solid var(--border)', borderRadius: '12px', fontSize: '14px', color: 'var(--text-primary)' }}
-              className="job-search"
-            />
-          </div>
-          <div style={{ display: 'flex', gap: '8px' }}>
-            {industries.map(ind => (
-              <button
-                key={ind.id}
-                onClick={() => setIndustryFilter(ind.id)}
-                style={{
-                  padding: '10px 16px', fontSize: '13px', fontWeight: '600', borderRadius: '10px', border: 'none', cursor: 'pointer',
-                  transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
-                  background: industryFilter === ind.id ? 'linear-gradient(135deg, var(--primary), var(--accent-violet))' : 'var(--bg-tertiary)',
-                  color: '#FFFFFF', boxShadow: industryFilter === ind.id ? '0 4px 12px var(--primary-glow)' : 'none'
-                }}
-              >
-                {language === 'zh' ? ind.label : ind.labelEn}
-              </button>
-            ))}
-          </div>
-        </div>
-      </div>
-
-      {/* Main Content */}
-      <div style={{ display: 'grid', gridTemplateColumns: showConfig && selectedJob ? '340px 1fr' : '1fr', gap: '20px', transition: 'all 0.3s ease' }} className="knowledge-grid">
-        {/* Left Panel */}
-        <div className="animate-slide-up stagger-2">
-          {/* Available Jobs */}
-          <div className="card" style={{ padding: '8px', marginBottom: '16px' }}>
-            <div style={{ fontSize: '11px', fontWeight: '600', color: 'var(--text-tertiary)', textTransform: 'uppercase', letterSpacing: '0.08em', padding: '8px 12px', marginBottom: '4px' }}>
-              {language === 'zh' ? '可添加岗位' : 'Available Jobs'} ({availableJobs.length})
-            </div>
-            <div style={{ maxHeight: '200px', overflow: 'auto' }}>
-              {availableJobs.length === 0 ? (
-                <div style={{ textAlign: 'center', padding: '24px', color: 'var(--text-tertiary)' }}>
-                  <CheckCircle size={24} style={{ opacity: 0.3, marginBottom: '8px' }} />
-                  <p style={{ fontSize: '13px' }}>{language === 'zh' ? '所有岗位已添加' : 'All jobs added'}</p>
-                </div>
-              ) : (
-                availableJobs.map(job => (
-                  <div
-                    key={job.id}
-                    draggable
-                    onDragStart={(e) => handleDragStart(e, job)}
-                    onDragEnd={handleDragEnd}
-                    style={{
-                      display: 'flex', alignItems: 'center', gap: '10px', padding: '12px', borderRadius: '12px',
-                      background: 'transparent', cursor: 'grab', transition: 'all 0.2s', marginBottom: '4px',
-                      opacity: draggedJob?.id === job.id ? 0.5 : 1
-                    }}
-                    className="job-item-draggable"
-                  >
-                    <GripVertical size={16} style={{ color: 'var(--text-tertiary)', flexShrink: 0 }} />
-                    <div style={{ flex: 1, minWidth: 0 }}>
-                      <div style={{ fontSize: '10px', fontWeight: '600', color: 'var(--text-tertiary)', marginBottom: '2px' }}>{getIndustryLabel(job.industry)}</div>
-                      <div style={{ fontSize: '14px', fontWeight: '600', color: 'var(--text-primary)' }}>{getJobTitle(job)}</div>
-                    </div>
-                    <button
-                      onClick={() => handleAddJob(job)}
-                      style={{
-                        padding: '6px 12px', fontSize: '11px', fontWeight: '600', borderRadius: '8px', border: 'none', cursor: 'pointer',
-                        background: 'linear-gradient(135deg, var(--primary), var(--accent-violet))', color: '#FFFFFF',
-                        boxShadow: '0 2px 8px var(--primary-glow)', flexShrink: 0
-                      }}
-                    >
-                      {language === 'zh' ? '添加' : 'Add'}
-                    </button>
-                  </div>
-                ))
-              )}
-            </div>
-          </div>
-
-          {/* Drop Zone - Selected Jobs */}
-          <div
-            className="card"
-            onDragOver={handleDragOver}
-            onDragLeave={handleDragLeave}
-            onDrop={handleDrop}
-            style={{
-              padding: '16px',
-              border: isDragOver ? '2px dashed var(--primary)' : '2px dashed var(--border)',
-              background: isDragOver ? 'rgba(232, 121, 249, 0.05)' : 'transparent',
-              transition: 'all 0.2s'
-            }}
-          >
-            <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '12px' }}>
-              <div style={{ width: '32px', height: '32px', borderRadius: '8px', background: 'linear-gradient(135deg, rgba(52, 211, 153, 0.2), rgba(16, 185, 129, 0.15))', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                <CheckCircle size={16} style={{ color: '#34D399' }} />
-              </div>
-              <div>
-                <div style={{ fontSize: '13px', fontWeight: '600', color: 'var(--text-primary)' }}>
-                  {language === 'zh' ? '已选岗位' : 'Selected Jobs'} ({configuredJobs.length})
-                </div>
-                <div style={{ fontSize: '11px', color: 'var(--text-tertiary)' }}>
-                  {language === 'zh' ? '拖拽岗位到此处批量添加' : 'Drag jobs here to batch add'}
-                </div>
-              </div>
-            </div>
-
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', minHeight: '80px' }}>
-              {configuredJobs.length === 0 ? (
-                <div style={{ textAlign: 'center', padding: '20px', border: '1px dashed var(--border)', borderRadius: '12px', color: 'var(--text-tertiary)' }}>
-                  <Users size={20} style={{ opacity: 0.3, marginBottom: '6px' }} />
-                  <p style={{ fontSize: '12px', margin: 0 }}>{language === 'zh' ? '拖拽或点击添加岗位' : 'Drag or click to add jobs'}</p>
-                </div>
-              ) : (
-                configuredJobs.map(job => {
-                  const isAssigned = isJobAssignedToAgent(job.id)
-                  const isSelected = selectedJob?.id === job.id
-                  return (
-                    <div
-                      key={job.id}
-                      onClick={() => { setSelectedJob(job); setShowConfig(true) }}
-                      style={{
-                        display: 'flex', alignItems: 'center', gap: '10px', padding: '12px', borderRadius: '12px',
-                        background: isSelected ? 'linear-gradient(135deg, rgba(99, 102, 241, 0.2), rgba(139, 92, 246, 0.15))' : 'var(--bg-tertiary)',
-                        border: isSelected ? '1px solid rgba(99, 102, 241, 0.3)' : '1px solid var(--border)',
-                        cursor: 'pointer', transition: 'all 0.2s'
-                      }}
-                      className="selected-job-item"
-                    >
-                      <GripVertical size={14} style={{ color: 'var(--text-tertiary)', flexShrink: 0 }} />
-                      <div style={{ flex: 1, minWidth: 0 }}>
-                        <div style={{ fontSize: '13px', fontWeight: '600', color: 'var(--text-primary)', display: 'flex', alignItems: 'center', gap: '6px' }}>
-                          {getJobTitle(job)}
-                          {isAssigned && (
-                            <span style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', fontSize: '9px', fontWeight: '600', padding: '2px 6px', borderRadius: '4px', background: 'rgba(59, 130, 246, 0.15)', color: '#3B82F6' }}>
-                              <Bot size={10} />
-                              {language === 'zh' ? '已分配' : 'Assigned'}
-                            </span>
-                          )}
-                        </div>
-                        <div style={{ fontSize: '10px', color: 'var(--text-tertiary)' }}>{getIndustryLabel(job.industry)}</div>
-                      </div>
-                      {!isAssigned && (
-                        <button
-                          onClick={(e) => { e.stopPropagation(); handleRemoveJob(job.id) }}
-                          style={{ padding: '4px', borderRadius: '6px', border: 'none', cursor: 'pointer', background: 'transparent', color: 'var(--text-tertiary)', display: 'flex' }}
-                          className="remove-btn"
-                        >
-                          <X size={14} />
-                        </button>
-                      )}
-                    </div>
-                  )
-                })
-              )}
-            </div>
-          </div>
-        </div>
-
-        {/* Right Panel - Config Details */}
-        {showConfig && selectedJob && (
-          <div className="card animate-slide-up" style={{ padding: '24px' }}>
-            <div style={{ marginBottom: '20px' }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '8px' }}>
-                <span style={{ fontSize: '10px', fontWeight: '700', padding: '4px 10px', borderRadius: '6px', background: 'rgba(139, 92, 246, 0.15)', color: '#8B5CF6', textTransform: 'uppercase' }}>
-                  {getIndustryLabel(selectedJob.industry)}
+      
+      {/* Tabs */}
+      <div style={{
+        display: 'flex',
+        gap: '8px',
+        marginBottom: '20px',
+        background: 'var(--bg-secondary)',
+        padding: '6px',
+        borderRadius: '14px',
+        border: '1px solid var(--border)',
+        width: 'fit-content',
+      }}>
+        {tabs.map(tab => {
+          const TabIcon = tab.icon
+          const isActive = activeTab === tab.id
+          return (
+            <button
+              key={tab.id}
+              onClick={() => setActiveTab(tab.id as typeof activeTab)}
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: '8px',
+                padding: '10px 18px',
+                borderRadius: '10px',
+                border: 'none',
+                background: isActive ? 'linear-gradient(135deg, #6366F1, #8B5CF6)' : 'transparent',
+                color: isActive ? 'white' : 'var(--text-secondary)',
+                fontSize: '13px',
+                fontWeight: '600',
+                cursor: 'pointer',
+                transition: 'all 0.2s',
+              }}
+            >
+              <TabIcon size={16} />
+              {language === 'zh' ? tab.label : tab.labelEn}
+              {tab.id === 'subscriptions' && subscribedIds.size > 0 && (
+                <span style={{
+                  fontSize: '10px',
+                  padding: '2px 6px',
+                  borderRadius: '6px',
+                  background: isActive ? 'rgba(255,255,255,0.2)' : 'rgba(52, 211, 153, 0.2)',
+                  color: isActive ? 'white' : '#34D399',
+                }}>
+                  {subscribedIds.size}
                 </span>
-                {isJobAssignedToAgent(selectedJob.id) && (
-                  <span style={{ fontSize: '10px', fontWeight: '700', padding: '4px 10px', borderRadius: '6px', background: 'rgba(59, 130, 246, 0.15)', color: '#3B82F6' }}>
-                    {language === 'zh' ? '已分配给智能体' : 'Assigned to Agent'}
-                  </span>
-                )}
-              </div>
-              <h2 style={{ fontSize: '28px', fontWeight: '700', color: 'var(--text-primary)', margin: 0, fontFamily: 'Cabinet Grotesk', lineHeight: '1.3' }}>
-                {getJobTitle(selectedJob)}
-              </h2>
-              <p style={{ fontSize: '13px', color: '#8B5CF6', margin: '6px 0 0 0', fontWeight: '500' }}>
-                {language === 'zh' ? selectedJob.role.titleZh : selectedJob.role.title}
-              </p>
-            </div>
-
-            {/* Three Column Config */}
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '16px' }} className="config-grid">
-              {/* Skills - Blue */}
-              <div style={{ padding: '16px', borderRadius: '14px', background: 'rgba(59, 130, 246, 0.08)', border: '1px solid rgba(59, 130, 246, 0.2)' }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '14px' }}>
-                  <div style={{ width: '36px', height: '36px', borderRadius: '10px', background: 'linear-gradient(135deg, #3B82F6, #60A5FA)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                    <Zap size={18} style={{ color: '#FFFFFF' }} />
-                  </div>
-                  <div>
-                    <div style={{ fontSize: '13px', fontWeight: '600', color: 'var(--text-primary)' }}>{language === 'zh' ? '技能' : 'Skills'}</div>
-                    <div style={{ fontSize: '11px', color: '#3B82F6' }}>{language === 'zh' ? selectedJob.skills.titleZh : selectedJob.skills.title}</div>
-                  </div>
-                </div>
-                <div style={{ padding: '12px', borderRadius: '10px', background: 'var(--bg-primary)', fontSize: '12px', color: 'var(--text-secondary)', lineHeight: '1.6', minHeight: '120px', overflow: 'auto', whiteSpace: 'pre-wrap' }}>
-                  {editingSkills ? (
-                    <textarea
-                      value={tempSkillsContent}
-                      onChange={(e) => setTempSkillsContent(e.target.value)}
-                      style={{ width: '100%', minHeight: '200px', background: 'var(--bg-tertiary)', border: '1px solid var(--primary)', borderRadius: '8px', padding: '10px', fontSize: '12px', color: 'var(--text-primary)', resize: 'vertical', fontFamily: 'inherit' }}
-                    />
-                  ) : (
-                    editedJobs[selectedJob.id]?.skills || (language === 'zh' ? selectedJob.skills.contentZh : selectedJob.skills.content)
-                  )}
-                </div>
-                {editingSkills && (
-                  <div style={{ display: 'flex', gap: '8px', marginTop: '10px' }}>
-                    <button onClick={() => { setEditingSkills(false); setTempSkillsContent('') }} style={{ flex: 1, padding: '8px', background: 'var(--bg-tertiary)', border: '1px solid var(--border)', borderRadius: '8px', fontSize: '12px', cursor: 'pointer' }}>取消</button>
-                    <button onClick={() => { setEditingSkills(false); setEditedJobs(prev => ({ ...prev, [selectedJob.id]: { ...prev[selectedJob.id], skills: tempSkillsContent } })); setTempSkillsContent('') }} style={{ flex: 1, padding: '8px', background: 'var(--primary)', border: 'none', borderRadius: '8px', fontSize: '12px', color: '#fff', cursor: 'pointer' }}>保存</button>
-                  </div>
-                )}
-                {!editingSkills && (
-                  <button onClick={() => { setEditingSkills(true); setTempSkillsContent(language === 'zh' ? selectedJob.skills.contentZh : selectedJob.skills.content) }} style={{ marginTop: '10px', padding: '6px 12px', background: 'var(--primary)', border: '1px solid var(--primary)', borderRadius: '8px', fontSize: '11px', color: '#fff', cursor: 'pointer' }}>编辑</button>
-                )}
-              </div>
-
-              {/* Knowledge - Green */}
-              <div style={{ padding: '16px', borderRadius: '14px', background: 'rgba(16, 185, 129, 0.08)', border: '1px solid rgba(16, 185, 129, 0.2)' }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '14px' }}>
-                  <div style={{ width: '36px', height: '36px', borderRadius: '10px', background: 'linear-gradient(135deg, #10B981, #14B8A6)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                    <BookOpen size={18} style={{ color: '#FFFFFF' }} />
-                  </div>
-                  <div>
-                    <div style={{ fontSize: '13px', fontWeight: '600', color: 'var(--text-primary)' }}>{language === 'zh' ? '知识库' : 'Knowledge'}</div>
-                    <div style={{ fontSize: '11px', color: '#10B981' }}>{language === 'zh' ? selectedJob.knowledge.titleZh : selectedJob.knowledge.title}</div>
-                  </div>
-                </div>
-                <div style={{ padding: '12px', borderRadius: '10px', background: 'var(--bg-primary)', fontSize: '12px', color: 'var(--text-secondary)', lineHeight: '1.6', minHeight: '120px', overflow: 'auto', whiteSpace: 'pre-wrap' }}>
-                  {editingKnowledge ? (
-                    <textarea
-                      value={tempKnowledgeContent}
-                      onChange={(e) => setTempKnowledgeContent(e.target.value)}
-                      style={{ width: '100%', minHeight: '200px', background: 'var(--bg-tertiary)', border: '1px solid var(--primary)', borderRadius: '8px', padding: '10px', fontSize: '12px', color: 'var(--text-primary)', resize: 'vertical', fontFamily: 'inherit' }}
-                    />
-                  ) : (
-                    editedJobs[selectedJob.id]?.knowledge || (language === 'zh' ? selectedJob.knowledge.contentZh : selectedJob.knowledge.content)
-                  )}
-                </div>
-                {editingKnowledge && (
-                  <div style={{ display: 'flex', gap: '8px', marginTop: '10px' }}>
-                    <button onClick={() => { setEditingKnowledge(false); setTempKnowledgeContent('') }} style={{ flex: 1, padding: '8px', background: 'var(--bg-tertiary)', border: '1px solid var(--border)', borderRadius: '8px', fontSize: '12px', cursor: 'pointer' }}>取消</button>
-                    <button onClick={() => { setEditingKnowledge(false); setEditedJobs(prev => ({ ...prev, [selectedJob.id]: { ...prev[selectedJob.id], knowledge: tempKnowledgeContent } })); setTempKnowledgeContent('') }} style={{ flex: 1, padding: '8px', background: 'var(--primary)', border: 'none', borderRadius: '8px', fontSize: '12px', color: '#fff', cursor: 'pointer' }}>保存</button>
-                  </div>
-                )}
-                {!editingKnowledge && (
-                  <button onClick={() => { setEditingKnowledge(true); setTempKnowledgeContent(language === 'zh' ? selectedJob.knowledge.contentZh : selectedJob.knowledge.content) }} style={{ marginTop: '10px', padding: '6px 12px', background: 'var(--primary)', border: '1px solid var(--primary)', borderRadius: '8px', fontSize: '11px', color: '#fff', cursor: 'pointer' }}>编辑</button>
-                )}
-              </div>
-
-              {/* Tools - Yellow */}
-              <div style={{ padding: '16px', borderRadius: '14px', background: 'rgba(251, 191, 36, 0.08)', border: '1px solid rgba(251, 191, 36, 0.2)' }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '14px' }}>
-                  <div style={{ width: '36px', height: '36px', borderRadius: '10px', background: 'linear-gradient(135deg, #FBBF24, #F59E0B)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                    <Wrench size={18} style={{ color: '#FFFFFF' }} />
-                  </div>
-                  <div>
-                    <div style={{ fontSize: '13px', fontWeight: '600', color: 'var(--text-primary)' }}>{language === 'zh' ? '工具' : 'Tools'}</div>
-                    <div style={{ fontSize: '11px', color: '#FBBF24' }}>{language === 'zh' ? (selectedJob.tools?.titleZh || '工具链接') : (selectedJob.tools?.title || 'Tool Links')}</div>
-                  </div>
-                </div>
-                <div style={{ padding: '12px', borderRadius: '10px', background: 'var(--bg-primary)', fontSize: '12px', color: 'var(--text-secondary)', lineHeight: '1.6', minHeight: '120px', overflow: 'auto' }}>
-                  {editingTools ? (
-                    <textarea
-                      value={tempToolsContent}
-                      onChange={(e) => setTempToolsContent(e.target.value)}
-                      style={{ width: '100%', minHeight: '150px', background: 'var(--bg-tertiary)', border: '1px solid var(--primary)', borderRadius: '8px', padding: '10px', fontSize: '12px', color: 'var(--text-primary)', resize: 'vertical', fontFamily: 'inherit' }}
-                      placeholder={language === 'zh' ? '每行一个链接...' : 'One link per line...'}
-                    />
-                  ) : (
-                    <>
-                      <div style={{ fontSize: '12px', marginBottom: '8px' }}>
-                        {language === 'zh' ? selectedJob.tools?.contentZh : selectedJob.tools?.content}
-                      </div>
-                      {(editedJobs[selectedJob.id]?.tools || selectedJob.tools?.links || []).length > 0 && (
-                        <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', marginTop: '8px' }}>
-                          {(editedJobs[selectedJob.id]?.tools || selectedJob.tools?.links || []).map((link, idx) => (
-                            <a key={idx} href={link} target="_blank" rel="noopener noreferrer" style={{ fontSize: '11px', color: '#3B82F6', textDecoration: 'none', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                              → {link.replace('https://', '')}
-                            </a>
-                          ))}
-                        </div>
-                      )}
-                    </>
-                  )}
-                </div>
-                {editingTools && (
-                  <div style={{ display: 'flex', gap: '8px', marginTop: '10px' }}>
-                    <button onClick={() => { setEditingTools(false); setTempToolsContent('') }} style={{ flex: 1, padding: '8px', background: 'var(--bg-tertiary)', border: '1px solid var(--border)', borderRadius: '8px', fontSize: '12px', cursor: 'pointer' }}>取消</button>
-                    <button onClick={() => { setEditingTools(false); setEditedJobs(prev => ({ ...prev, [selectedJob.id]: { ...prev[selectedJob.id], tools: tempToolsContent.split('\n').filter(l => l.trim()) } })); setTempToolsContent('') }} style={{ flex: 1, padding: '8px', background: 'var(--primary)', border: 'none', borderRadius: '8px', fontSize: '12px', color: '#fff', cursor: 'pointer' }}>保存</button>
-                  </div>
-                )}
-                {!editingTools && (
-                  <button onClick={() => { setEditingTools(true); setTempToolsContent(selectedJob.tools?.links?.join('\n') || '') }} style={{ marginTop: '10px', padding: '6px 12px', background: 'var(--primary)', border: '1px solid var(--primary)', borderRadius: '8px', fontSize: '11px', color: '#fff', cursor: 'pointer' }}>编辑</button>
-                )}
-              </div>
-            </div>
-
-            {/* Action Buttons */}
-            <div style={{ display: 'flex', gap: '12px', marginTop: '20px' }}>
-              <button onClick={() => { setEditingSkills(false); setEditingKnowledge(false); setEditingTools(false); setTempSkillsContent(''); setTempKnowledgeContent(''); setTempToolsContent(''); setEditedJobs(prev => { const next = {...prev}; delete next[selectedJob.id]; return next; }) }} className="btn-secondary" style={{ flex: 1 }}>
-                {language === 'zh' ? '重置' : 'Reset'}
-              </button>
-              <button onClick={() => setShowConfig(false)} className="btn-secondary">
-                {language === 'zh' ? '关闭' : 'Close'}
-              </button>
-            </div>
+              )}
+            </button>
+          )
+        })}
+      </div>
+      
+      {/* Search + Filters */}
+      <div style={{ display: 'flex', gap: '12px', marginBottom: '20px', flexWrap: 'wrap' }}>
+        <div style={{
+          flex: 1,
+          minWidth: 240,
+          display: 'flex',
+          alignItems: 'center',
+          gap: '10px',
+          background: 'var(--bg-secondary)',
+          borderRadius: '12px',
+          padding: '10px 16px',
+          border: '1px solid var(--border)',
+        }}>
+          <Search size={16} style={{ color: 'var(--text-tertiary)' }} />
+          <input
+            value={search}
+            onChange={e => setSearch(e.target.value)}
+            placeholder={language === 'zh' ? '搜索职业、能力或工具...' : 'Search jobs, skills, or tools...'}
+            style={{
+              flex: 1,
+              border: 'none',
+              background: 'transparent',
+              color: 'var(--text-primary)',
+              fontSize: '14px',
+              outline: 'none',
+            }}
+          />
+        </div>
+        
+        {/* Category filters */}
+        {activeTab === 'discover' && (
+          <div style={{ display: 'flex', gap: '6px' }}>
+            <button
+              onClick={() => setSelectedCategory('all')}
+              style={{
+                padding: '10px 16px',
+                borderRadius: '10px',
+                border: selectedCategory === 'all' ? '1px solid #6366F1' : '1px solid var(--border)',
+                background: selectedCategory === 'all' ? 'rgba(99, 102, 241, 0.1)' : 'var(--bg-secondary)',
+                color: selectedCategory === 'all' ? '#6366F1' : 'var(--text-secondary)',
+                fontSize: '12px',
+                fontWeight: '500',
+                cursor: 'pointer',
+              }}
+            >
+              {language === 'zh' ? '全部' : 'All'}
+            </button>
+            {(Object.keys(categoryConfig) as Array<keyof typeof categoryConfig>).map(cat => {
+              const cfg = categoryConfig[cat]
+              const CatIcon = cfg.icon
+              return (
+                <button
+                  key={cat}
+                  onClick={() => setSelectedCategory(cat)}
+                  style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '6px',
+                    padding: '10px 16px',
+                    borderRadius: '10px',
+                    border: selectedCategory === cat ? `1px solid ${cfg.color}` : '1px solid var(--border)',
+                    background: selectedCategory === cat ? `${cfg.color}10` : 'var(--bg-secondary)',
+                    color: selectedCategory === cat ? cfg.color : 'var(--text-secondary)',
+                    fontSize: '12px',
+                    fontWeight: '500',
+                    cursor: 'pointer',
+                  }}
+                >
+                  <CatIcon size={14} />
+                  {language === 'zh' ? cfg.label : cfg.labelEn}
+                </button>
+              )
+            })}
           </div>
         )}
       </div>
-
-      {/* Empty State */}
-      {!showConfig && filteredJobs.length > 0 && (
-        <div className="card animate-slide-up stagger-3" style={{ padding: '48px', textAlign: 'center', marginTop: '20px' }}>
-          <Users size={48} style={{ color: 'var(--text-tertiary)', opacity: 0.3, marginBottom: '16px' }} />
-          <h3 style={{ fontSize: '18px', fontWeight: '600', color: 'var(--text-primary)', marginBottom: '8px' }}>
-            {language === 'zh' ? '选择岗位查看配置' : 'Select a job to view configuration'}
-          </h3>
-          <p style={{ color: 'var(--text-tertiary)', fontSize: '14px' }}>
-            {language === 'zh' ? '点击岗位或拖拽到下方区域添加' : 'Click a job or drag to the area below to add'}
-          </p>
-        </div>
-      )}
-
-      {/* Create Job Modal */}
-      {showCreateModal && (
-        <div style={{
-          position: 'fixed',
-          inset: 0,
-          background: 'rgba(0, 0, 0, 0.85)',
-          backdropFilter: 'blur(12px)',
-          zIndex: 9999,
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center',
-          padding: '20px',
-          animation: 'fadeIn 0.3s ease'
-        }}>
+      
+      {/* Content */}
+      <div style={{ flex: 1, overflow: 'auto' }}>
+        {activeTab === 'discover' && (
+          <>
+            {filteredJobs.length === 0 ? (
+              <div style={{ textAlign: 'center', padding: '64px 20px' }}>
+                <BookOpen size={48} style={{ color: 'var(--text-tertiary)', margin: '0 auto 16px' }} />
+                <p style={{ fontSize: '16px', color: 'var(--text-secondary)', marginBottom: '8px' }}>
+                  {language === 'zh' ? '未找到匹配的职业' : 'No matching jobs found'}
+                </p>
+                <p style={{ fontSize: '14px', color: 'var(--text-tertiary)' }}>
+                  {language === 'zh' ? '尝试其他关键词或筛选条件' : 'Try different keywords or filters'}
+                </p>
+              </div>
+            ) : (
+              <div style={{
+                display: 'grid',
+                gridTemplateColumns: 'repeat(auto-fill, minmax(320px, 1fr))',
+                gap: '16px',
+              }}>
+                {filteredJobs.map(job => (
+                  <JobCard
+                    key={job.id}
+                    job={job}
+                    onSubscribe={handleSubscribe}
+                    onView={setSelectedJob}
+                    isSubscribed={subscribedIds.has(job.id)}
+                    language={language}
+                  />
+                ))}
+              </div>
+            )}
+          </>
+        )}
+        
+        {activeTab === 'subscriptions' && (
+          <>
+            {subscribedJobs.length === 0 ? (
+              <div style={{ textAlign: 'center', padding: '64px 20px' }}>
+                <Star size={48} style={{ color: 'var(--text-tertiary)', margin: '0 auto 16px' }} />
+                <p style={{ fontSize: '16px', color: 'var(--text-secondary)', marginBottom: '8px' }}>
+                  {language === 'zh' ? '暂无订阅' : 'No subscriptions yet'}
+                </p>
+                <p style={{ fontSize: '14px', color: 'var(--text-tertiary)' }}>
+                  {language === 'zh' ? '去发现页订阅感兴趣的职业技能' : 'Go to Discover to subscribe to jobs'}
+                </p>
+              </div>
+            ) : (
+              <div style={{
+                display: 'grid',
+                gridTemplateColumns: 'repeat(auto-fill, minmax(320px, 1fr))',
+                gap: '16px',
+              }}>
+                {subscribedJobs.map(job => (
+                  <JobCard
+                    key={job.id}
+                    job={job}
+                    onSubscribe={handleSubscribe}
+                    onView={setSelectedJob}
+                    isSubscribed={true}
+                    language={language}
+                  />
+                ))}
+              </div>
+            )}
+          </>
+        )}
+        
+        {activeTab === 'contribute' && (
           <div style={{
-            background: 'var(--bg-card)',
-            border: '1px solid var(--border)',
-            borderRadius: '24px',
-            padding: '32px',
-            maxWidth: '600px',
-            width: '100%',
-            maxHeight: '90vh',
-            overflow: 'auto',
-            position: 'relative',
-            animation: 'scaleIn 0.3s cubic-bezier(0.4, 0, 0.2, 1)'
+            display: 'flex',
+            flexDirection: 'column',
+            alignItems: 'center',
+            justifyContent: 'center',
+            padding: '64px 20px',
+            textAlign: 'center',
           }}>
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '24px' }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-                <div style={{ width: '44px', height: '44px', borderRadius: '12px', background: 'linear-gradient(135deg, var(--primary), var(--accent-violet))', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                  <Plus size={22} style={{ color: '#fff' }} />
-                </div>
-                <div>
-                  <h2 style={{ fontSize: '20px', fontWeight: '700', color: 'var(--text-primary)', margin: 0 }}>
-                    {language === 'zh' ? '新建岗位' : 'Create Job'}
-                  </h2>
-                  <p style={{ fontSize: '12px', color: 'var(--text-tertiary)', margin: '2px 0 0 0' }}>
-                    {language === 'zh' ? '创建空白岗位，后续配置角色/技能/知识库' : 'Create blank job, configure role/skills/knowledge later'}
-                  </p>
-                </div>
-              </div>
-              <button
-                onClick={() => setShowCreateModal(false)}
-                style={{ padding: '8px', background: 'var(--bg-tertiary)', border: 'none', borderRadius: '10px', cursor: 'pointer' }}
-              >
-                <X size={18} style={{ color: 'var(--text-secondary)' }} />
-              </button>
+            <div style={{
+              width: 80, height: 80, borderRadius: '20px',
+              background: 'linear-gradient(135deg, rgba(99, 102, 241, 0.2), rgba(139, 92, 246, 0.15))',
+              display: 'flex', alignItems: 'center', justifyContent: 'center',
+              marginBottom: '24px',
+            }}>
+              <Plus size={32} style={{ color: '#8B5CF6' }} />
             </div>
-
-            {/* Form */}
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
-              {/* Title */}
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
-                <div>
-                  <label style={{ display: 'block', fontSize: '12px', fontWeight: '600', color: 'var(--text-secondary)', marginBottom: '8px' }}>
-                    {language === 'zh' ? '岗位名称 (中文)' : 'Job Title (Chinese)'}
-                  </label>
-                  <input
-                    type="text"
-                    value={newJobForm.titleZh}
-                    onChange={(e) => setNewJobForm({ ...newJobForm, titleZh: e.target.value, title: e.target.value })}
-                    placeholder={language === 'zh' ? '例如：前端开发工程师' : 'e.g. Frontend Developer'}
-                    style={{ width: '100%', padding: '12px 14px', background: 'var(--bg-primary)', border: '1px solid var(--border)', borderRadius: '12px', fontSize: '14px', color: 'var(--text-primary)' }}
-                  />
-                </div>
-                <div>
-                  <label style={{ display: 'block', fontSize: '12px', fontWeight: '600', color: 'var(--text-secondary)', marginBottom: '8px' }}>
-                    {language === 'zh' ? '岗位名称 (English)' : 'Job Title (English)'}
-                  </label>
-                  <input
-                    type="text"
-                    value={newJobForm.title}
-                    onChange={(e) => setNewJobForm({ ...newJobForm, title: e.target.value })}
-                    placeholder={language === 'zh' ? '例如：Frontend Developer' : 'e.g. Frontend Developer'}
-                    style={{ width: '100%', padding: '12px 14px', background: 'var(--bg-primary)', border: '1px solid var(--border)', borderRadius: '12px', fontSize: '14px', color: 'var(--text-primary)' }}
-                  />
-                </div>
-              </div>
-
-              {/* Industry */}
-              <div>
-                <label style={{ display: 'block', fontSize: '12px', fontWeight: '600', color: 'var(--text-secondary)', marginBottom: '8px' }}>
-                  {language === 'zh' ? '行业' : 'Industry'}
-                </label>
-                <select
-                  value={newJobForm.industry}
-                  onChange={(e) => {
-                    const ind = industries.find(i => i.id === e.target.value)
-                    setNewJobForm({ ...newJobForm, industry: e.target.value, industryZh: ind?.label || '科技' })
-                  }}
-                  style={{ width: '100%', padding: '12px 14px', background: 'var(--bg-primary)', border: '1px solid var(--border)', borderRadius: '12px', fontSize: '14px', color: 'var(--text-primary)' }}
-                >
-                  {industries.filter(i => i.id !== 'all').map(ind => (
-                    <option key={ind.id} value={ind.id}>{language === 'zh' ? ind.label : ind.labelEn}</option>
-                  ))}
-                </select>
-              </div>
-
-              {/* Config Placeholders - Empty */}
-              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '12px' }}>
-                <div style={{ padding: '16px', borderRadius: '14px', background: 'rgba(139, 92, 246, 0.05)', border: '1px solid rgba(139, 92, 246, 0.15)' }}>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '12px' }}>
-                    <Shield size={16} style={{ color: '#8B5CF6' }} />
-                    <span style={{ fontSize: '12px', fontWeight: '600', color: 'var(--text-secondary)' }}>{language === 'zh' ? '角色' : 'Role'}</span>
-                  </div>
-                  <div style={{ fontSize: '11px', color: 'var(--text-tertiary)', textAlign: 'center', padding: '12px' }}>
-                    {language === 'zh' ? '暂无配置' : 'Not configured'}
-                  </div>
-                </div>
-                <div style={{ padding: '16px', borderRadius: '14px', background: 'rgba(251, 191, 36, 0.05)', border: '1px solid rgba(251, 191, 36, 0.15)' }}>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '12px' }}>
-                    <Zap size={16} style={{ color: '#FBBF24' }} />
-                    <span style={{ fontSize: '12px', fontWeight: '600', color: 'var(--text-secondary)' }}>{language === 'zh' ? '技能' : 'Skills'}</span>
-                  </div>
-                  <div style={{ fontSize: '11px', color: 'var(--text-tertiary)', textAlign: 'center', padding: '12px' }}>
-                    {language === 'zh' ? '暂无配置' : 'Not configured'}
-                  </div>
-                </div>
-                <div style={{ padding: '16px', borderRadius: '14px', background: 'rgba(16, 185, 129, 0.05)', border: '1px solid rgba(16, 185, 129, 0.15)' }}>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '12px' }}>
-                    <BookOpen size={16} style={{ color: '#10B981' }} />
-                    <span style={{ fontSize: '12px', fontWeight: '600', color: 'var(--text-secondary)' }}>{language === 'zh' ? '知识库' : 'Knowledge'}</span>
-                  </div>
-                  <div style={{ fontSize: '11px', color: 'var(--text-tertiary)', textAlign: 'center', padding: '12px' }}>
-                    {language === 'zh' ? '暂无配置' : 'Not configured'}
-                  </div>
-                </div>
-              </div>
-
-              {/* Actions */}
-              <div style={{ display: 'flex', gap: '12px', marginTop: '8px' }}>
-                <button
-                  onClick={() => setShowCreateModal(false)}
-                  style={{ flex: 1, padding: '14px', background: 'var(--bg-tertiary)', border: '1px solid var(--border)', borderRadius: '12px', fontSize: '14px', fontWeight: '600', color: 'var(--text-primary)', cursor: 'pointer' }}
-                >
-                  {language === 'zh' ? '取消' : 'Cancel'}
-                </button>
-                <button
-                  onClick={() => {
-                    if (!newJobForm.title || !newJobForm.titleZh) return
-                    const newJob: JobTemplate = { ...newJobForm, id: `custom-${Date.now()}` }
-                    jobTemplates.push(newJob)
-                    setAddedJobs([...addedJobs, newJob.id])
-                    setShowCreateModal(false)
-                    setNewJobForm({
-                      title: '', titleZh: '', industry: 'Technology', industryZh: '科技',
-                      role: { title: '', titleZh: '', content: '', contentZh: '' },
-                      skills: { title: '', titleZh: '', content: '', contentZh: '' },
-                      knowledge: { title: '', titleZh: '', content: '', contentZh: '' }
-                    })
-                  }}
-                  style={{ flex: 1, padding: '14px', background: 'linear-gradient(135deg, var(--primary), var(--accent-violet))', border: 'none', borderRadius: '12px', fontSize: '14px', fontWeight: '600', color: '#fff', cursor: 'pointer', boxShadow: '0 4px 16px var(--primary-glow)' }}
-                >
-                  {language === 'zh' ? '创建岗位' : 'Create Job'}
-                </button>
-              </div>
-            </div>
+            <h3 style={{ fontSize: '20px', fontWeight: '600', color: 'var(--text-primary)', marginBottom: '8px' }}>
+              {language === 'zh' ? '贡献职业知识' : 'Contribute Job Knowledge'}
+            </h3>
+            <p style={{ fontSize: '14px', color: 'var(--text-tertiary)', maxWidth: 400, lineHeight: 1.6 }}>
+              {language === 'zh' 
+                ? '帮助完善团队的职业能力知识库。分享你的经验，贡献最佳实践，让团队更强大。'
+                : 'Help improve the team\'s professional knowledge base. Share your experience and contribute best practices.'}
+            </p>
+            <button
+              style={{
+                marginTop: '24px',
+                padding: '14px 28px',
+                borderRadius: '12px',
+                background: 'linear-gradient(135deg, #6366F1, #8B5CF6)',
+                border: 'none',
+                color: 'white',
+                fontSize: '14px',
+                fontWeight: '600',
+                cursor: 'pointer',
+              }}
+            >
+              {language === 'zh' ? '创建新职业' : 'Create New Job'}
+            </button>
           </div>
-        </div>
+        )}
+      </div>
+      
+      {/* Job detail modal */}
+      {selectedJob && (
+        <JobDetailModal
+          job={selectedJob}
+          onClose={() => setSelectedJob(null)}
+          onSubscribe={handleSubscribe}
+          isSubscribed={subscribedIds.has(selectedJob.id)}
+          language={language}
+        />
       )}
-
+      
       <style>{`
-        .job-search:focus { outline: none; border-color: var(--primary); box-shadow: 0 0 0 3px var(--primary-glow); }
-        .job-item-draggable:hover { background: var(--bg-tertiary) !important; }
-        .selected-job-item:hover { border-color: var(--border-hover) !important; }
-        .remove-btn:hover { color: #F87171 !important; background: rgba(248, 113, 113, 0.1) !important; }
-        @media (max-width: 1024px) { .config-grid { grid-template-columns: repeat(2, 1fr) !important; } }
-        @media (max-width: 768px) { 
-          .config-grid { grid-template-columns: 1fr !important; }
-          .knowledge-grid { grid-template-columns: 1fr !important; }
+        .job-card:hover {
+          border-color: var(--border-hover);
+          transform: translateY(-2px);
+          box-shadow: 0 8px 24px rgba(0,0,0,0.1);
         }
       `}</style>
     </div>
