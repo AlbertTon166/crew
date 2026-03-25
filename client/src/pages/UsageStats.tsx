@@ -2,7 +2,7 @@ import { useState } from 'react'
 import { 
   TrendingUp, TrendingDown, Coins, Zap, Bot, FolderKanban,
   Calendar, ArrowUp, ArrowDown, Clock, BarChart3, PieChart,
-  Activity, Target, CheckCircle
+  Activity, Target, CheckCircle, Gauge
 } from 'lucide-react'
 import { useLanguage } from '../context/LanguageContext'
 
@@ -11,6 +11,8 @@ const mockUsageData = {
   totalTokens: 2847293,
   totalCost: 127.84,
   apiCalls: 12847,
+  callsInLast5Min: 47,
+  rateLimitPer5Min: 60,
   activeDays: 12,
   periodTokens: [
     { date: '03-19', tokens: 128000, cost: 5.76 },
@@ -192,7 +194,7 @@ export default function UsageStats() {
       </div>
       
       {/* Main stats */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '16px', marginBottom: '24px' }} className="stats-grid">
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(5, 1fr)', gap: '16px', marginBottom: '24px' }} className="stats-grid">
         <StatCard
           icon={<Coins size={20} />}
           label="总 Token"
@@ -208,8 +210,19 @@ export default function UsageStats() {
           label="API 调用"
           labelEn="API Calls"
           value={formatNumber(mockUsageData.apiCalls)}
+          subValue={`${language === 'zh' ? '近5分钟' : 'Last 5min'}: ${mockUsageData.callsInLast5Min}/${mockUsageData.rateLimitPer5Min}`}
           trend="up"
           color="#6366F1"
+          language={language}
+        />
+        <StatCard
+          icon={<Gauge size={20} />}
+          label="限流使用"
+          labelEn="Rate Limit"
+          value={`${Math.round(mockUsageData.callsInLast5Min / mockUsageData.rateLimitPer5Min * 100)}%`}
+          subValue={`${mockUsageData.callsInLast5Min} / ${mockUsageData.rateLimitPer5Min} (5min)`}
+          trend={mockUsageData.callsInLast5Min / mockUsageData.rateLimitPer5Min > 0.8 ? 'down' : undefined}
+          color="#F59E0B"
           language={language}
         />
         <StatCard
@@ -228,7 +241,7 @@ export default function UsageStats() {
           labelEn="Daily Average"
           value={`$${(mockUsageData.totalCost / mockUsageData.activeDays).toFixed(2)}`}
           trend="down"
-          color="#F59E0B"
+          color="#EC4899"
           language={language}
         />
       </div>

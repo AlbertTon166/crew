@@ -27,7 +27,8 @@ import {
   Users,
   FileText,
   Rocket,
-  TrendingUp
+  TrendingUp,
+  Settings as SettingsIcon
 } from 'lucide-react'
 import { useDashboardStore } from '../stores/dashboardStore'
 import { useLanguage } from '../context/LanguageContext'
@@ -49,6 +50,7 @@ const navItems = [
   { path: '/api-keys', icon: Key, color: '#6366F1', cloudOnly: false },
   { path: '/quickstart', icon: Rocket, color: '#F59E0B', cloudOnly: false },
   { path: '/usage', icon: TrendingUp, color: '#34D399', cloudOnly: false },
+  { path: '/resources', icon: SettingsIcon, color: '#8B5CF6', cloudOnly: true },
 ]
 
 const navLabels: Record<string, { en: string; zh: string }> = {
@@ -60,6 +62,7 @@ const navLabels: Record<string, { en: string; zh: string }> = {
   '/api-keys': { en: 'API Keys', zh: 'API密钥' },
   '/quickstart': { en: 'Quick Start', zh: '快速上手' },
   '/usage': { en: 'Usage Stats', zh: '使用统计' },
+  '/resources': { en: 'Resources', zh: '资源管理' },
 }
 
 const navDescs: Record<string, { en: string; zh: string }> = {
@@ -71,6 +74,7 @@ const navDescs: Record<string, { en: string; zh: string }> = {
   '/api-keys': { en: 'API keys management', zh: '管理AI模型密钥' },
   '/quickstart': { en: 'Get started guide', zh: '5分钟快速上手' },
   '/usage': { en: 'Token & cost analytics', zh: 'Token消耗与成本分析' },
+  '/resources': { en: 'Shared keys & server management', zh: '共享密钥与服务器管理' },
 }
 
 export default function Sidebar({ isOpen = false, onClose, openSettingsTab }: SidebarProps) {
