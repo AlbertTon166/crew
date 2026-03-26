@@ -9,6 +9,7 @@ import APIKeys from './pages/APIKeys'
 import QuickStart from './pages/QuickStart'
 import UsageStats from './pages/UsageStats'
 import Resources from './pages/Resources'
+import Settings from './pages/Settings'
 import { AuthProvider } from './context/AuthContext'
 import { LanguageProvider } from './context/LanguageContext'
 import { DeployModeProvider } from './context/DeployModeContext'
@@ -29,6 +30,7 @@ function App() {
                 <Route path="api-keys" element={<APIKeys />} />
                 <Route path="quickstart" element={<QuickStart />} />
                 <Route path="usage" element={<UsageStats />} />
+                <Route path="settings" element={<Settings />} />
                 <Route path="resources" element={<Resources />} />
               </Route>
             </Routes>
