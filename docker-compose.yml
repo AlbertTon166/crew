@@ -1,134 +1,132 @@
-#===========================================
-# Agent Teams Manager - Docker Compose
-# 支持云端/本地两种部署模式
-#
-# 使用方式:
-#   全部服务 (云端模式): docker-compose --profile cloud up -d
-#   仅核心服务 (本地模式): docker-compose up -d
-#===========================================
+version: '3.8'
 
 services:
-  # ========== 核心服务 (始终运行) ==========
-  
   # PostgreSQL Database
   postgres:
     image: postgres:16-alpine
-    container_name: ${PROJECT_NAME:-agent-teams}-postgres
+    container_name: crew-postgres
     restart: unless-stopped
     environment:
-      POSTGRES_DB: agent_teams
-      POSTGRES_USER: ${PG_USER:-postgres}
-      POSTGRES_PASSWORD: ${PG_PASSWORD:-postgres}
+      POSTGRES_DB: ${POSTGRES_DB:-crew}
+      POSTGRES_USER: ${POSTGRES_USER:-crew_user}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
     volumes:
       - postgres_data:/var/lib/postgresql/data
-    ports:
-      - "${PG_PORT:-5432}:5432"
-    networks:
-      - agent-network
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-crew_user} -d ${POSTGRES_DB:-crew}"]
       interval: 10s
       timeout: 5s
       retries: 5
+    networks:
+      - crew-network
 
-  # Redis Cache
+  # Redis for Job Queue
   redis:
     image: redis:7-alpine
-    container_name: ${PROJECT_NAME:-agent-teams}-redis
+    container_name: crew-redis
     restart: unless-stopped
-    command: redis-server --appendonly yes
+    command: redis-server --requirepass ${REDIS_PASSWORD} --appendonly yes
     volumes:
       - redis_data:/data
-    ports:
-      - "${REDIS_PORT:-6379}:6379"
-    networks:
-      - agent-network
     healthcheck:
-      test: ["CMD", "redis-cli", "ping"]
+      test: ["CMD", "redis-cli", "-a", "${REDIS_PASSWORD}", "ping"]
       interval: 10s
       timeout: 5s
       retries: 5
-
-  # ChromaDB Vector Database (RAG Knowledge Base)
-  chromadb:
-    image: chromadb/chroma:latest
-    container_name: ${PROJECT_NAME:-agent-teams}-chromadb
-    restart: unless-stopped
-    environment:
-      IS_PERSISTENT: TRUE
-      ANONYMIZED_TELEMETRY: FALSE
-    volumes:
-      - chroma_data:/chroma/chroma
-    ports:
-      - "${CHROMA_PORT:-8000}:8000"
     networks:
-      - agent-network
-    healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:8000/api/v1/heartbeat"]
-      interval: 30s
-      timeout: 10s
-      retries: 3
+      - crew-network
 
-  # Backend API Server (Agent Teams Core)
+  # Backend API Service
   backend:
     build:
-      context: ./server
-      dockerfile: Dockerfile
-    container_name: ${PROJECT_NAME:-agent-teams}-backend
+      context: .
+      dockerfile: Dockerfile.backend
+    container_name: crew-backend
     restart: unless-stopped
     environment:
       NODE_ENV: production
-      PORT: 3001
-      DEPLOY_MODE: ${DEPLOY_MODE:-cloud}
-      PG_HOST: postgres
-      PG_PORT: 5432
-      PG_DATABASE: agent_teams
-      PG_USER: ${PG_USER:-postgres}
-      PG_PASSWORD: ${PG_PASSWORD:-postgres}
-      REDIS_HOST: redis
-      REDIS_PORT: 6379
-      REDIS_PASSWORD: ${REDIS_PASSWORD:-}
-      CHROMA_HOST: chromadb
-      CHROMA_PORT: 8000
-      CORS_ORIGIN: ${CORS_ORIGIN:-http://localhost:5173}
-    ports:
-      - "${SERVER_PORT:-3001}:3001"
+      DATABASE_URL: postgresql://${POSTGRES_USER:-crew_user}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB:-crew}
+      REDIS_URL: redis://:${REDIS_PASSWORD}@redis:6379
+      JWT_SECRET: ${JWT_SECRET}
+      GITHUB_TOKEN: ${GITHUB_TOKEN}
+      PORT: 3000
     depends_on:
       postgres:
         condition: service_healthy
       redis:
         condition: service_healthy
-      chromadb:
-        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:3000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
     networks:
-      - agent-network
-    volumes:
-      - /var/run/docker.sock:/var/run/docker.sock
+      - crew-network
 
-  # ========== 云端模式专属服务 ==========
-  
-  # Frontend Web UI
+  # Frontend Service (React SPA with Nginx)
   frontend:
-    profiles: [cloud]
     build:
-      context: ./client
-      dockerfile: Dockerfile
-    container_name: ${PROJECT_NAME:-agent-teams}-frontend
+      context: .
+      dockerfile: Dockerfile.frontend
+    container_name: crew-frontend
     restart: unless-stopped
-    environment:
-      VITE_API_URL: ${API_URL:-http://localhost:3001}
-    ports:
-      - "${FRONTEND_PORT:-80}:80"
     depends_on:
       - backend
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:80/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
     networks:
-      - agent-network
+      - crew-network
 
-networks:
-  agent-network:
-    driver: bridge
+  # Nginx Reverse Proxy
+  nginx:
+    image: nginx:alpine
+    container_name: crew-nginx
+    restart: unless-stopped
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./nginx.conf:/etc/nginx/nginx.conf:ro
+      - ./ssl:/etc/nginx/ssl:ro
+    depends_on:
+      - backend
+      - frontend
+    healthcheck:
+      test: ["CMD", "nginx", "-t"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+    networks:
+      - crew-network
+
+  # Docker-in-Docker for Sandbox Execution
+  docker-dind:
+    image: docker:dind
+    container_name: crew-dind
+    restart: unless-stopped
+    privileged: true
+    environment:
+      DOCKER_TLS_CERTDIR: ""
+      DOCKER_REGISTRY_MIRROR: ${DOCKER_REGISTRY_MIRROR:-}
+    volumes:
+      - dind_data:/var/lib/docker
+      - /var/run/docker.sock:/var/run/docker.sock
+    healthcheck:
+      test: ["CMD", "docker", "info"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+    networks:
+      - crew-network
 
 volumes:
   postgres_data:
   redis_data:
-  chroma_data:
+  dind_data:
+
+networks:
+  crew-network:
+    driver: bridge
