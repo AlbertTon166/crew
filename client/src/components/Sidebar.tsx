@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react'
+import { useNavigate } from 'react-router-dom'
 import { NavLink } from 'react-router-dom'
 import { 
   LayoutDashboard, 
@@ -80,6 +81,7 @@ const navDescs: Record<string, { en: string; zh: string }> = {
 export default function Sidebar({ isOpen = false, onClose }: SidebarProps) {
   const { agents } = useDashboardStore()
   const { language, setLanguage } = useLanguage()
+  const navigate = useNavigate()
   const { mode } = useDeployMode()
   const { user, isAuthenticated, isAdmin, logout, tokens, generateToken, revokeToken, setPassword, users, deleteUser, auditLogs } = useAuth()
   
@@ -492,7 +494,7 @@ const [theme, setTheme] = useState<'dark' | 'light' | 'auto'>('dark')
 
         {/* Settings Button */}
         <button 
-          onClick={() => window.location.href = '/settings'}
+          onClick={() => navigate('/settings')}
           style={{ 
             width: '100%',
             display: 'flex',
