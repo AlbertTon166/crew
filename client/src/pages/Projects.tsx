@@ -606,42 +606,177 @@ export default function Projects() {
             </div>
           </div>
           
-          {/* Workflow canvas */}
-          <div style={{ display: 'flex', flexWrap: 'wrap', gap: '20px', alignItems: 'flex-start', padding: '20px', minHeight: '400px' }}>
-            {currentProject.tasks.map(task => (
-              <div key={task.id} style={{ position: 'relative' }}>
-                <WorkflowNode
-                  task={task}
-                  onClick={() => setSelectedWorkflowTask(task)}
-                  isSelected={selectedWorkflowTask?.id === task.id}
-                  language={language}
-                />
-                {/* Exception settings button */}
-                <button
-                  onClick={(e) => { e.stopPropagation(); setSelectedWorkflowTask(task); setShowExceptionModal(true) }}
-                  style={{
-                    position: 'absolute',
-                    top: -8,
-                    right: -8,
-                    width: 28,
-                    height: 28,
-                    borderRadius: '8px',
-                    background: 'var(--bg-primary)',
-                    border: '1px solid var(--border)',
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    cursor: 'pointer',
-                  }}
-                >
-                  <Settings size={12} style={{ color: 'var(--text-secondary)' }} />
-                </button>
-                {/* Connecting line to next */}
-                {task.status !== 'completed' && currentProject.tasks.find(t => t.dependsOn?.includes(task.id)) && (
-                  <div style={{ position: 'absolute', top: '50%', right: -20, width: 20, height: 2, background: 'var(--border)' }} />
-                )}
+          {/* Project name header */}
+          <div style={{ 
+            background: 'linear-gradient(135deg, rgba(99, 102, 241, 0.15), rgba(139, 92, 246, 0.15))',
+            borderRadius: '12px',
+            padding: '16px 20px',
+            marginBottom: '20px',
+            border: '1px solid rgba(99, 102, 241, 0.2)'
+          }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+              <div style={{
+                width: '40px', height: '40px',
+                borderRadius: '10px',
+                background: 'linear-gradient(135deg, #6366F1, #8B5CF6)',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                fontSize: '18px'
+              }}>
+                📋
               </div>
-            ))}
+              <div>
+                <h2 style={{ fontSize: '18px', fontWeight: '700', color: 'var(--text-primary)', margin: 0 }}>
+                  {language === 'zh' ? currentProject.nameZh : currentProject.name}
+                </h2>
+                <p style={{ fontSize: '12px', color: 'var(--text-tertiary)', margin: '2px 0 0 0' }}>
+                  {language === 'zh' ? currentProject.descZh : currentProject.description}
+                </p>
+              </div>
+              <div style={{ marginLeft: 'auto', display: 'flex', gap: '8px' }}>
+                <StatusBadge status={currentProject.status} />
+              </div>
+            </div>
+          </div>
+          
+          {/* Workflow stages - horizontal flow */}
+          <div style={{ 
+            display: 'flex', 
+            gap: '0', 
+            overflowX: 'auto',
+            padding: '10px 0 20px 0'
+          }}>
+            {(Object.keys(statusConfig) as Array<keyof typeof statusConfig>).map((status, idx) => {
+              const stageTasks = currentProject.tasks.filter(t => t.status === status)
+              const cfg = statusConfig[status]
+              const isActive = stageTasks.length > 0
+              
+              return (
+                <div key={status} style={{ 
+                  display: 'flex',
+                  alignItems: 'flex-start',
+                  minWidth: '180px'
+                }}>
+                  {/* Stage column */}
+                  <div style={{
+                    flex: 1,
+                    background: isActive ? cfg.bg : 'var(--bg-tertiary)',
+                    borderRadius: '12px',
+                    padding: '12px',
+                    border: `1px solid ${isActive ? cfg.border : 'var(--border)'}`,
+                    opacity: isActive ? 1 : 0.5,
+                  }}>
+                    {/* Stage header */}
+                    <div style={{ 
+                      display: 'flex', 
+                      alignItems: 'center', 
+                      justifyContent: 'space-between',
+                      marginBottom: '12px',
+                      paddingBottom: '8px',
+                      borderBottom: `1px solid ${isActive ? cfg.border : 'var(--border)'}`
+                    }}>
+                      <span style={{ fontSize: '12px', fontWeight: '600', color: isActive ? cfg.color : 'var(--text-tertiary)' }}>
+                        {language === 'zh' ? cfg.label : cfg.labelEn}
+                      </span>
+                      <span style={{
+                        fontSize: '11px',
+                        padding: '2px 8px',
+                        borderRadius: '10px',
+                        background: isActive ? cfg.color : 'var(--text-tertiary)',
+                        color: 'white',
+                        fontWeight: '600'
+                      }}>
+                        {stageTasks.length}
+                      </span>
+                    </div>
+                    
+                    {/* Tasks in stage */}
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                      {stageTasks.map(task => (
+                        <div
+                          key={task.id}
+                          onClick={() => setSelectedWorkflowTask(task)}
+                          style={{
+                            padding: '10px',
+                            background: 'var(--bg-primary)',
+                            borderRadius: '8px',
+                            cursor: 'pointer',
+                            border: selectedWorkflowTask?.id === task.id ? `2px solid ${cfg.color}` : '1px solid var(--border)',
+                            transition: 'all 0.2s',
+                          }}
+                        >
+                          <div style={{ fontSize: '13px', fontWeight: '500', color: 'var(--text-primary)', marginBottom: '4px' }}>
+                            {language === 'zh' ? task.titleZh : task.title}
+                          </div>
+                          <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap' }}>
+                            <PriorityBadge priority={task.priority} />
+                            {task.isHumanInterruptPoint && (
+                              <span style={{ fontSize: '9px', padding: '2px 5px', borderRadius: '4px', background: 'rgba(239, 68, 68, 0.15)', color: '#EF4444' }}>
+                                ⏸️ 人工
+                              </span>
+                            )}
+                          </div>
+                        </div>
+                      ))}
+                      
+                      {stageTasks.length === 0 && (
+                        <div style={{ 
+                          fontSize: '11px', 
+                          color: 'var(--text-tertiary)', 
+                          textAlign: 'center',
+                          padding: '16px 0'
+                        }}>
+                          {language === 'zh' ? '暂无任务' : 'No tasks'}
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                  
+                  {/* Animated arrow to next stage */}
+                  {idx < Object.keys(statusConfig).length - 1 && (
+                    <div style={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      padding: '0 8px',
+                      height: '100%',
+                      position: 'relative'
+                    }}>
+                      <svg width="24" height="24" viewBox="0 0 24 24" style={{ overflow: 'visible' }}>
+                        <defs>
+                          <linearGradient id={`grad-${status}`} x1="0%" y1="0%" x2="100%" y2="0%">
+                            <stop offset="0%" stopColor={cfg.color} stopOpacity="0.3" />
+                            <stop offset="50%" stopColor={cfg.color} stopOpacity="1" />
+                            <stop offset="100%" stopColor={cfg.color} stopOpacity="0.3" />
+                          </linearGradient>
+                        </defs>
+                        {/* Arrow line */}
+                        <line 
+                          x1="0" y1="12" x2="16" y2="12" 
+                          stroke={`url(#grad-${status})`} 
+                          strokeWidth="2"
+                          strokeLinecap="round"
+                        />
+                        {/* Animated dot */}
+                        <circle r="3" fill={cfg.color}>
+                          <animateMotion
+                            dur="1.5s"
+                            repeatCount="indefinite"
+                            path="M 0 12 L 16 12"
+                          />
+                        </circle>
+                        {/* Arrow head */}
+                        <polygon 
+                          points="14,8 20,12 14,16" 
+                          fill={cfg.color}
+                          opacity="0.6"
+                        />
+                      </svg>
+                    </div>
+                  )}
+                </div>
+              )
+            })}
           </div>
           
           {/* Selected task detail */}
