@@ -1,0 +1,131 @@
+# 多租户隔离架构
+# Docker Network Namespace + 资源配额
+
+version: '3.8'
+
+services:
+  # ============================================
+  # 租户网络隔离层
+  # ============================================
+  
+  # 每个租户独立的网络命名空间
+  tenant-network:
+    image: alpine:latest
+    container_name: tenant-network-${TENANT_ID}
+    restart: unless-stopped
+    command: ["sleep", "infinity"]
+    networks:
+      - tenant-${TENANT_ID}-network
+    volumes:
+      - tenant-${TENANT_ID}-data:/data
+    environment:
+      TENANT_ID: ${TENANT_ID}
+    cpus: ${TENANT_CPU_LIMIT:-2}
+    mem_limit: ${TENANT_MEM_LIMIT:-4g}
+    pids_limit: ${TENANT_PIDS_LIMIT:-100}
+    disk_quota: ${TENANT_DISK_QUOTA:-10g}
+    labels:
+      - "tenant.id=${TENANT_ID}"
+      - "tenant.isolation=namespace"
+
+  # ============================================
+  # 租户数据库隔离
+  # ============================================
+  
+  tenant-postgres:
+    image: postgres:16-alpine
+    container_name: tenant-${TENANT_ID}-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ${TENANT_DB:-tenant_${TENANT_ID}}
+      POSTGRES_USER: ${TENANT_USER:-tenant_${TENANT_ID}_user}
+      POSTGRES_PASSWORD: ${TENANT_PASSWORD}
+    volumes:
+      - tenant-${TENANT_ID}-postgres:/var/lib/postgresql/data
+    networks:
+      - tenant-${TENANT_ID}-network
+    cpus: ${TENANT_CPU_LIMIT:-2}
+    mem_limit: ${TENANT_MEM_LIMIT:-4g}
+    labels:
+      - "tenant.id=${TENANT_ID}"
+      - "tenant.resource=database"
+
+  # ============================================
+  # 租户 Redis 隔离
+  # ============================================
+  
+  tenant-redis:
+    image: redis:7-alpine
+    container_name: tenant-${TENANT_ID}-redis
+    restart: unless-stopped
+    command: redis-server --requirepass ${TENANT_REDIS_PASSWORD} --maxmemory ${TENANT_REDIS_MAXMEMORY:-2gb} --maxmemory-policy allkeys-lru
+    volumes:
+      - tenant-${TENANT_ID}-redis:/data
+    networks:
+      - tenant-${TENANT_ID}-network
+    cpus: ${TENANT_CPU_LIMIT:-2}
+    mem_limit: ${TENANT_MEM_LIMIT:-4g}
+    labels:
+      - "tenant.id=${TENANT_ID}"
+      - "tenant.resource=cache"
+
+  # ============================================
+  # 租户工作负载（Sandbox）
+  # ============================================
+  
+  tenant-sandbox:
+    image: docker:dind
+    container_name: tenant-${TENANT_ID}-sandbox
+    restart: unless-stopped
+    privileged: true
+    environment:
+      TENANT_ID: ${TENANT_ID}
+      DOCKER_TLS_CERTDIR: ""
+    volumes:
+      - tenant-${TENANT_ID}-sandbox:/var/lib/docker
+      - /var/run/docker.sock:/var/run/docker.sock
+    networks:
+      - tenant-${TENANT_ID}-network
+    cpus: ${TENANT_SANDBOX_CPU:-4}
+    mem_limit: ${TENANT_SANDBOX_MEM:-8g}
+    pids_limit: ${TENANT_PIDS_LIMIT:-200}
+    labels:
+      - "tenant.id=${TENANT_ID}"
+      - "tenant.resource=sandbox"
+    # 资源配额
+    ulimits:
+      nproc: ${TENANT_PIDS_LIMIT:-100}
+      nofile:
+        soft: 65536
+        hard: 65536
+
+networks:
+  tenant-${TENANT_ID}-network:
+    driver: bridge
+    driver_opts:
+      com.docker.network.bridge.name: br-tenant-${TENANT_ID}
+      com.docker.network.bridge.enable_icc: "true"
+      com.docker.network.bridge.enable_ip_masquerade: "true"
+
+volumes:
+  tenant-${TENANT_ID}-data:
+    driver: local
+  tenant-${TENANT_ID}-postgres:
+    driver: local
+  tenant-${TENANT_ID}-redis:
+    driver: local
+  tenant-${TENANT_ID}-sandbox:
+    driver: local
+
+# ============================================
+# 全局资源限制
+# ============================================
+x-resource-limits: &resource-limits
+  cpus: ${TENANT_CPU_LIMIT:-2}
+  mem_limit: ${TENANT_MEM_LIMIT:-4g}
+  pids_limit: ${TENANT_PIDS_LIMIT:-100}
+  disk_quota: ${TENANT_DISK_QUOTA:-10g}
+
+# ============================================
+# 隔离验证脚本
+# ============================================
