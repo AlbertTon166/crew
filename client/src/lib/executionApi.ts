@@ -5,7 +5,7 @@
 
 const API_BASE = import.meta.env.VITE_API_BASE || 'http://localhost:3001';
 
-interface Execution {
+export interface Execution {
   id: string
   task_id: string
   agent_id?: string
@@ -19,7 +19,7 @@ interface Execution {
   duration_ms?: number
 }
 
-interface ExecutionLog {
+export interface ExecutionLog {
   id: string
   execution_id: string
   level: 'debug' | 'info' | 'warn' | 'error'
@@ -28,7 +28,7 @@ interface ExecutionLog {
   created_at: string
 }
 
-interface ExecutionWithLogs extends Execution {
+export interface ExecutionWithLogs extends Execution {
   logs: ExecutionLog[]
 }
 

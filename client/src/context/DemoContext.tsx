@@ -58,7 +58,7 @@ export function DemoProvider({ children }: { children: ReactNode }) {
           id: p.id,
           name: p.name,
           description: p.description,
-          status: p.status === 'active' ? 'in_progress' : 'completed',
+          status: (p.status === 'active' ? 'in_progress' : 'completed') as any,
           tasks: [],
           createdAt: new Date().toISOString(),
           updatedAt: new Date().toISOString(),
