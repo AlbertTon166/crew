@@ -49,3 +49,13 @@ Thumbs.db
 
 # Certbot challenge files
 .acme-challenge/
+
+#===========================================
+# Agent Meta Files (Local only)
+#===========================================
+.openclaw/agent-meta/
+
+#===========================================
+# Memory / Local Backup
+#===========================================
+memory/
