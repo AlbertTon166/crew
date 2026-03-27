@@ -5,11 +5,12 @@ import {
   Settings, MessageSquare, Zap, Code, TestTube, Shield, FileText, 
   ChevronDown, Lock, RotateCw, WifiOff, GripVertical, MoreHorizontal,
   AlertCircle, Play, Pause, SkipForward, Trash2, Edit2, Eye,
-  GitBranch, Workflow, AlertTriangle, RefreshCw
+  GitBranch, Workflow, AlertTriangle, RefreshCw, Check, Loader
 } from 'lucide-react'
 import { useDashboardStore } from '../stores/dashboardStore'
 import { useLanguage } from '../context/LanguageContext'
 import { useDeployMode } from '../context/DeployModeContext'
+import { updateTaskStatus, canTransition, statusConfig as apiStatusConfig, getNextStatuses } from '../lib/taskApi'
 
 // Task interface
 interface Task {
@@ -136,18 +137,34 @@ function StatusBadge({ status }: { status: string }) {
 }
 
 // Task card component
-function TaskCard({ task, onDragStart, onClick, language }: { task: Task; onDragStart: (e: React.DragEvent, task: Task) => void; onClick: () => void; language: 'en' | 'zh' }) {
+function TaskCard({ task, onDragStart, onClick, onStatusChange, language }: {
+  task: Task
+  onDragStart: (e: React.DragEvent, task: Task) => void
+  onClick: () => void
+  onStatusChange?: (taskId: string, newStatus: string) => void
+  language: 'en' | 'zh'
+}) {
+  const [showStatusMenu, setShowStatusMenu] = useState(false)
   const getAssigneeInitials = (name: string) => {
     return name.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2)
   }
-  
+
   const assigneeColor = task.assignee ? ['#6366F1', '#8B5CF6', '#EC4899', '#14B8A6', '#F59E0B'][Math.abs(task.assignee.id.charCodeAt(0)) % 5] : '#64748B'
-  
+  const nextStatuses = getNextStatuses(task.status)
+  const hasTransitions = nextStatuses.length > 0
+
   return (
     <div
       draggable
       onDragStart={(e) => onDragStart(e, task)}
-      onClick={onClick}
+      onClick={(e) => {
+        // If showing status menu, don't trigger card click
+        if (showStatusMenu) {
+          setShowStatusMenu(false)
+          return
+        }
+        onClick()
+      }}
       style={{
         background: 'var(--bg-secondary)',
         border: '1px solid var(--border)',
@@ -155,13 +172,89 @@ function TaskCard({ task, onDragStart, onClick, language }: { task: Task; onDrag
         padding: '12px',
         cursor: 'grab',
         transition: 'all 0.2s ease',
+        position: 'relative',
       }}
       className="task-card"
     >
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '8px' }}>
         <PriorityBadge priority={task.priority} />
-        <StatusBadge status={task.status} />
+        <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+          <StatusBadge status={task.status} />
+          {hasTransitions && onStatusChange && (
+            <button
+              onClick={(e) => {
+                e.stopPropagation()
+                setShowStatusMenu(!showStatusMenu)
+              }}
+              style={{
+                background: 'var(--bg-tertiary)',
+                border: 'none',
+                borderRadius: '4px',
+                padding: '2px 6px',
+                cursor: 'pointer',
+                fontSize: '10px',
+                color: 'var(--text-secondary)',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '2px',
+              }}
+            >
+              <ChevronDown size={10} />
+            </button>
+          )}
+        </div>
       </div>
+
+      {/* Status transition popup */}
+      {showStatusMenu && hasTransitions && onStatusChange && (
+        <div
+          style={{
+            position: 'absolute',
+            top: '100%',
+            right: 0,
+            background: 'var(--bg-secondary)',
+            border: '1px solid var(--border)',
+            borderRadius: '8px',
+            padding: '4px',
+            zIndex: 100,
+            minWidth: '120px',
+            boxShadow: '0 4px 12px rgba(0,0,0,0.3)',
+          }}
+          onClick={(e) => e.stopPropagation()}
+        >
+          {nextStatuses.map(status => {
+            const cfg = apiStatusConfig[status] || { color: '#64748B', label: status }
+            return (
+              <button
+                key={status}
+                onClick={() => {
+                  onStatusChange(task.id, status)
+                  setShowStatusMenu(false)
+                }}
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '8px',
+                  width: '100%',
+                  padding: '8px 10px',
+                  background: 'transparent',
+                  border: 'none',
+                  borderRadius: '6px',
+                  cursor: 'pointer',
+                  fontSize: '12px',
+                  color: cfg.color,
+                  textAlign: 'left',
+                }}
+                onMouseEnter={(e) => (e.currentTarget.style.background = 'var(--bg-tertiary)')}
+                onMouseLeave={(e) => (e.currentTarget.style.background = 'transparent')}
+              >
+                <div style={{ width: 8, height: 8, borderRadius: '50%', background: cfg.color }} />
+                {language === 'zh' ? cfg.label : cfg.labelEn}
+              </button>
+            )
+          })}
+        </div>
+      )}
       
       <p style={{ fontSize: '13px', fontWeight: '600', color: 'var(--text-primary)', margin: '0 0 8px 0', lineHeight: 1.4 }}>
         {language === 'zh' ? task.titleZh : task.title}
@@ -207,7 +300,17 @@ function TaskCard({ task, onDragStart, onClick, language }: { task: Task; onDrag
 }
 
 // Kanban column
-function KanbanColumn({ status, tasks, onDragOver, onDrop, onDragStart, onTaskClick, language }: { status: keyof typeof statusConfig; tasks: Task[]; onDragOver: (e: React.DragEvent) => void; onDrop: (e: React.DragEvent, status: string) => void; onDragStart: (e: React.DragEvent, task: Task) => void; onTaskClick: (task: Task) => void; language: 'en' | 'zh' }) {
+function KanbanColumn({ status, tasks, onDragOver, onDrop, onDragStart, onTaskClick, onStatusChange, draggedTaskLoading, language }: {
+  status: keyof typeof statusConfig
+  tasks: Task[]
+  onDragOver: (e: React.DragEvent) => void
+  onDrop: (e: React.DragEvent, status: string) => void
+  onDragStart: (e: React.DragEvent, task: Task) => void
+  onTaskClick: (task: Task) => void
+  onStatusChange: (taskId: string, newStatus: string) => void
+  draggedTaskLoading?: boolean
+  language: 'en' | 'zh'
+}) {
   const cfg = statusConfig[status]
   const [isDragOver, setIsDragOver] = useState(false)
   
@@ -242,7 +345,14 @@ function KanbanColumn({ status, tasks, onDragOver, onDrop, onDragStart, onTaskCl
       
       <div style={{ flex: 1, overflow: 'auto', padding: '12px', display: 'flex', flexDirection: 'column', gap: '8px' }}>
         {tasks.map(task => (
-          <TaskCard key={task.id} task={task} onDragStart={onDragStart} onClick={() => onTaskClick(task)} language={language} />
+          <TaskCard
+            key={task.id}
+            task={task}
+            onDragStart={onDragStart}
+            onClick={() => onTaskClick(task)}
+            onStatusChange={onStatusChange}
+            language={language}
+          />
         ))}
         {tasks.length === 0 && (
           <div style={{ textAlign: 'center', padding: '24px 12px', color: 'var(--text-tertiary)', fontSize: '12px' }}>
@@ -471,7 +581,14 @@ export default function Projects() {
   const [selectedTask, setSelectedTask] = useState<Task | null>(null)
   const [selectedWorkflowTask, setSelectedWorkflowTask] = useState<Task | null>(null)
   const [showExceptionModal, setShowExceptionModal] = useState(false)
-  
+
+  // Drag state
+  const [draggedTask, setDraggedTask] = useState<Task | null>(null)
+  const [draggedTaskLoading, setDraggedTaskLoading] = useState(false)
+
+  // Status change popup
+  const [statusPopup, setStatusPopup] = useState<{ task: Task; position: { x: number; y: number } } | null>(null)
+
   const [projects, setProjects] = useState<Project[]>(mockProjects)
   
   const getProjectName = (p: Project) => language === 'zh' ? (p.nameZh || p.name) : p.name
@@ -483,11 +600,42 @@ export default function Projects() {
   
   const currentProject = filteredProjects[0]
   
-  const handleTaskStatusChange = (taskId: string, newStatus: string) => {
+  const handleTaskStatusChange = async (taskId: string, newStatus: string) => {
+    // Find the task first
+    let taskToUpdate: Task | null = null
+    for (const p of projects) {
+      const t = p.tasks.find(t => t.id === taskId)
+      if (t) {
+        taskToUpdate = t
+        break
+      }
+    }
+
+    if (!taskToUpdate) return
+
+    // Check if transition is valid
+    if (!canTransition(taskToUpdate.status, newStatus)) {
+      console.warn(`Invalid transition from ${taskToUpdate.status} to ${newStatus}`)
+      return
+    }
+
+    // Optimistic update
     setProjects(prev => prev.map(p => ({
       ...p,
       tasks: p.tasks.map(t => t.id === taskId ? { ...t, status: newStatus as Task['status'] } : t)
     })))
+
+    // Call API
+    const result = await updateTaskStatus(taskId, newStatus)
+
+    if (!result.success) {
+      // Rollback on failure
+      setProjects(prev => prev.map(p => ({
+        ...p,
+        tasks: p.tasks.map(t => t.id === taskId ? { ...t, status: taskToUpdate!.status } : t)
+      })))
+      console.error('Failed to update task status:', result.error)
+    }
   }
   
   const handleSaveException = (updatedTask: Task) => {
@@ -570,10 +718,26 @@ export default function Projects() {
                 key={status}
                 status={status}
                 tasks={currentProject.tasks.filter(t => t.status === status)}
-                onDragOver={() => {}}
-                onDrop={() => {}}
-                onDragStart={() => {}}
-                onTaskClick={() => {}}
+                onDragOver={(e) => e.preventDefault()}
+                onDrop={(e, targetStatus) => {
+                  if (draggedTask && draggedTask.status !== targetStatus) {
+                    handleTaskStatusChange(draggedTask.id, targetStatus)
+                  }
+                  setDraggedTask(null)
+                }}
+                onDragStart={(e, task) => {
+                  setDraggedTask(task)
+                  e.dataTransfer.effectAllowed = 'move'
+                }}
+                onTaskClick={(task) => {
+                  const nextStatuses = getNextStatuses(task.status)
+                  if (nextStatuses.length > 0) {
+                    // Get click position from event (we'll approximate with mouse position)
+                    setStatusPopup({ task, position: { x: window.innerWidth / 2, y: window.innerHeight / 2 } })
+                  }
+                }}
+                onStatusChange={(taskId, newStatus) => handleTaskStatusChange(taskId, newStatus)}
+                draggedTaskLoading={draggedTaskLoading}
                 language={language}
               />
             ))}
