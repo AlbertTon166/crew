@@ -1,15 +1,16 @@
 /**
- * Office3D - 3D 可视化 Agent 工作空间 Phase 2
+ * Office3D - 3D 可视化 Agent 工作空间 Phase 3
  * 使用 Three.js + React Three Fiber
- * 新增: 视角切换、状态筛选、Agent 选择、任务面板
+ * 新增: WebSocket 实时状态、任务拖拽、活动日志流
  */
 
-import { useState, Suspense, useRef, useEffect } from 'react'
+import { useState, Suspense, useRef, useEffect, useCallback } from 'react'
 import { Canvas, useFrame, useThree } from '@react-three/fiber'
-import { OrbitControls, PerspectiveCamera, Html, Environment, ContactShadows, Text } from '@react-three/drei'
+import { OrbitControls, PerspectiveCamera, Html, Environment, ContactShadows } from '@react-three/drei'
 import {
-  X, Maximize2, Users, Bot, Activity, Eye, Grid3X3, LayoutGrid,
-  ChevronDown, Filter, ArrowRight, Clock, CheckCircle, AlertCircle
+  X, Users, Bot, Activity, Eye, Grid3X3, LayoutGrid,
+  ChevronDown, Filter, Clock, CheckCircle, AlertCircle,
+  Play, Pause, Zap, ArrowRight, MessageSquare, RefreshCw
 } from 'lucide-react'
 import { useLanguage } from '../context/LanguageContext'
 import { useDashboardStore } from '../stores/dashboardStore'
@@ -23,7 +24,7 @@ interface Agent3D {
   status: 'online' | 'idle' | 'busy' | 'thinking' | 'error' | 'offline'
   color: string
   position: [number, number, number]
-  tasks?: { title: string; status: string }[]
+  tasks: Task3D[]
 }
 
 interface Task3D {
@@ -31,6 +32,15 @@ interface Task3D {
   title: string
   status: 'pending' | 'in_progress' | 'completed'
   assigneeId?: string
+}
+
+interface ActivityLog {
+  id: string
+  type: 'task' | 'review' | 'deploy' | 'message'
+  agentName: string
+  content: string
+  time: string
+  timestamp: number
 }
 
 // Agent 角色配置
@@ -53,7 +63,14 @@ const statusConfig: Record<string, { color: string; bg: string; label: string; l
   offline: { color: '#334155', bg: 'rgba(51, 65, 85, 0.15)', label: '离线', labelEn: 'Offline' },
 }
 
-// Agent 数据
+// 任务状态配置
+const taskStatusConfig: Record<string, { color: string; icon: any; label: string; labelEn: string }> = {
+  pending: { color: '#64748B', icon: AlertCircle, label: '待处理', labelEn: 'Pending' },
+  in_progress: { color: '#3B82F6', icon: Clock, label: '进行中', labelEn: 'In Progress' },
+  completed: { color: '#34D399', icon: CheckCircle, label: '完成', labelEn: 'Done' },
+}
+
+// 初始 Agent 数据
 const initialAgents: Agent3D[] = [
   { id: '1', name: 'Alice', role: 'pm', status: 'online', color: agentRoles.pm.color, position: [-3, 0, 0], tasks: [{ id: 't1', title: '规划 v2.0', status: 'in_progress' }, { id: 't2', title: '需求评审', status: 'completed' }] },
   { id: '2', name: 'Bob', role: 'planner', status: 'busy', color: agentRoles.planner.color, position: [-1, 0, 1], tasks: [{ id: 't3', title: '任务分解', status: 'in_progress' }] },
@@ -61,6 +78,15 @@ const initialAgents: Agent3D[] = [
   { id: '4', name: 'Diana', role: 'reviewer', status: 'idle', color: agentRoles.reviewer.color, position: [3, 0, 0], tasks: [] },
   { id: '5', name: 'Evan', role: 'tester', status: 'offline', color: agentRoles.tester.color, position: [-2, 0, -1], tasks: [] },
   { id: '6', name: 'Frank', role: 'deployer', status: 'online', color: agentRoles.deployer.color, position: [2, 0, -1], tasks: [{ id: 't6', title: '部署上线', status: 'pending' }] },
+]
+
+// 模拟活动日志
+const mockActivities: ActivityLog[] = [
+  { id: 'a1', type: 'task', agentName: 'Charlie', content: '完成了 API 集成模块', time: '2min ago', timestamp: Date.now() - 120000 },
+  { id: 'a2', type: 'review', agentName: 'Diana', content: '通过代码审查 #23', time: '5min ago', timestamp: Date.now() - 300000 },
+  { id: 'a3', type: 'deploy', agentName: 'Frank', content: '上线版本 v2.1.0', time: '12min ago', timestamp: Date.now() - 720000 },
+  { id: 'a4', type: 'task', agentName: 'Charlie', content: '修复登录 bug', time: '1h ago', timestamp: Date.now() - 3600000 },
+  { id: 'a5', type: 'message', agentName: 'Alice', content: '确认需求：支付模块', time: '2h ago', timestamp: Date.now() - 7200000 },
 ]
 
 // 视角配置
@@ -105,42 +131,77 @@ function CameraController({ viewMode }: { viewMode: ViewMode }) {
   )
 }
 
-// Agent Avatar Component
-function AgentAvatar({
+// Draggable Agent Avatar
+function DraggableAgentAvatar({
   agent,
   isSelected,
-  onClick
+  onClick,
+  onDragEnd,
+  isDragging
 }: {
   agent: Agent3D
   isSelected: boolean
   onClick: () => void
+  onDragEnd: (agentId: string, newPosition: [number, number, number]) => void
+  isDragging: boolean
 }) {
   const meshRef = useRef<THREE.Mesh>(null)
-  const [hovered, setHovered] = useState(false)
   const groupRef = useRef<THREE.Group>(null)
+  const [hovered, setHovered] = useState(false)
+  const [localPosition, setLocalPosition] = useState<[number, number, number]>(agent.position)
+  const [isDraggingLocal, setIsDraggingLocal] = useState(false)
+  const dragPlaneRef = useRef(new THREE.Plane(new THREE.Vector3(0, 1, 0), 0))
+  const intersectionPoint = useRef(new THREE.Vector3())
 
   useFrame((state) => {
     if (meshRef.current) {
-      // Status animations
       if (agent.status === 'thinking') {
-        meshRef.current.position.y = agent.position[1] + Math.sin(state.clock.elapsedTime * 3) * 0.15
+        meshRef.current.position.y = localPosition[1] + Math.sin(state.clock.elapsedTime * 3) * 0.15
       } else if (agent.status === 'busy') {
         meshRef.current.rotation.y += 0.03
-        meshRef.current.position.y = agent.position[1] + Math.sin(state.clock.elapsedTime * 5) * 0.03
+        meshRef.current.position.y = localPosition[1] + Math.sin(state.clock.elapsedTime * 5) * 0.03
       } else {
-        meshRef.current.position.y = agent.position[1]
+        meshRef.current.position.y = localPosition[1]
       }
     }
     // Selection glow
-    if (groupRef.current && isSelected) {
-      groupRef.current.scale.setScalar(1 + Math.sin(state.clock.elapsedTime * 4) * 0.05)
-    } else {
-      groupRef.current?.scale.setScalar(1)
+    if (groupRef.current) {
+      const scale = isSelected ? 1 + Math.sin(state.clock.elapsedTime * 4) * 0.05 : 1
+      const dragScale = isDraggingLocal ? 1.1 : 1
+      groupRef.current.scale.setScalar(scale * dragScale)
     }
   })
 
+  const handlePointerDown = (e: any) => {
+    e.stopPropagation()
+    setIsDraggingLocal(true)
+    document.body.style.cursor = 'grabbing'
+  }
+
+  const handlePointerUp = (e: any) => {
+    if (isDraggingLocal) {
+      setIsDraggingLocal(false)
+      document.body.style.cursor = 'auto'
+      // Snap to grid (1 unit)
+      const snapped: [number, number, number] = [
+        Math.round(localPosition[0]),
+        localPosition[1],
+        Math.round(localPosition[2])
+      ]
+      setLocalPosition(snapped)
+      if (onDragEnd) onDragEnd(agent.id, snapped)
+    }
+  }
+
+  const handlePointerMove = (e: any) => {
+    if (isDraggingLocal && e.point) {
+      // Move on XZ plane
+      setLocalPosition([e.point.x, localPosition[1], e.point.z])
+    }
+  }
+
   return (
-    <group ref={groupRef} position={agent.position}>
+    <group ref={groupRef} position={localPosition}>
       {/* Selection ring */}
       {isSelected && (
         <mesh position={[0, -0.4, 0]} rotation={[-Math.PI / 2, 0, 0]}>
@@ -149,12 +210,23 @@ function AgentAvatar({
         </mesh>
       )}
 
+      {/* Drag plane */}
+      {isDraggingLocal && (
+        <mesh position={[0, 0, 0]} rotation={[-Math.PI / 2, 0, 0]} visible={false}>
+          <planeGeometry args={[50, 50]} />
+          <meshBasicMaterial transparent opacity={0} />
+        </mesh>
+      )}
+
       {/* Body */}
       <mesh
         ref={meshRef}
         onClick={(e) => { e.stopPropagation(); onClick() }}
-        onPointerOver={() => setHovered(true)}
-        onPointerOut={() => setHovered(false)}
+        onPointerDown={handlePointerDown}
+        onPointerUp={handlePointerUp}
+        onPointerOver={() => { setHovered(true); document.body.style.cursor = 'grab' }}
+        onPointerOut={() => { setHovered(false); if (!isDraggingLocal) document.body.style.cursor = 'auto' }}
+        onPointerMove={handlePointerMove}
         castShadow
       >
         <cylinderGeometry args={[0.35, 0.45, 1.1, 16]} />
@@ -164,6 +236,8 @@ function AgentAvatar({
           roughness={0.6}
           emissive={isSelected ? agent.color : '#000000'}
           emissiveIntensity={isSelected ? 0.3 : 0}
+          opacity={isDraggingLocal ? 0.8 : 1}
+          transparent={isDraggingLocal}
         />
       </mesh>
 
@@ -171,6 +245,8 @@ function AgentAvatar({
       <mesh
         position={[0, 0.8, 0]}
         onClick={(e) => { e.stopPropagation(); onClick() }}
+        onPointerDown={handlePointerDown}
+        onPointerUp={handlePointerUp}
         castShadow
       >
         <sphereGeometry args={[0.3, 16, 16]} />
@@ -178,6 +254,8 @@ function AgentAvatar({
           color={hovered ? '#ffffff' : agent.color}
           metalness={0.3}
           roughness={0.7}
+          opacity={isDraggingLocal ? 0.8 : 1}
+          transparent={isDraggingLocal}
         />
       </mesh>
 
@@ -191,7 +269,7 @@ function AgentAvatar({
         />
       </mesh>
 
-      {/* Role label */}
+      {/* Name label */}
       <Html position={[0, -0.7, 0]} center>
         <div
           style={{
@@ -210,8 +288,8 @@ function AgentAvatar({
         </div>
       </Html>
 
-      {/* Task count badge */}
-      {agent.tasks && agent.tasks.length > 0 && (
+      {/* Task count */}
+      {agent.tasks.length > 0 && (
         <Html position={[0.4, 0.5, 0]} center>
           <div
             style={{
@@ -239,7 +317,6 @@ function Floor() {
         <planeGeometry args={[24, 24]} />
         <meshStandardMaterial color="#0f172a" metalness={0.2} roughness={0.9} />
       </mesh>
-      {/* Grid */}
       <gridHelper args={[24, 24, '#1e293b', '#1e293b']} position={[0, -0.49, 0]} />
     </group>
   )
@@ -288,12 +365,16 @@ function Scene({
   agents,
   selectedAgentId,
   onAgentClick,
-  viewMode
+  onAgentDragEnd,
+  viewMode,
+  draggingAgentId
 }: {
   agents: Agent3D[]
   selectedAgentId: string | null
   onAgentClick: (agent: Agent3D) => void
+  onAgentDragEnd: (agentId: string, newPosition: [number, number, number]) => void
   viewMode: ViewMode
+  draggingAgentId: string | null
 }) {
   return (
     <>
@@ -309,11 +390,13 @@ function Scene({
       <Desk position={[3, 0, 0]} />
       <Desk position={[0, 0, 1.5]} />
       {agents.map((agent) => (
-        <AgentAvatar
+        <DraggableAgentAvatar
           key={agent.id}
           agent={agent}
           isSelected={agent.id === selectedAgentId}
           onClick={() => onAgentClick(agent)}
+          onDragEnd={onAgentDragEnd}
+          isDragging={agent.id === draggingAgentId}
         />
       ))}
       <ContactShadows position={[0, -0.48, 0]} opacity={0.5} scale={20} blur={2.5} />
@@ -325,10 +408,12 @@ function Scene({
 function AgentDetailPanel({
   agent,
   onClose,
+  onTaskStatusChange,
   language
 }: {
   agent: Agent3D
   onClose: () => void
+  onTaskStatusChange: (taskId: string, newStatus: string) => void
   language: 'en' | 'zh'
 }) {
   const role = agentRoles[agent.role] || { label: agent.role, labelEn: agent.role, color: '#64748B' }
@@ -347,6 +432,8 @@ function AgentDetailPanel({
         padding: '20px',
         backdropFilter: 'blur(12px)',
         zIndex: 20,
+        maxHeight: 'calc(100vh - 160px)',
+        overflow: 'auto',
       }}
     >
       {/* Header */}
@@ -404,52 +491,151 @@ function AgentDetailPanel({
         </span>
       </div>
 
+      {/* Position */}
+      <div style={{ marginBottom: '16px', fontSize: '12px', color: 'rgba(255,255,255,0.5)' }}>
+        {language === 'zh' ? '位置' : 'Position'}: ({agent.position[0]}, {agent.position[2]})
+      </div>
+
       {/* Tasks */}
       <div>
         <h4 style={{ margin: '0 0 12px 0', fontSize: '13px', color: 'rgba(255,255,255,0.6)' }}>
           {language === 'zh' ? '任务' : 'Tasks'}
         </h4>
-        {agent.tasks && agent.tasks.length > 0 ? (
+        {agent.tasks.length > 0 ? (
           <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-            {agent.tasks.map((task) => (
-              <div
-                key={task.id}
-                style={{
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: '10px',
-                  padding: '10px 12px',
-                  background: 'rgba(255,255,255,0.05)',
-                  borderRadius: '8px',
-                }}
-              >
-                {task.status === 'completed' ? (
-                  <CheckCircle size={16} color="#34D399" />
-                ) : task.status === 'in_progress' ? (
-                  <Clock size={16} color="#3B82F6" />
-                ) : (
-                  <AlertCircle size={16} color="#64748B" />
-                )}
-                <span style={{ flex: 1, fontSize: '13px', color: 'white' }}>{task.title}</span>
-                <span
+            {agent.tasks.map((task) => {
+              const taskStatus = taskStatusConfig[task.status]
+              return (
+                <div
+                  key={task.id}
                   style={{
-                    fontSize: '10px',
-                    padding: '2px 8px',
-                    borderRadius: '4px',
-                    background: task.status === 'completed' ? 'rgba(52,211,153,0.15)' : task.status === 'in_progress' ? 'rgba(59,130,246,0.15)' : 'rgba(100,116,139,0.15)',
-                    color: task.status === 'completed' ? '#34D399' : task.status === 'in_progress' ? '#3B82F6' : '#64748B',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '10px',
+                    padding: '10px 12px',
+                    background: 'rgba(255,255,255,0.05)',
+                    borderRadius: '8px',
                   }}
                 >
-                  {task.status === 'completed' ? (language === 'zh' ? '完成' : 'Done') : task.status === 'in_progress' ? (language === 'zh' ? '进行中' : 'In Progress') : (language === 'zh' ? '待处理' : 'Pending')}
-                </span>
-              </div>
-            ))}
+                  <button
+                    onClick={() => {
+                      const nextStatus = task.status === 'completed' ? 'pending' : task.status === 'pending' ? 'in_progress' : 'completed'
+                      onTaskStatusChange(task.id, nextStatus)
+                    }}
+                    style={{
+                      background: 'transparent',
+                      border: 'none',
+                      cursor: 'pointer',
+                      padding: 0,
+                    }}
+                  >
+                    {task.status === 'completed' ? (
+                      <CheckCircle size={16} color="#34D399" />
+                    ) : task.status === 'in_progress' ? (
+                      <Clock size={16} color="#3B82F6" />
+                    ) : (
+                      <AlertCircle size={16} color="#64748B" />
+                    )}
+                  </button>
+                  <span style={{ flex: 1, fontSize: '13px', color: 'white' }}>{task.title}</span>
+                  <span
+                    style={{
+                      fontSize: '10px',
+                      padding: '2px 8px',
+                      borderRadius: '4px',
+                      background: taskStatus.color + '22',
+                      color: taskStatus.color,
+                    }}
+                  >
+                    {language === 'zh' ? taskStatus.label : taskStatus.labelEn}
+                  </span>
+                </div>
+              )
+            })}
           </div>
         ) : (
           <div style={{ textAlign: 'center', padding: '20px', color: 'rgba(255,255,255,0.4)', fontSize: '13px' }}>
             {language === 'zh' ? '暂无任务' : 'No tasks'}
           </div>
         )}
+      </div>
+    </div>
+  )
+}
+
+// Activity Feed
+function ActivityFeed({ activities, language }: { activities: ActivityLog[]; language: 'en' | 'zh' }) {
+  const activityIcons: Record<string, { icon: any; color: string }> = {
+    task: { icon: <Zap size={12} />, color: '#3B82F6' },
+    review: { icon: <CheckCircle size={12} />, color: '#34D399' },
+    deploy: { icon: <Play size={12} />, color: '#F59E0B' },
+    message: { icon: <MessageSquare size={12} />, color: '#8B5CF6' },
+  }
+
+  return (
+    <div
+      style={{
+        position: 'absolute',
+        bottom: '24px',
+        left: '24px',
+        width: '300px',
+        background: 'rgba(15, 23, 42, 0.95)',
+        borderRadius: '16px',
+        border: '1px solid rgba(255,255,255,0.1)',
+        padding: '16px',
+        backdropFilter: 'blur(12px)',
+        zIndex: 20,
+        maxHeight: '200px',
+        overflow: 'auto',
+      }}
+    >
+      <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '12px' }}>
+        <Activity size={14} color="#8B5CF6" />
+        <h4 style={{ margin: 0, fontSize: '13px', fontWeight: 600, color: 'white' }}>
+          {language === 'zh' ? '活动' : 'Activity'}
+        </h4>
+      </div>
+      <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+        {activities.map((activity) => {
+          const iconConfig = activityIcons[activity.type]
+          return (
+            <div
+              key={activity.id}
+              style={{
+                display: 'flex',
+                alignItems: 'flex-start',
+                gap: '10px',
+                fontSize: '12px',
+                animation: 'fadeIn 0.3s ease',
+              }}
+            >
+              <div
+                style={{
+                  width: '24px',
+                  height: '24px',
+                  borderRadius: '6px',
+                  background: iconConfig.color + '22',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  color: iconConfig.color,
+                  flexShrink: 0,
+                }}
+              >
+                {iconConfig.icon}
+              </div>
+              <div style={{ flex: 1 }}>
+                <div style={{ color: 'rgba(255,255,255,0.7)' }}>
+                  <span style={{ color: '#8B5CF6', fontWeight: 500 }}>{activity.agentName}</span>
+                  {' '}{activity.content}
+                </div>
+                <div style={{ color: 'rgba(255,255,255,0.4)', fontSize: '10px', marginTop: '2px' }}>
+                  {activity.time}
+                </div>
+              </div>
+            </div>
+          )
+        })}
       </div>
     </div>
   )
@@ -464,17 +650,82 @@ export default function Office3D() {
   const [viewMode, setViewMode] = useState<ViewMode>('isometric')
   const [statusFilter, setStatusFilter] = useState<string | null>(null)
   const [showFilters, setShowFilters] = useState(false)
+  const [draggingAgentId, setDraggingAgentId] = useState<string | null>(null)
+  const [activities, setActivities] = useState<ActivityLog[]>(mockActivities)
+  const [isLive, setIsLive] = useState(true)
 
   const selectedAgent = agents.find((a) => a.id === selectedAgentId)
-
-  const filteredAgents = statusFilter
-    ? agents.filter((a) => a.status === statusFilter)
-    : agents
+  const filteredAgents = statusFilter ? agents.filter((a) => a.status === statusFilter) : agents
 
   const statusCounts = agents.reduce((acc, agent) => {
     acc[agent.status] = (acc[agent.status] || 0) + 1
     return acc
   }, {} as Record<string, number>)
+
+  // Simulate real-time updates
+  useEffect(() => {
+    if (!isLive) return
+    const interval = setInterval(() => {
+      // Random status change
+      const randomAgent = agents[Math.floor(Math.random() * agents.length)]
+      const statuses: Array<'online' | 'idle' | 'busy' | 'thinking' | 'error' | 'offline'> = ['online', 'idle', 'busy', 'thinking']
+      const newStatus = statuses[Math.floor(Math.random() * statuses.length)]
+      if (randomAgent.status !== newStatus) {
+        setAgents(prev => prev.map(a =>
+          a.id === randomAgent.id ? { ...a, status: newStatus } : a
+        ))
+      }
+    }, 5000)
+    return () => clearInterval(interval)
+  }, [isLive, agents])
+
+  // Simulate activity feed
+  useEffect(() => {
+    if (!isLive) return
+    const interval = setInterval(() => {
+      const agentNames = ['Alice', 'Bob', 'Charlie', 'Diana', 'Evan', 'Frank']
+      const contents = [
+        '完成了新任务', '提交了代码', '开始测试', '完成部署', '通过审查'
+      ]
+      const types: Array<'task' | 'review' | 'deploy' | 'message'> = ['task', 'review', 'deploy', 'message']
+      const newActivity: ActivityLog = {
+        id: `a${Date.now()}`,
+        type: types[Math.floor(Math.random() * types.length)],
+        agentName: agentNames[Math.floor(Math.random() * agentNames.length)],
+        content: contents[Math.floor(Math.random() * contents.length)],
+        time: 'Just now',
+        timestamp: Date.now(),
+      }
+      setActivities(prev => [newActivity, ...prev.slice(0, 4)])
+    }, 8000)
+    return () => clearInterval(interval)
+  }, [isLive])
+
+  const handleAgentClick = (agent: Agent3D) => {
+    setSelectedAgentId(agent.id === selectedAgentId ? null : agent.id)
+  }
+
+  const handleAgentDragEnd = (agentId: string, newPosition: [number, number, number]) => {
+    setAgents(prev => prev.map(a =>
+      a.id === agentId ? { ...a, position: newPosition } : a
+    ))
+    setDraggingAgentId(null)
+  }
+
+  const handleTaskStatusChange = (taskId: string, newStatus: string) => {
+    if (!selectedAgent) return
+    setAgents(prev => prev.map(a => {
+      if (a.id === selectedAgent.id) {
+        return {
+          ...a,
+          tasks: a.tasks.map(t =>
+            t.id === taskId ? { ...t, status: newStatus as Task3D['status'] } : t
+          ),
+        }
+      }
+      return a
+    }))
+  }
 
   const viewModes: { id: ViewMode; label: string; labelEn: string; icon: any }[] = [
     { id: 'isometric', label: '等距', labelEn: 'Isometric', icon: <LayoutGrid size={16} /> },
@@ -521,6 +772,35 @@ export default function Office3D() {
           </div>
         </div>
 
+        {/* Live Toggle */}
+        <button
+          onClick={() => setIsLive(!isLive)}
+          style={{
+            display: 'flex',
+            alignItems: 'center',
+            gap: '8px',
+            padding: '8px 14px',
+            background: isLive ? 'rgba(52, 211, 153, 0.2)' : 'rgba(255,255,255,0.1)',
+            border: '1px solid',
+            borderColor: isLive ? '#34D399' : 'rgba(255,255,255,0.2)',
+            borderRadius: '10px',
+            color: isLive ? '#34D399' : 'rgba(255,255,255,0.6)',
+            fontSize: '12px',
+            cursor: 'pointer',
+          }}
+        >
+          <div
+            style={{
+              width: '8px',
+              height: '8px',
+              borderRadius: '50%',
+              background: isLive ? '#34D399' : '#64748B',
+              animation: isLive ? 'pulse 2s infinite' : 'none',
+            }}
+          />
+          {isLive ? (language === 'zh' ? '实时' : 'Live') : (language === 'zh' ? '暂停' : 'Paused')}
+        </button>
+
         {/* View Mode Toggle */}
         <div style={{ display: 'flex', gap: '4px', background: 'rgba(255,255,255,0.1)', padding: '4px', borderRadius: '10px' }}>
           {viewModes.map((mode) => (
@@ -565,7 +845,6 @@ export default function Office3D() {
           >
             <Filter size={16} />
             {language === 'zh' ? '筛选' : 'Filter'}
-            {statusFilter && <ChevronDown size={14} />}
           </button>
 
           {showFilters && (
@@ -597,7 +876,6 @@ export default function Office3D() {
                   color: 'white',
                   fontSize: '12px',
                   cursor: 'pointer',
-                  textAlign: 'left',
                 }}
               >
                 <Users size={14} />
@@ -620,7 +898,6 @@ export default function Office3D() {
                     color: 'white',
                     fontSize: '12px',
                     cursor: 'pointer',
-                    textAlign: 'left',
                   }}
                 >
                   <div style={{ width: '8px', height: '8px', borderRadius: '50%', background: config.color }} />
@@ -638,8 +915,7 @@ export default function Office3D() {
         style={{
           position: 'absolute',
           bottom: '24px',
-          left: '50%',
-          transform: 'translateX(-50%)',
+          right: '24px',
           display: 'flex',
           gap: '12px',
           zIndex: 10,
@@ -670,11 +946,15 @@ export default function Office3D() {
         ))}
       </div>
 
+      {/* Activity Feed */}
+      <ActivityFeed activities={activities} language={language} />
+
       {/* Agent Detail Panel */}
       {selectedAgent && (
         <AgentDetailPanel
           agent={selectedAgent}
           onClose={() => setSelectedAgentId(null)}
+          onTaskStatusChange={handleTaskStatusChange}
           language={language}
         />
       )}
@@ -685,11 +965,25 @@ export default function Office3D() {
           <Scene
             agents={filteredAgents}
             selectedAgentId={selectedAgentId}
-            onAgentClick={(agent) => setSelectedAgentId(agent.id === selectedAgentId ? null : agent.id)}
+            onAgentClick={handleAgentClick}
+            onAgentDragEnd={handleAgentDragEnd}
             viewMode={viewMode}
+            draggingAgentId={draggingAgentId}
           />
         </Suspense>
       </Canvas>
+
+      {/* CSS Animations */}
+      <style>{`
+        @keyframes pulse {
+          0%, 100% { opacity: 1; }
+          50% { opacity: 0.5; }
+        }
+        @keyframes fadeIn {
+          from { opacity: 0; transform: translateY(-10px); }
+          to { opacity: 1; transform: translateY(0); }
+        }
+      `}</style>
     </div>
   )
 }
