@@ -146,6 +146,41 @@ router.post('/', asyncHandler(async (req, res) => {
   });
 }));
 
+
+/**
+ * POST /api/execution/:id/logs - Add execution log
+ */
+router.post('/:id/logs', asyncHandler(async (req, res) => {
+  const { id } = req.params;
+  const { level = 'info', message, metadata = {} } = req.body;
+
+  if (!message) {
+    throw new BadRequestError('Log message is required');
+  }
+
+  // Verify execution exists
+  const execResult = await query(
+    'SELECT * FROM task_executions WHERE id = $1',
+    [id]
+  );
+
+  if (execResult.rows.length === 0) {
+    throw new NotFoundError('Execution not found');
+  }
+
+  // Insert log
+  const logResult = await query(
+    `INSERT INTO execution_logs (execution_id, level, message, metadata)
+     VALUES ($1, $2, $3, $4)
+     RETURNING *`,
+    [id, level, message, JSON.stringify(metadata)]
+  );
+
+  res.status(201).json({
+    success: true,
+    data: logResult.rows[0],
+  });
+}));
 /**
  * PATCH /api/execution/:id - Update execution (complete/fail)
  */

@@ -5,12 +5,13 @@ import {
   Settings, MessageSquare, Zap, Code, TestTube, Shield, FileText, 
   ChevronDown, Lock, RotateCw, WifiOff, GripVertical, MoreHorizontal,
   AlertCircle, Play, Pause, SkipForward, Trash2, Edit2, Eye,
-  GitBranch, Workflow, AlertTriangle, RefreshCw, Check, Loader
+  GitBranch, Workflow, AlertTriangle, RefreshCw, Check, Loader, FileTextIcon
 } from 'lucide-react'
 import { useDashboardStore } from '../stores/dashboardStore'
 import { useLanguage } from '../context/LanguageContext'
 import { useDeployMode } from '../context/DeployModeContext'
 import { updateTaskStatus, canTransition, statusConfig as apiStatusConfig, getNextStatuses } from '../lib/taskApi'
+import ExecutionLogsPanel from '../components/ExecutionLogsPanel'
 
 // Task interface
 interface Task {
@@ -589,6 +590,9 @@ export default function Projects() {
   // Status change popup
   const [statusPopup, setStatusPopup] = useState<{ task: Task; position: { x: number; y: number } } | null>(null)
 
+  // Execution logs panel
+  const [selectedExecutionId, setSelectedExecutionId] = useState<string | null>(null)
+
   const [projects, setProjects] = useState<Project[]>(mockProjects)
   
   const getProjectName = (p: Project) => language === 'zh' ? (p.nameZh || p.name) : p.name
@@ -956,9 +960,29 @@ export default function Projects() {
                     {language === 'zh' ? selectedWorkflowTask.titleZh : selectedWorkflowTask.title}
                   </h4>
                 </div>
-                <button onClick={() => setSelectedWorkflowTask(null)} style={{ background: 'none', border: 'none', cursor: 'pointer' }}>
-                  <X size={16} style={{ color: 'var(--text-tertiary)' }} />
-                </button>
+                <div style={{ display: 'flex', gap: '8px' }}>
+                  <button
+                    onClick={() => setSelectedExecutionId(selectedWorkflowTask.id)}
+                    style={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '6px',
+                      padding: '6px 12px',
+                      background: 'rgba(99, 102, 241, 0.1)',
+                      border: 'none',
+                      borderRadius: '6px',
+                      color: '#6366F1',
+                      fontSize: '12px',
+                      cursor: 'pointer',
+                    }}
+                  >
+                    <FileTextIcon size={14} />
+                    {language === 'zh' ? '执行日志' : 'Logs'}
+                  </button>
+                  <button onClick={() => setSelectedWorkflowTask(null)} style={{ background: 'none', border: 'none', cursor: 'pointer' }}>
+                    <X size={16} style={{ color: 'var(--text-tertiary)' }} />
+                  </button>
+                </div>
               </div>
               
               {/* Exception summary */}
@@ -1050,6 +1074,15 @@ export default function Projects() {
         .task-card:hover { border-color: var(--border-hover); transform: translateY(-2px); box-shadow: 0 4px 12px rgba(0,0,0,0.1); }
         .task-card:active { cursor: grabbing; }
       `}</style>
+
+      {/* Execution Logs Panel */}
+      {selectedExecutionId && (
+        <ExecutionLogsPanel
+          executionId={selectedExecutionId}
+          onClose={() => setSelectedExecutionId(null)}
+          language={language}
+        />
+      )}
     </div>
   )
 }
