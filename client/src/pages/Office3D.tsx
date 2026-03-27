@@ -1,17 +1,21 @@
 /**
- * Office3D - 3D 可视化 Agent 工作空间
+ * Office3D - 3D 可视化 Agent 工作空间 Phase 2
  * 使用 Three.js + React Three Fiber
+ * 新增: 视角切换、状态筛选、Agent 选择、任务面板
  */
 
-import { useState, Suspense, useRef } from 'react'
-import { Canvas, useFrame, ThreeEvent } from '@react-three/fiber'
-import { OrbitControls, PerspectiveCamera, Html, Environment, ContactShadows, Float } from '@react-three/drei'
-import { X, Maximize2, Minimize2, RotateCcw, ZoomIn, ZoomOut, Users, Bot, Activity } from 'lucide-react'
+import { useState, Suspense, useRef, useEffect } from 'react'
+import { Canvas, useFrame, useThree } from '@react-three/fiber'
+import { OrbitControls, PerspectiveCamera, Html, Environment, ContactShadows, Text } from '@react-three/drei'
+import {
+  X, Maximize2, Users, Bot, Activity, Eye, Grid3X3, LayoutGrid,
+  ChevronDown, Filter, ArrowRight, Clock, CheckCircle, AlertCircle
+} from 'lucide-react'
 import { useLanguage } from '../context/LanguageContext'
 import { useDashboardStore } from '../stores/dashboardStore'
 import * as THREE from 'three'
 
-// Agent 类型
+// Types
 interface Agent3D {
   id: string
   name: string
@@ -19,72 +23,157 @@ interface Agent3D {
   status: 'online' | 'idle' | 'busy' | 'thinking' | 'error' | 'offline'
   color: string
   position: [number, number, number]
+  tasks?: { title: string; status: string }[]
 }
 
-// Agent 颜色配置
-const agentColors: Record<string, string> = {
-  pm: '#8B5CF6',      // 紫色
-  planner: '#3B82F6', // 蓝色
-  coder: '#10B981',   // 绿色
-  reviewer: '#F59E0B', // 黄色
-  tester: '#EF4444',   // 红色
-  deployer: '#06B6D4', // 青色
-  default: '#64748B',
+interface Task3D {
+  id: string
+  title: string
+  status: 'pending' | 'in_progress' | 'completed'
+  assigneeId?: string
 }
 
-// Agent 位置布局
-const agentLayout: Agent3D[] = [
-  { id: '1', name: 'PM Agent', role: 'pm', status: 'online', color: agentColors.pm, position: [-3, 0, 0] },
-  { id: '2', name: 'Planner', role: 'planner', status: 'busy', color: agentColors.planner, position: [-1, 0, 1] },
-  { id: '3', name: 'Coder', role: 'coder', status: 'thinking', color: agentColors.coder, position: [1, 0, 1] },
-  { id: '4', name: 'Reviewer', role: 'reviewer', status: 'idle', color: agentColors.reviewer, position: [3, 0, 0] },
-  { id: '5', name: 'Tester', role: 'tester', status: 'offline', color: agentColors.tester, position: [-2, 0, -1] },
-  { id: '6', name: 'Deployer', role: 'deployer', status: 'online', color: agentColors.deployer, position: [2, 0, -1] },
+// Agent 角色配置
+const agentRoles: Record<string, { label: string; labelEn: string; color: string }> = {
+  pm: { label: '产品经理', labelEn: 'PM', color: '#8B5CF6' },
+  planner: { label: '规划师', labelEn: 'Planner', color: '#3B82F6' },
+  coder: { label: '工程师', labelEn: 'Coder', color: '#10B981' },
+  reviewer: { label: '审核员', labelEn: 'Reviewer', color: '#F59E0B' },
+  tester: { label: '测试员', labelEn: 'Tester', color: '#EF4444' },
+  deployer: { label: '部署员', labelEn: 'Deployer', color: '#06B6D4' },
+}
+
+// 状态配置
+const statusConfig: Record<string, { color: string; bg: string; label: string; labelEn: string }> = {
+  online: { color: '#34D399', bg: 'rgba(52, 211, 153, 0.15)', label: '在线', labelEn: 'Online' },
+  idle: { color: '#64748B', bg: 'rgba(100, 116, 139, 0.15)', label: '空闲', labelEn: 'Idle' },
+  busy: { color: '#FBBF24', bg: 'rgba(251, 191, 36, 0.15)', label: '忙碌', labelEn: 'Busy' },
+  thinking: { color: '#8B5CF6', bg: 'rgba(139, 92, 246, 0.15)', label: '思考中', labelEn: 'Thinking' },
+  error: { color: '#EF4444', bg: 'rgba(239, 68, 68, 0.15)', label: '异常', labelEn: 'Error' },
+  offline: { color: '#334155', bg: 'rgba(51, 65, 85, 0.15)', label: '离线', labelEn: 'Offline' },
+}
+
+// Agent 数据
+const initialAgents: Agent3D[] = [
+  { id: '1', name: 'Alice', role: 'pm', status: 'online', color: agentRoles.pm.color, position: [-3, 0, 0], tasks: [{ id: 't1', title: '规划 v2.0', status: 'in_progress' }, { id: 't2', title: '需求评审', status: 'completed' }] },
+  { id: '2', name: 'Bob', role: 'planner', status: 'busy', color: agentRoles.planner.color, position: [-1, 0, 1], tasks: [{ id: 't3', title: '任务分解', status: 'in_progress' }] },
+  { id: '3', name: 'Charlie', role: 'coder', status: 'thinking', color: agentRoles.coder.color, position: [1, 0, 1], tasks: [{ id: 't4', title: 'API 开发', status: 'in_progress' }, { id: 't5', title: '单元测试', status: 'pending' }] },
+  { id: '4', name: 'Diana', role: 'reviewer', status: 'idle', color: agentRoles.reviewer.color, position: [3, 0, 0], tasks: [] },
+  { id: '5', name: 'Evan', role: 'tester', status: 'offline', color: agentRoles.tester.color, position: [-2, 0, -1], tasks: [] },
+  { id: '6', name: 'Frank', role: 'deployer', status: 'online', color: agentRoles.deployer.color, position: [2, 0, -1], tasks: [{ id: 't6', title: '部署上线', status: 'pending' }] },
 ]
 
-// 状态动画颜色
-const statusColors: Record<string, string> = {
-  online: '#34D399',
-  idle: '#64748B',
-  busy: '#FBBF24',
-  thinking: '#8B5CF6',
-  error: '#EF4444',
-  offline: '#334155',
+// 视角配置
+type ViewMode = 'isometric' | 'front' | 'top'
+const viewPositions: Record<ViewMode, { position: [number, number, number]; target: [number, number, number] }> = {
+  isometric: { position: [8, 6, 8], target: [0, 0, 0] },
+  front: { position: [0, 3, 10], target: [0, 0, 0] },
+  top: { position: [0, 12, 0], target: [0, 0, 0] },
 }
 
-// Agent 3D 化身组件
-function AgentAvatar({ agent, onClick }: { agent: Agent3D; onClick: (agent: Agent3D) => void }) {
-  const meshRef = useRef<THREE.Mesh>(null)
-  const [hovered, setHovered] = useState(false)
+// Camera Controller
+function CameraController({ viewMode }: { viewMode: ViewMode }) {
+  const { camera } = useThree()
+  const controlsRef = useRef<any>(null)
+  const targetPosition = useRef(new THREE.Vector3(...viewPositions.isometric.position))
+  const targetLookAt = useRef(new THREE.Vector3(...viewPositions.isometric.target))
 
-  // 状态动画
-  useFrame((state) => {
-    if (meshRef.current) {
-      // 思考状态 - 上下浮动
-      if (agent.status === 'thinking') {
-        meshRef.current.position.y = agent.position[1] + Math.sin(state.clock.elapsedTime * 2) * 0.1
-      }
-      // 忙碌状态 - 轻微旋转
-      else if (agent.status === 'busy') {
-        meshRef.current.rotation.y += 0.02
-      }
-      // 其他状态保持静止
-      else {
-        meshRef.current.position.y = agent.position[1]
-      }
+  useEffect(() => {
+    const config = viewPositions[viewMode]
+    targetPosition.current.set(...config.position)
+    targetLookAt.current.set(...config.target)
+  }, [viewMode])
+
+  useFrame(() => {
+    if (controlsRef.current) {
+      camera.position.lerp(targetPosition.current, 0.05)
+      controlsRef.current.target.lerp(targetLookAt.current, 0.05)
+      controlsRef.current.update()
     }
   })
 
   return (
-    <group position={agent.position}>
-      {/* 身体 - 圆柱体 */}
+    <OrbitControls
+      ref={controlsRef}
+      enablePan={true}
+      enableZoom={true}
+      enableRotate={true}
+      maxPolarAngle={Math.PI / 2}
+      minDistance={5}
+      maxDistance={20}
+    />
+  )
+}
+
+// Agent Avatar Component
+function AgentAvatar({
+  agent,
+  isSelected,
+  onClick
+}: {
+  agent: Agent3D
+  isSelected: boolean
+  onClick: () => void
+}) {
+  const meshRef = useRef<THREE.Mesh>(null)
+  const [hovered, setHovered] = useState(false)
+  const groupRef = useRef<THREE.Group>(null)
+
+  useFrame((state) => {
+    if (meshRef.current) {
+      // Status animations
+      if (agent.status === 'thinking') {
+        meshRef.current.position.y = agent.position[1] + Math.sin(state.clock.elapsedTime * 3) * 0.15
+      } else if (agent.status === 'busy') {
+        meshRef.current.rotation.y += 0.03
+        meshRef.current.position.y = agent.position[1] + Math.sin(state.clock.elapsedTime * 5) * 0.03
+      } else {
+        meshRef.current.position.y = agent.position[1]
+      }
+    }
+    // Selection glow
+    if (groupRef.current && isSelected) {
+      groupRef.current.scale.setScalar(1 + Math.sin(state.clock.elapsedTime * 4) * 0.05)
+    } else {
+      groupRef.current?.scale.setScalar(1)
+    }
+  })
+
+  return (
+    <group ref={groupRef} position={agent.position}>
+      {/* Selection ring */}
+      {isSelected && (
+        <mesh position={[0, -0.4, 0]} rotation={[-Math.PI / 2, 0, 0]}>
+          <ringGeometry args={[0.6, 0.8, 32]} />
+          <meshBasicMaterial color={agent.color} transparent opacity={0.5} />
+        </mesh>
+      )}
+
+      {/* Body */}
       <mesh
         ref={meshRef}
-        onClick={() => onClick(agent)}
+        onClick={(e) => { e.stopPropagation(); onClick() }}
         onPointerOver={() => setHovered(true)}
         onPointerOut={() => setHovered(false)}
+        castShadow
       >
-        <cylinderGeometry args={[0.4, 0.5, 1.2, 16]} />
+        <cylinderGeometry args={[0.35, 0.45, 1.1, 16]} />
+        <meshStandardMaterial
+          color={hovered ? '#ffffff' : agent.color}
+          metalness={0.4}
+          roughness={0.6}
+          emissive={isSelected ? agent.color : '#000000'}
+          emissiveIntensity={isSelected ? 0.3 : 0}
+        />
+      </mesh>
+
+      {/* Head */}
+      <mesh
+        position={[0, 0.8, 0]}
+        onClick={(e) => { e.stopPropagation(); onClick() }}
+        castShadow
+      >
+        <sphereGeometry args={[0.3, 16, 16]} />
         <meshStandardMaterial
           color={hovered ? '#ffffff' : agent.color}
           metalness={0.3}
@@ -92,184 +181,183 @@ function AgentAvatar({ agent, onClick }: { agent: Agent3D; onClick: (agent: Agen
         />
       </mesh>
 
-      {/* 头部 - 球体 */}
-      <mesh position={[0, 0.9, 0]} onClick={() => onClick(agent)}>
-        <sphereGeometry args={[0.35, 16, 16]} />
+      {/* Status light */}
+      <mesh position={[0, 1.25, 0.2]}>
+        <sphereGeometry args={[0.06, 8, 8]} />
         <meshStandardMaterial
-          color={hovered ? '#ffffff' : agent.color}
-          metalness={0.2}
-          roughness={0.8}
+          color={statusConfig[agent.status].color}
+          emissive={statusConfig[agent.status].color}
+          emissiveIntensity={agent.status === 'online' ? 2 : 0.8}
         />
       </mesh>
 
-      {/* 状态指示灯 */}
-      <mesh position={[0, 1.4, 0.2]}>
-        <sphereGeometry args={[0.08, 8, 8]} />
-        <meshStandardMaterial
-          color={statusColors[agent.status]}
-          emissive={statusColors[agent.status]}
-          emissiveIntensity={agent.status === 'online' ? 2 : 0.5}
-        />
-      </mesh>
-
-      {/* 名字标签 */}
-      <Html position={[0, -0.8, 0]} center>
+      {/* Role label */}
+      <Html position={[0, -0.7, 0]} center>
         <div
           style={{
-            background: 'rgba(0,0,0,0.8)',
+            background: 'rgba(0,0,0,0.85)',
             color: 'white',
-            padding: '4px 8px',
-            borderRadius: '4px',
+            padding: '4px 10px',
+            borderRadius: '6px',
             fontSize: '11px',
+            fontWeight: 600,
             whiteSpace: 'nowrap',
-            pointerEvents: 'none',
+            border: `2px solid ${isSelected ? agent.color : 'transparent'}`,
+            transition: 'all 0.2s',
           }}
         >
           {agent.name}
         </div>
       </Html>
+
+      {/* Task count badge */}
+      {agent.tasks && agent.tasks.length > 0 && (
+        <Html position={[0.4, 0.5, 0]} center>
+          <div
+            style={{
+              background: '#3B82F6',
+              color: 'white',
+              padding: '2px 6px',
+              borderRadius: '10px',
+              fontSize: '10px',
+              fontWeight: 700,
+            }}
+          >
+            {agent.tasks.length}
+          </div>
+        </Html>
+      )}
     </group>
   )
 }
 
-// 地板组件
+// Floor
 function Floor() {
   return (
-    <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, -0.5, 0]} receiveShadow>
-      <planeGeometry args={[20, 20]} />
-      <meshStandardMaterial color="#1a1a2e" metalness={0.1} roughness={0.9} />
-    </mesh>
+    <group>
+      <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, -0.5, 0]} receiveShadow>
+        <planeGeometry args={[24, 24]} />
+        <meshStandardMaterial color="#0f172a" metalness={0.2} roughness={0.9} />
+      </mesh>
+      {/* Grid */}
+      <gridHelper args={[24, 24, '#1e293b', '#1e293b']} position={[0, -0.49, 0]} />
+    </group>
   )
 }
 
-// 办公室墙壁
+// Walls
 function Walls() {
   return (
     <group>
-      {/* 后墙 */}
-      <mesh position={[0, 1.5, -4]}>
-        <planeGeometry args={[12, 4]} />
-        <meshStandardMaterial color="#16213e" metalness={0.1} roughness={0.9} />
+      <mesh position={[0, 2, -6]} receiveShadow>
+        <planeGeometry args={[16, 6]} />
+        <meshStandardMaterial color="#1e293b" metalness={0.1} roughness={0.95} />
       </mesh>
-
-      {/* 左墙 */}
-      <mesh position={[-6, 1.5, 0]} rotation={[0, Math.PI / 2, 0]}>
-        <planeGeometry args={[8, 4]} />
-        <meshStandardMaterial color="#1a1a2e" metalness={0.1} roughness={0.9} />
+      <mesh position={[-8, 2, 0]} rotation={[0, Math.PI / 2, 0]} receiveShadow>
+        <planeGeometry args={[12, 6]} />
+        <meshStandardMaterial color="#1e293b" metalness={0.1} roughness={0.95} />
       </mesh>
-
-      {/* 右墙 */}
-      <mesh position={[6, 1.5, 0]} rotation={[0, -Math.PI / 2, 0]}>
-        <planeGeometry args={[8, 4]} />
-        <meshStandardMaterial color="#1a1a2e" metalness={0.1} roughness={0.9} />
+      <mesh position={[8, 2, 0]} rotation={[0, -Math.PI / 2, 0]} receiveShadow>
+        <planeGeometry args={[12, 6]} />
+        <meshStandardMaterial color="#1e293b" metalness={0.1} roughness={0.95} />
       </mesh>
     </group>
   )
 }
 
-// 桌子组件
+// Desk
 function Desk({ position }: { position: [number, number, number] }) {
   return (
     <group position={position}>
-      {/* 桌面 */}
-      <mesh position={[0, 0, 0]} castShadow>
-        <boxGeometry args={[1.5, 0.1, 0.8]} />
-        <meshStandardMaterial color="#4a4a6a" metalness={0.2} roughness={0.8} />
+      <mesh position={[0, 0, 0]} castShadow receiveShadow>
+        <boxGeometry args={[1.4, 0.08, 0.7]} />
+        <meshStandardMaterial color="#334155" metalness={0.2} roughness={0.8} />
       </mesh>
-      {/* 桌腿 */}
-      {[[-0.6, -0.5, -0.3], [0.6, -0.5, -0.3], [-0.6, -0.5, 0.3], [0.6, -0.5, 0.3]].map((pos, i) => (
+      {[[-0.55, -0.4, -0.25], [0.55, -0.4, -0.25], [-0.55, -0.4, 0.25], [0.55, -0.4, 0.25]].map((pos, i) => (
         <mesh key={i} position={pos as [number, number, number]} castShadow>
-          <cylinderGeometry args={[0.05, 0.05, 0.9, 8]} />
-          <meshStandardMaterial color="#3a3a5a" metalness={0.3} roughness={0.7} />
+          <cylinderGeometry args={[0.04, 0.04, 0.75, 8]} />
+          <meshStandardMaterial color="#1e293b" metalness={0.4} roughness={0.7} />
         </mesh>
       ))}
     </group>
   )
 }
 
-// 3D 场景
-function Scene({ onAgentClick }: { onAgentClick: (agent: Agent3D) => void }) {
+// 3D Scene
+function Scene({
+  agents,
+  selectedAgentId,
+  onAgentClick,
+  viewMode
+}: {
+  agents: Agent3D[]
+  selectedAgentId: string | null
+  onAgentClick: (agent: Agent3D) => void
+  viewMode: ViewMode
+}) {
   return (
     <>
-      <PerspectiveCamera makeDefault position={[0, 4, 8]} fov={50} />
-      <OrbitControls enablePan={true} enableZoom={true} enableRotate={true} maxPolarAngle={Math.PI / 2.2} />
-
-      {/* 灯光 */}
-      <ambientLight intensity={0.4} />
-      <directionalLight
-        position={[5, 10, 5]}
-        intensity={1}
-        castShadow
-        shadow-mapSize-width={2048}
-        shadow-mapSize-height={2048}
-      />
-      <pointLight position={[-5, 5, -5]} intensity={0.5} color="#8B5CF6" />
-      <pointLight position={[5, 5, 5]} intensity={0.5} color="#3B82F6" />
-
-      {/* 环境 */}
+      <CameraController viewMode={viewMode} />
+      <ambientLight intensity={0.5} />
+      <directionalLight position={[10, 15, 10]} intensity={1.2} castShadow shadow-mapSize-width={2048} shadow-mapSize-height={2048} />
+      <pointLight position={[-5, 5, -5]} intensity={0.6} color="#8B5CF6" />
+      <pointLight position={[5, 5, 5]} intensity={0.6} color="#3B82F6" />
       <Environment preset="city" />
-
-      {/* 地板和墙壁 */}
       <Floor />
       <Walls />
-
-      {/* 桌子 */}
       <Desk position={[-3, 0, 0]} />
       <Desk position={[3, 0, 0]} />
       <Desk position={[0, 0, 1.5]} />
-
-      {/* Agent 化身 */}
-      {agentLayout.map((agent) => (
-        <AgentAvatar key={agent.id} agent={agent} onClick={onAgentClick} />
+      {agents.map((agent) => (
+        <AgentAvatar
+          key={agent.id}
+          agent={agent}
+          isSelected={agent.id === selectedAgentId}
+          onClick={() => onAgentClick(agent)}
+        />
       ))}
-
-      {/* 阴影 */}
-      <ContactShadows position={[0, -0.49, 0]} opacity={0.4} scale={20} blur={2} />
+      <ContactShadows position={[0, -0.48, 0]} opacity={0.5} scale={20} blur={2.5} />
     </>
   )
 }
 
-// Agent 详情弹窗
-function AgentDetailModal({ agent, onClose, language }: { agent: Agent3D; onClose: () => void; language: 'en' | 'zh' }) {
-  const statusLabels: Record<string, { en: string; zh: string }> = {
-    online: { en: 'Online', zh: '在线' },
-    idle: { en: 'Idle', zh: '空闲' },
-    busy: { en: 'Busy', zh: '忙碌' },
-    thinking: { en: 'Thinking', zh: '思考中' },
-    error: { en: 'Error', zh: '异常' },
-    offline: { en: 'Offline', zh: '离线' },
-  }
+// Agent Detail Panel
+function AgentDetailPanel({
+  agent,
+  onClose,
+  language
+}: {
+  agent: Agent3D
+  onClose: () => void
+  language: 'en' | 'zh'
+}) {
+  const role = agentRoles[agent.role] || { label: agent.role, labelEn: agent.role, color: '#64748B' }
+  const status = statusConfig[agent.status]
 
   return (
     <div
       style={{
-        position: 'fixed',
-        inset: 0,
-        background: 'rgba(0,0,0,0.7)',
-        display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'center',
-        zIndex: 1000,
+        position: 'absolute',
+        top: '80px',
+        right: '24px',
+        width: '320px',
+        background: 'rgba(15, 23, 42, 0.95)',
+        borderRadius: '16px',
+        border: '1px solid rgba(255,255,255,0.1)',
+        padding: '20px',
+        backdropFilter: 'blur(12px)',
+        zIndex: 20,
       }}
-      onClick={onClose}
     >
-      <div
-        style={{
-          background: 'var(--bg-secondary)',
-          borderRadius: '16px',
-          padding: '24px',
-          width: '320px',
-          border: '1px solid var(--border)',
-        }}
-        onClick={(e) => e.stopPropagation()}
-      >
-        <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '16px' }}>
+      {/* Header */}
+      <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', marginBottom: '16px' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
           <div
             style={{
               width: '48px',
               height: '48px',
               borderRadius: '12px',
-              background: `linear-gradient(135deg, ${agent.color}, ${agent.color}88)`,
+              background: `linear-gradient(135deg, ${role.color}, ${role.color}66)`,
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'center',
@@ -279,84 +367,123 @@ function AgentDetailModal({ agent, onClose, language }: { agent: Agent3D; onClos
             <Bot size={28} color="white" />
           </div>
           <div>
-            <h3 style={{ margin: 0, fontSize: '16px', color: 'var(--text-primary)' }}>{agent.name}</h3>
-            <p style={{ margin: 0, fontSize: '12px', color: 'var(--text-tertiary)', textTransform: 'capitalize' }}>
-              {agent.role}
-            </p>
+            <h3 style={{ margin: 0, fontSize: '16px', fontWeight: 600, color: 'white' }}>{agent.name}</h3>
+            <p style={{ margin: 0, fontSize: '12px', color: 'rgba(255,255,255,0.6)' }}>{role.labelEn}</p>
           </div>
         </div>
-
-        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '12px' }}>
-          <div
-            style={{
-              width: '10px',
-              height: '10px',
-              borderRadius: '50%',
-              background: statusColors[agent.status],
-            }}
-          />
-          <span style={{ fontSize: '13px', color: statusColors[agent.status] }}>
-            {statusLabels[agent.status][language === 'zh' ? 'zh' : 'en']}
-          </span>
-        </div>
-
-        <div
-          style={{
-            background: 'var(--bg-tertiary)',
-            borderRadius: '8px',
-            padding: '12px',
-            marginBottom: '16px',
-          }}
-        >
-          <div style={{ fontSize: '11px', color: 'var(--text-tertiary)', marginBottom: '4px' }}>
-            {language === 'zh' ? '角色' : 'Role'}
-          </div>
-          <div style={{ fontSize: '13px', color: 'var(--text-primary)', textTransform: 'capitalize' }}>
-            {agent.role}
-          </div>
-        </div>
-
         <button
           onClick={onClose}
           style={{
-            width: '100%',
-            padding: '12px',
-            background: 'var(--bg-tertiary)',
+            background: 'rgba(255,255,255,0.1)',
             border: 'none',
             borderRadius: '8px',
-            color: 'var(--text-secondary)',
-            fontSize: '13px',
+            padding: '6px',
             cursor: 'pointer',
+            color: 'rgba(255,255,255,0.6)',
           }}
         >
-          {language === 'zh' ? '关闭' : 'Close'}
+          <X size={16} />
         </button>
+      </div>
+
+      {/* Status */}
+      <div
+        style={{
+          display: 'flex',
+          alignItems: 'center',
+          gap: '8px',
+          padding: '10px 12px',
+          background: status.bg,
+          borderRadius: '8px',
+          marginBottom: '16px',
+        }}
+      >
+        <div style={{ width: '10px', height: '10px', borderRadius: '50%', background: status.color }} />
+        <span style={{ fontSize: '13px', color: status.color, fontWeight: 500 }}>
+          {language === 'zh' ? status.label : status.labelEn}
+        </span>
+      </div>
+
+      {/* Tasks */}
+      <div>
+        <h4 style={{ margin: '0 0 12px 0', fontSize: '13px', color: 'rgba(255,255,255,0.6)' }}>
+          {language === 'zh' ? '任务' : 'Tasks'}
+        </h4>
+        {agent.tasks && agent.tasks.length > 0 ? (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+            {agent.tasks.map((task) => (
+              <div
+                key={task.id}
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '10px',
+                  padding: '10px 12px',
+                  background: 'rgba(255,255,255,0.05)',
+                  borderRadius: '8px',
+                }}
+              >
+                {task.status === 'completed' ? (
+                  <CheckCircle size={16} color="#34D399" />
+                ) : task.status === 'in_progress' ? (
+                  <Clock size={16} color="#3B82F6" />
+                ) : (
+                  <AlertCircle size={16} color="#64748B" />
+                )}
+                <span style={{ flex: 1, fontSize: '13px', color: 'white' }}>{task.title}</span>
+                <span
+                  style={{
+                    fontSize: '10px',
+                    padding: '2px 8px',
+                    borderRadius: '4px',
+                    background: task.status === 'completed' ? 'rgba(52,211,153,0.15)' : task.status === 'in_progress' ? 'rgba(59,130,246,0.15)' : 'rgba(100,116,139,0.15)',
+                    color: task.status === 'completed' ? '#34D399' : task.status === 'in_progress' ? '#3B82F6' : '#64748B',
+                  }}
+                >
+                  {task.status === 'completed' ? (language === 'zh' ? '完成' : 'Done') : task.status === 'in_progress' ? (language === 'zh' ? '进行中' : 'In Progress') : (language === 'zh' ? '待处理' : 'Pending')}
+                </span>
+              </div>
+            ))}
+          </div>
+        ) : (
+          <div style={{ textAlign: 'center', padding: '20px', color: 'rgba(255,255,255,0.4)', fontSize: '13px' }}>
+            {language === 'zh' ? '暂无任务' : 'No tasks'}
+          </div>
+        )}
       </div>
     </div>
   )
 }
 
-// 主组件
+// Main Component
 export default function Office3D() {
   const { language } = useLanguage()
   const { agents: storeAgents } = useDashboardStore()
-  const [selectedAgent, setSelectedAgent] = useState<Agent3D | null>(null)
-  const [isFullscreen, setIsFullscreen] = useState(false)
-  const [showHelp, setShowHelp] = useState(true)
+  const [agents, setAgents] = useState<Agent3D[]>(initialAgents)
+  const [selectedAgentId, setSelectedAgentId] = useState<string | null>(null)
+  const [viewMode, setViewMode] = useState<ViewMode>('isometric')
+  const [statusFilter, setStatusFilter] = useState<string | null>(null)
+  const [showFilters, setShowFilters] = useState(false)
 
-  const handleAgentClick = (agent: Agent3D) => {
-    setSelectedAgent(agent)
-  }
+  const selectedAgent = agents.find((a) => a.id === selectedAgentId)
+
+  const filteredAgents = statusFilter
+    ? agents.filter((a) => a.status === statusFilter)
+    : agents
+
+  const statusCounts = agents.reduce((acc, agent) => {
+    acc[agent.status] = (acc[agent.status] || 0) + 1
+    return acc
+  }, {} as Record<string, number>)
+
+  const viewModes: { id: ViewMode; label: string; labelEn: string; icon: any }[] = [
+    { id: 'isometric', label: '等距', labelEn: 'Isometric', icon: <LayoutGrid size={16} /> },
+    { id: 'front', label: '正面', labelEn: 'Front', icon: <Eye size={16} /> },
+    { id: 'top', label: '顶部', labelEn: 'Top', icon: <Grid3X3 size={16} /> },
+  ]
 
   return (
-    <div
-      style={{
-        position: 'fixed',
-        inset: 0,
-        background: '#0a0a14',
-        zIndex: 900,
-      }}
-    >
+    <div style={{ position: 'fixed', inset: 0, background: '#030712', zIndex: 900 }}>
       {/* Header */}
       <div
         style={{
@@ -378,7 +505,7 @@ export default function Office3D() {
               width: '40px',
               height: '40px',
               borderRadius: '10px',
-              background: 'linear-gradient(135deg, #8B5CF6, #3B82F6)',
+              background: 'linear-gradient(135deg, #8B5CF6, #EC4899)',
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'center',
@@ -387,116 +514,182 @@ export default function Office3D() {
             <Bot size={24} color="white" />
           </div>
           <div>
-            <h2 style={{ margin: 0, fontSize: '18px', fontWeight: '600', color: 'white' }}>
-              3D Office
-            </h2>
-            <p style={{ margin: 0, fontSize: '12px', color: 'rgba(255,255,255,0.6)' }}>
+            <h2 style={{ margin: 0, fontSize: '18px', fontWeight: 600, color: 'white' }}>3D Office</h2>
+            <p style={{ margin: 0, fontSize: '12px', color: 'rgba(255,255,255,0.5)' }}>
               {language === 'zh' ? '可视化 Agent 工作空间' : 'Visual Agent Workspace'}
             </p>
           </div>
         </div>
 
-        <div style={{ display: 'flex', gap: '12px' }}>
+        {/* View Mode Toggle */}
+        <div style={{ display: 'flex', gap: '4px', background: 'rgba(255,255,255,0.1)', padding: '4px', borderRadius: '10px' }}>
+          {viewModes.map((mode) => (
+            <button
+              key={mode.id}
+              onClick={() => setViewMode(mode.id)}
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: '6px',
+                padding: '8px 14px',
+                background: viewMode === mode.id ? 'rgba(139,92,246,0.3)' : 'transparent',
+                border: 'none',
+                borderRadius: '8px',
+                color: viewMode === mode.id ? 'white' : 'rgba(255,255,255,0.6)',
+                fontSize: '12px',
+                cursor: 'pointer',
+              }}
+            >
+              {mode.icon}
+              {language === 'zh' ? mode.label : mode.labelEn}
+            </button>
+          ))}
+        </div>
+
+        {/* Status Filter */}
+        <div style={{ position: 'relative' }}>
           <button
-            onClick={() => setShowHelp(!showHelp)}
+            onClick={() => setShowFilters(!showFilters)}
             style={{
-              padding: '8px 12px',
-              background: showHelp ? 'rgba(255,255,255,0.1)' : 'transparent',
-              border: '1px solid rgba(255,255,255,0.2)',
-              borderRadius: '8px',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '8px',
+              padding: '8px 14px',
+              background: showFilters ? 'rgba(139,92,246,0.3)' : 'rgba(255,255,255,0.1)',
+              border: 'none',
+              borderRadius: '10px',
               color: 'white',
               fontSize: '12px',
               cursor: 'pointer',
             }}
           >
-            {language === 'zh' ? '帮助' : 'Help'}
+            <Filter size={16} />
+            {language === 'zh' ? '筛选' : 'Filter'}
+            {statusFilter && <ChevronDown size={14} />}
           </button>
+
+          {showFilters && (
+            <div
+              style={{
+                position: 'absolute',
+                top: '100%',
+                right: 0,
+                marginTop: '8px',
+                background: 'rgba(15, 23, 42, 0.95)',
+                borderRadius: '12px',
+                border: '1px solid rgba(255,255,255,0.1)',
+                padding: '8px',
+                minWidth: '180px',
+                backdropFilter: 'blur(12px)',
+              }}
+            >
+              <button
+                onClick={() => { setStatusFilter(null); setShowFilters(false) }}
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '10px',
+                  width: '100%',
+                  padding: '10px 12px',
+                  background: !statusFilter ? 'rgba(139,92,246,0.2)' : 'transparent',
+                  border: 'none',
+                  borderRadius: '8px',
+                  color: 'white',
+                  fontSize: '12px',
+                  cursor: 'pointer',
+                  textAlign: 'left',
+                }}
+              >
+                <Users size={14} />
+                {language === 'zh' ? '全部' : 'All'}
+                <span style={{ marginLeft: 'auto', color: 'rgba(255,255,255,0.5)' }}>{agents.length}</span>
+              </button>
+              {Object.entries(statusConfig).map(([status, config]) => (
+                <button
+                  key={status}
+                  onClick={() => { setStatusFilter(status); setShowFilters(false) }}
+                  style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '10px',
+                    width: '100%',
+                    padding: '10px 12px',
+                    background: statusFilter === status ? `${config.color}22` : 'transparent',
+                    border: 'none',
+                    borderRadius: '8px',
+                    color: 'white',
+                    fontSize: '12px',
+                    cursor: 'pointer',
+                    textAlign: 'left',
+                  }}
+                >
+                  <div style={{ width: '8px', height: '8px', borderRadius: '50%', background: config.color }} />
+                  {language === 'zh' ? config.label : config.labelEn}
+                  <span style={{ marginLeft: 'auto', color: 'rgba(255,255,255,0.5)' }}>{statusCounts[status] || 0}</span>
+                </button>
+              ))}
+            </div>
+          )}
         </div>
       </div>
 
-      {/* Help Panel */}
-      {showHelp && (
-        <div
-          style={{
-            position: 'absolute',
-            top: '80px',
-            right: '24px',
-            background: 'rgba(0,0,0,0.8)',
-            borderRadius: '12px',
-            padding: '16px',
-            zIndex: 10,
-            minWidth: '200px',
-          }}
-        >
-          <h4 style={{ margin: '0 0 12px 0', fontSize: '13px', color: 'white' }}>
-            {language === 'zh' ? '操作说明' : 'Controls'}
-          </h4>
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', fontSize: '12px', color: 'rgba(255,255,255,0.7)' }}>
-            <div>🖱️ {language === 'zh' ? '拖拽旋转视角' : 'Drag to rotate'}</div>
-            <div>🔍 {language === 'zh' ? '滚轮缩放' : 'Scroll to zoom'}</div>
-            <div>👆 {language === 'zh' ? '点击 Agent 查看详情' : 'Click agent for details'}</div>
-          </div>
-        </div>
-      )}
-
-      {/* Stats */}
+      {/* Stats Bar */}
       <div
         style={{
           position: 'absolute',
           bottom: '24px',
-          left: '24px',
+          left: '50%',
+          transform: 'translateX(-50%)',
           display: 'flex',
-          gap: '16px',
+          gap: '12px',
           zIndex: 10,
         }}
       >
-        <div
-          style={{
-            background: 'rgba(0,0,0,0.8)',
-            borderRadius: '12px',
-            padding: '12px 16px',
-            display: 'flex',
-            alignItems: 'center',
-            gap: '8px',
-          }}
-        >
-          <Users size={16} color="#8B5CF6" />
-          <span style={{ fontSize: '12px', color: 'white' }}>
-            {agentLayout.length} {language === 'zh' ? 'Agents' : 'Agents'}
-          </span>
-        </div>
-        <div
-          style={{
-            background: 'rgba(0,0,0,0.8)',
-            borderRadius: '12px',
-            padding: '12px 16px',
-            display: 'flex',
-            alignItems: 'center',
-            gap: '8px',
-          }}
-        >
-          <Activity size={16} color="#34D399" />
-          <span style={{ fontSize: '12px', color: 'white' }}>
-            {agentLayout.filter((a) => a.status === 'online').length} {language === 'zh' ? '在线' : 'Online'}
-          </span>
-        </div>
+        {[
+          { icon: <Users size={16} />, label: 'Agents', value: agents.length, color: '#8B5CF6' },
+          { icon: <Activity size={16} />, label: 'Online', value: statusCounts.online || 0, color: '#34D399' },
+          { icon: <Bot size={16} />, label: 'Busy', value: statusCounts.busy || 0, color: '#FBBF24' },
+        ].map((stat, i) => (
+          <div
+            key={i}
+            style={{
+              background: 'rgba(15, 23, 42, 0.9)',
+              borderRadius: '12px',
+              padding: '12px 20px',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '10px',
+              backdropFilter: 'blur(12px)',
+              border: '1px solid rgba(255,255,255,0.1)',
+            }}
+          >
+            <div style={{ color: stat.color }}>{stat.icon}</div>
+            <span style={{ fontSize: '13px', color: 'white', fontWeight: 600 }}>{stat.value}</span>
+            <span style={{ fontSize: '11px', color: 'rgba(255,255,255,0.5)' }}>{stat.label}</span>
+          </div>
+        ))}
       </div>
+
+      {/* Agent Detail Panel */}
+      {selectedAgent && (
+        <AgentDetailPanel
+          agent={selectedAgent}
+          onClose={() => setSelectedAgentId(null)}
+          language={language}
+        />
+      )}
 
       {/* 3D Canvas */}
       <Canvas shadows>
         <Suspense fallback={null}>
-          <Scene onAgentClick={handleAgentClick} />
+          <Scene
+            agents={filteredAgents}
+            selectedAgentId={selectedAgentId}
+            onAgentClick={(agent) => setSelectedAgentId(agent.id === selectedAgentId ? null : agent.id)}
+            viewMode={viewMode}
+          />
         </Suspense>
       </Canvas>
-
-      {/* Agent Detail Modal */}
-      {selectedAgent && (
-        <AgentDetailModal
-          agent={selectedAgent}
-          onClose={() => setSelectedAgent(null)}
-          language={language}
-        />
-      )}
     </div>
   )
 }
