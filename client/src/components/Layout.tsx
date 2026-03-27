@@ -3,6 +3,7 @@ import { Outlet } from 'react-router-dom'
 import Sidebar from './Sidebar'
 import LoginModal from './LoginModal'
 import SettingsModal from './SettingsModal'
+import DemoBanner from './DemoBanner'
 import { Menu, X, ArrowRight, ArrowLeft, Check, Sparkles, Lock, Globe } from 'lucide-react'
 import { useAuth } from '../context/AuthContext'
 import { useLanguage } from '../context/LanguageContext'
@@ -449,6 +450,9 @@ export default function Layout() {
 
       {/* Settings Modal */}
       <SettingsModal isOpen={isSettingsOpen} onClose={() => setIsSettingsOpen(false)} />
+
+      {/* Demo Banner */}
+      <DemoBanner />
     </div>
   )
 }

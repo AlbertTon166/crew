@@ -13,28 +13,31 @@ import Settings from './pages/Settings'
 import { AuthProvider } from './context/AuthContext'
 import { LanguageProvider } from './context/LanguageContext'
 import { DeployModeProvider } from './context/DeployModeContext'
+import { DemoProvider } from './context/DemoContext'
 
 function App() {
   return (
     <LanguageProvider>
       <AuthProvider>
         <DeployModeProvider>
-          <BrowserRouter>
-            <Routes>
-              <Route path="/" element={<Layout />}>
-                <Route index element={<Dashboard />} />
-                <Route path="projects" element={<Projects />} />
-                <Route path="requirements" element={<Requirements />} />
-                <Route path="agents" element={<Agents />} />
-                <Route path="knowledge" element={<Knowledge />} />
-                <Route path="api-keys" element={<APIKeys />} />
-                <Route path="quickstart" element={<QuickStart />} />
-                <Route path="usage" element={<UsageStats />} />
-                <Route path="settings" element={<Settings />} />
-                <Route path="resources" element={<Resources />} />
-              </Route>
-            </Routes>
-          </BrowserRouter>
+          <DemoProvider>
+            <BrowserRouter>
+              <Routes>
+                <Route path="/" element={<Layout />}>
+                  <Route index element={<Dashboard />} />
+                  <Route path="projects" element={<Projects />} />
+                  <Route path="requirements" element={<Requirements />} />
+                  <Route path="agents" element={<Agents />} />
+                  <Route path="knowledge" element={<Knowledge />} />
+                  <Route path="api-keys" element={<APIKeys />} />
+                  <Route path="quickstart" element={<QuickStart />} />
+                  <Route path="usage" element={<UsageStats />} />
+                  <Route path="settings" element={<Settings />} />
+                  <Route path="resources" element={<Resources />} />
+                </Route>
+              </Routes>
+            </BrowserRouter>
+          </DemoProvider>
         </DeployModeProvider>
       </AuthProvider>
     </LanguageProvider>
