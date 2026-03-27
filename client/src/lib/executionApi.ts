@@ -30,6 +30,7 @@ export interface ExecutionLog {
 
 export interface ExecutionWithLogs extends Execution {
   logs: ExecutionLog[]
+  task_title?: string
 }
 
 interface CreateExecutionResult {
