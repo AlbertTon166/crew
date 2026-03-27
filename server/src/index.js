@@ -21,6 +21,7 @@ import agentsRouter from './routes/agents.js';
 import teamsRouter from './routes/teams.js';
 import executionRouter from './routes/execution.js';
 import usersRouter from './routes/users.js';
+import demoRouter from './routes/demo.js';
 
 // Create Express app
 const app = express();
@@ -79,6 +80,7 @@ app.get('/', (req, res) => {
       agents: '/api/agents',
       teams: '/api/teams',
       execution: '/api/execution',
+      demo: '/api/demo',
     },
   });
 });
@@ -93,6 +95,7 @@ app.use('/api/tasks', tasksRouter);
 app.use('/api/agents', agentsRouter);
 app.use('/api/teams', teamsRouter);
 app.use('/api/execution', executionRouter);
+app.use('/api/demo', demoRouter);
 
 // ============================================
 // ERROR HANDLING

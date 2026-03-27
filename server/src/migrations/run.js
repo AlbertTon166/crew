@@ -71,6 +71,7 @@ async function runMigrations() {
     // Get list of migration files
     const migrationFiles = [
       '001_initial_schema.sql',
+      '002_demo_data.sql',
     ];
     
     for (const filename of migrationFiles) {
