@@ -6,6 +6,7 @@ export interface User {
   passwordHash?: string  // If exists, user has configured password
   isAdmin: boolean
   createdAt: string
+  isDemo?: boolean  // Demo user flag
 }
 
 // Auth token

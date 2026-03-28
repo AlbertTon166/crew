@@ -538,54 +538,105 @@ const [theme, setTheme] = useState<'dark' | 'light' | 'auto'>('dark')
           </div>
         </button>
 
-        {/* Logout Button */}
-        <button 
-          onClick={() => {
-            logout()
-            navigate('/')
-          }}
-          style={{ 
-            width: '100%',
-            display: 'flex',
-            alignItems: 'center',
-            gap: '12px',
-            padding: '14px 16px',
-            borderRadius: '14px',
-            background: 'rgba(239, 68, 68, 0.1)',
-            border: '1px solid rgba(239, 68, 68, 0.3)',
-            cursor: 'pointer',
-            transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)'
-          }}
-          className="hover-lift"
-        >
-          <div style={{ 
-            width: '40px',
-            height: '40px',
-            borderRadius: '10px',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            background: 'rgba(239, 68, 68, 0.2)',
-            border: '1px solid rgba(239, 68, 68, 0.3)'
-          }}>
-            <LogOut size={18} style={{ color: '#EF4444' }} />
-          </div>
-          <div style={{ textAlign: 'left' }}>
+        {/* User Info / Demo Mode */}
+        {user?.isDemo ? (
+          /* Demo Mode: Show register button */
+          <button 
+            onClick={() => {
+              navigate('/')
+            }}
+            style={{ 
+              width: '100%',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '12px',
+              padding: '14px 16px',
+              borderRadius: '14px',
+              background: 'rgba(99, 102, 241, 0.1)',
+              border: '1px solid rgba(99, 102, 241, 0.3)',
+              cursor: 'pointer',
+              transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)'
+            }}
+            className="hover-lift"
+          >
             <div style={{ 
-              fontSize: '13px', 
-              fontWeight: '500',
-              color: '#EF4444'
+              width: '40px',
+              height: '40px',
+              borderRadius: '10px',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              background: 'rgba(99, 102, 241, 0.2)',
+              border: '1px solid rgba(99, 102, 241, 0.3)'
             }}>
-              {language === 'en' ? 'Logout' : '退出登录'}
+              <User size={18} style={{ color: '#6366F1' }} />
             </div>
+            <div style={{ textAlign: 'left' }}>
+              <div style={{ 
+                fontSize: '13px', 
+                fontWeight: '500',
+                color: '#6366F1'
+              }}>
+                {language === 'en' ? 'Register' : '注册账号'}
+              </div>
+              <div style={{ 
+                fontSize: '11px', 
+                color: 'rgba(99, 102, 241, 0.7)'
+              }}>
+                {language === 'en' ? 'Demo Mode' : '体验模式'}
+              </div>
+            </div>
+          </button>
+        ) : (
+          /* Logged-in User: Show username + logout */
+          <button 
+            onClick={() => {
+              logout()
+              navigate('/')
+            }}
+            style={{ 
+              width: '100%',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '12px',
+              padding: '14px 16px',
+              borderRadius: '14px',
+              background: 'rgba(239, 68, 68, 0.1)',
+              border: '1px solid rgba(239, 68, 68, 0.3)',
+              cursor: 'pointer',
+              transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)'
+            }}
+            className="hover-lift"
+          >
             <div style={{ 
-              fontSize: '11px', 
-              color: 'rgba(239, 68, 68, 0.7)'
+              width: '40px',
+              height: '40px',
+              borderRadius: '10px',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              background: 'rgba(239, 68, 68, 0.2)',
+              border: '1px solid rgba(239, 68, 68, 0.3)'
             }}>
-              {user?.username || language === 'en' ? 'Sign out' : '退出当前账户'}
+              <LogOut size={18} style={{ color: '#EF4444' }} />
             </div>
-          </div>
-        </button>
+            <div style={{ textAlign: 'left' }}>
+              <div style={{ 
+                fontSize: '13px', 
+                fontWeight: '500',
+                color: '#EF4444'
+              }}>
+                {user?.username || user?.email || (language === 'en' ? 'Logout' : '退出登录')}
+              </div>
+              <div style={{ 
+                fontSize: '11px', 
+                color: 'rgba(239, 68, 68, 0.7)'
+              }}>
+                {language === 'en' ? 'Click to logout' : '点击退出'}
+              </div>
+            </div>
+          </button>
+        )}
       </div>
 
       {/* Nav item hover styles */}
