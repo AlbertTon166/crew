@@ -708,6 +708,241 @@ app.post('/api/requirements/:id/analyze', (req, res) => {
   res.json({ success: true, data: analysisResult })
 })
 
+// ==================== Workflow APIs (Phase 5) ====================
+
+// Helper to generate random embedding vector
+function generateRandomEmbedding(dimensions = 1536) {
+  const embedding = []
+  for (let i = 0; i < dimensions; i++) {
+    embedding.push(Math.random() * 2 - 1) // Random number between -1 and 1
+  }
+  return embedding
+}
+
+// POST /api/workflows - Create a workflow
+app.post('/api/workflows', (req, res) => {
+  const { name, description, steps } = req.body
+  
+  if (!name) {
+    return res.status(400).json({ success: false, error: 'Workflow name is required' })
+  }
+  
+  const now = new Date().toISOString()
+  const workflow = {
+    id: uuidv4(),
+    name,
+    description: description || '',
+    steps: steps || [],
+    status: 'draft',
+    createdAt: now,
+    updatedAt: now
+  }
+  
+  db.workflows.push(workflow)
+  res.status(201).json({ success: true, data: workflow })
+})
+
+// GET /api/workflows - List all workflows
+app.get('/api/workflows', (req, res) => {
+  const { status } = req.query
+  let results = db.workflows
+  
+  if (status) {
+    results = results.filter(w => w.status === status)
+  }
+  
+  res.json({ success: true, data: results })
+})
+
+// GET /api/workflows/:id - Get workflow details
+app.get('/api/workflows/:id', (req, res) => {
+  const workflow = db.workflows.find(w => w.id === req.params.id)
+  if (!workflow) {
+    return res.status(404).json({ success: false, error: 'Workflow not found' })
+  }
+  
+  res.json({ success: true, data: workflow })
+})
+
+// PUT /api/workflows/:id - Update workflow
+app.put('/api/workflows/:id', (req, res) => {
+  const index = db.workflows.findIndex(w => w.id === req.params.id)
+  if (index === -1) {
+    return res.status(404).json({ success: false, error: 'Workflow not found' })
+  }
+  
+  const { name, description, steps, status } = req.body
+  const workflow = db.workflows[index]
+  
+  if (name !== undefined) workflow.name = name
+  if (description !== undefined) workflow.description = description
+  if (steps !== undefined) workflow.steps = steps
+  if (status !== undefined) workflow.status = status
+  workflow.updatedAt = new Date().toISOString()
+  
+  res.json({ success: true, data: workflow })
+})
+
+// DELETE /api/workflows/:id - Delete workflow
+app.delete('/api/workflows/:id', (req, res) => {
+  const index = db.workflows.findIndex(w => w.id === req.params.id)
+  if (index === -1) {
+    return res.status(404).json({ success: false, error: 'Workflow not found' })
+  }
+  
+  db.workflows.splice(index, 1)
+  res.json({ success: true, data: { message: 'Workflow deleted successfully' } })
+})
+
+// POST /api/workflows/:id/execute - Execute workflow
+app.post('/api/workflows/:id/execute', (req, res) => {
+  const workflow = db.workflows.find(w => w.id === req.params.id)
+  if (!workflow) {
+    return res.status(404).json({ success: false, error: 'Workflow not found' })
+  }
+  
+  if (workflow.status !== 'active') {
+    return res.status(400).json({ success: false, error: 'Workflow must be active to execute' })
+  }
+  
+  const { input } = req.body || {}
+  const executionId = uuidv4()
+  const now = new Date().toISOString()
+  
+  // Simulate execution - walk through steps
+  const executionLog = []
+  let currentStepId = workflow.steps[0]?.id || null
+  let stepIndex = 0
+  
+  for (const step of workflow.steps) {
+    stepIndex++
+    executionLog.push({
+      stepId: step.id,
+      stepName: step.name,
+      stepType: step.type,
+      status: 'completed',
+      startedAt: new Date(Date.now() - 1000).toISOString(),
+      completedAt: now,
+      output: { result: `Mock execution of step: ${step.name}` }
+    })
+    
+    if (step.nextStepId) {
+      currentStepId = step.nextStepId
+    } else {
+      currentStepId = null
+    }
+  }
+  
+  const executionResult = {
+    executionId,
+    workflowId: workflow.id,
+    workflowName: workflow.name,
+    status: 'completed',
+    startedAt: new Date(Date.now() - workflow.steps.length * 1000).toISOString(),
+    completedAt: now,
+    input,
+    stepsExecuted: workflow.steps.length,
+    executionLog,
+    finalOutput: { result: 'Workflow execution completed successfully' }
+  }
+  
+  res.json({ success: true, data: executionResult })
+})
+
+// ==================== RAG APIs (Phase 5) ====================
+
+// POST /api/rag/index - Add document to index
+app.post('/api/rag/index', (req, res) => {
+  const { content, metadata } = req.body
+  
+  if (!content) {
+    return res.status(400).json({ success: false, error: 'Content is required' })
+  }
+  
+  const now = new Date().toISOString()
+  const document = {
+    id: uuidv4(),
+    content,
+    metadata: {
+      source: metadata?.source || 'unknown',
+      category: metadata?.category || 'general',
+      tags: metadata?.tags || []
+    },
+    embedding: generateRandomEmbedding(1536),
+    createdAt: now
+  }
+  
+  db.ragDocuments.push(document)
+  res.status(201).json({ success: true, data: { id: document.id, indexed: true, embeddingSize: document.embedding.length } })
+})
+
+// POST /api/rag/query - Query documents
+app.post('/api/rag/query', (req, res) => {
+  const { query, topK = 5, filters } = req.body
+  
+  if (!query) {
+    return res.status(400).json({ success: false, error: 'Query is required' })
+  }
+  
+  // Simple keyword matching simulation
+  const queryTerms = query.toLowerCase().split(/\s+/)
+  
+  let scoredDocs = db.ragDocuments.map(doc => {
+    let score = 0
+    const contentLower = doc.content.toLowerCase()
+    
+    // Calculate relevance score based on keyword matches
+    for (const term of queryTerms) {
+      if (contentLower.includes(term)) {
+        score += 1
+        // Bonus for exact phrase match
+        if (contentLower.includes(query.toLowerCase())) {
+          score += 2
+        }
+      }
+    }
+    
+    // Check tags match
+    if (doc.metadata.tags) {
+      for (const tag of doc.metadata.tags) {
+        if (queryTerms.some(term => tag.toLowerCase().includes(term))) {
+          score += 0.5
+        }
+      }
+    }
+    
+    // Check category match
+    if (filters?.category && doc.metadata.category === filters.category) {
+      score += 1
+    }
+    
+    return { ...doc, relevanceScore: score }
+  })
+  
+  // Filter out zero-score docs and sort by relevance
+  let results = scoredDocs
+    .filter(doc => doc.relevanceScore > 0)
+    .sort((a, b) => b.relevanceScore - a.relevanceScore)
+    .slice(0, topK)
+    .map(doc => ({
+      id: doc.id,
+      content: doc.content,
+      metadata: doc.metadata,
+      relevanceScore: doc.relevanceScore,
+      createdAt: doc.createdAt
+    }))
+  
+  res.json({ 
+    success: true, 
+    data: { 
+      query,
+      results,
+      totalIndexed: db.ragDocuments.length,
+      returned: results.length
+    } 
+  })
+})
+
 // ==================== Dashboard Stats ====================
 
 app.get('/api/dashboard/stats', (req, res) => {
