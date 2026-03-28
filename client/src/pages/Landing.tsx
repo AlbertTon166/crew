@@ -5,7 +5,7 @@ import LoginModal from '../components/LoginModal'
 
 export default function Landing() {
   const navigate = useNavigate()
-  const [loginOpen, setLoginOpen] = useState(true) // 自动弹出登录
+  const [loginOpen, setLoginOpen] = useState(false) // 用户点击按钮才弹出
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
 
   const features = [
