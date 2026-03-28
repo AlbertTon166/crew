@@ -79,27 +79,6 @@ const timeoutStrategyConfig = {
   fallback: { label: '降级', labelEn: 'Fallback', color: '#8B5CF6' },
   interrupt: { label: '中断', labelEn: 'Interrupt', color: '#EF4444' },
 }
-
-// Mock data
-const mockProjects: Project[] = [] // No mock data
-  {
-    id: 'proj-1',
-    name: 'E-commerce API',
-    nameZh: '电商 API',
-    description: '电商后端 API 开发',
-    descZh: '电商后端API开发',
-    status: 'in_progress',
-    dueDate: '2026-04-15',
-    tasks: [
-      { id: 't1', projectId: 'proj-1', title: '设计 RESTful API', titleZh: '设计 RESTful API', description: '完成用户模块 API 设计', descZh: '完成用户模块API设计', status: 'completed', priority: 'P1', assignee: { id: 'a1', name: 'Coder' }, estimatedHours: 8, actualHours: 6, tags: ['API', 'Backend'], timeoutSeconds: 300, maxRetries: 3, retryInterval: 2, timeoutStrategy: 'retry', isHumanInterruptPoint: false, createdAt: '2026-03-20', updatedAt: '2026-03-22' },
-      { id: 't2', projectId: 'proj-1', title: '数据库建模', titleZh: '数据库建模', description: '设计商品表结构', descZh: '设计商品表结构', status: 'in_progress', priority: 'P0', assignee: { id: 'a2', name: 'Architect' }, estimatedHours: 12, actualHours: 4, tags: ['Database'], timeoutSeconds: 600, maxRetries: 2, retryInterval: 3, timeoutStrategy: 'fallback', isHumanInterruptPoint: false, createdAt: '2026-03-20', updatedAt: '2026-03-24' },
-      { id: 't3', projectId: 'proj-1', title: '单元测试', titleZh: '单元测试', description: '编写 API 单元测试', descZh: '编写API单元测试', status: 'pending', priority: 'P2', assignee: { id: 'a3', name: 'Tester' }, estimatedHours: 16, tags: ['Testing'], timeoutSeconds: 300, maxRetries: 3, retryInterval: 1, timeoutStrategy: 'retry', isHumanInterruptPoint: false, createdAt: '2026-03-21', updatedAt: '2026-03-21' },
-      { id: 't4', projectId: 'proj-1', title: '支付集成', titleZh: '支付集成', description: '集成第三方支付', descZh: '集成第三方支付', status: 'blocked', priority: 'P0', assignee: { id: 'a1', name: 'Coder' }, estimatedHours: 24, tags: ['Payment'], timeoutSeconds: 120, maxRetries: 1, retryInterval: 5, timeoutStrategy: 'interrupt', isHumanInterruptPoint: true, createdAt: '2026-03-21', updatedAt: '2026-03-23' },
-      { id: 't5', projectId: 'proj-1', title: '性能优化', titleZh: '性能优化', description: '优化数据库查询', descZh: '优化数据库查询', status: 'new', priority: 'P2', tags: ['Performance'], timeoutSeconds: 300, maxRetries: 2, retryInterval: 2, timeoutStrategy: 'fallback', isHumanInterruptPoint: false, createdAt: '2026-03-25', updatedAt: '2026-03-25' },
-    ],
-    createdAt: '2026-03-20',
-    updatedAt: '2026-03-25',
-  },
 ]
 
 // Priority badge
