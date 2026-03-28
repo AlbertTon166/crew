@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom'
 import { 
   Bot, 
   FolderKanban, 
+  Folder,
   CheckCircle, 
   AlertCircle, 
   Activity,
@@ -124,7 +125,9 @@ function QuickAction({ icon, label, color, onClick }: {
 }
 
 // Agent mini card
-function AgentMiniCard({ agent, language }: { agent: typeof mockAgents[0]; language: 'en' | 'zh' }) {
+import { Agent } from '../stores/dashboardStore'
+
+function AgentMiniCard({ agent, language }: { agent: Agent; language: 'en' | 'zh' }) {
   const cfg = agentStatusConfig[agent.status as keyof typeof agentStatusConfig]
   const emoji = roleEmoji[agent.role] || '🤖'
   
@@ -174,7 +177,7 @@ function AgentMiniCard({ agent, language }: { agent: typeof mockAgents[0]; langu
         background: 'var(--bg-secondary)',
         color: 'var(--text-tertiary)',
       }}>
-        {agent.model}
+        {agent.modelName}
       </div>
     </div>
   )
