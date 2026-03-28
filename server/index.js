@@ -23,27 +23,29 @@ const db = {
 
 // Initialize with demo data
 function initDemoData() {
-  // Demo agents
+  const now = new Date().toISOString()
+  
+  // Demo agents (new model)
   db.agents = [
-    { id: uuidv4(), name: 'Product Manager Agent', role: 'pm', status: 'online', model_provider: 'openai', model_name: 'gpt-4', enabled: true },
-    { id: uuidv4(), name: 'Architect Agent', role: 'architect', status: 'online', model_provider: 'openai', model_name: 'gpt-4', enabled: true },
-    { id: uuidv4(), name: 'Code Agent', role: 'coder', status: 'online', model_provider: 'openai', model_name: 'gpt-4', enabled: true },
-    { id: uuidv4(), name: 'Review Agent', role: 'reviewer', status: 'idle', model_provider: 'openai', model_name: 'gpt-4', enabled: true },
-    { id: uuidv4(), name: 'Test Agent', role: 'tester', status: 'offline', model_provider: 'openai', model_name: 'gpt-4', enabled: false },
+    { id: uuidv4(), name: 'Product Manager Agent', role: 'pm', modelProvider: 'openai', modelName: 'gpt-4', status: 'online', userId: null, createdAt: now, updatedAt: now },
+    { id: uuidv4(), name: 'Architect Agent', role: 'architect', modelProvider: 'openai', modelName: 'gpt-4', status: 'online', userId: null, createdAt: now, updatedAt: now },
+    { id: uuidv4(), name: 'Code Agent', role: 'coder', modelProvider: 'openai', modelName: 'gpt-4', status: 'online', userId: null, createdAt: now, updatedAt: now },
+    { id: uuidv4(), name: 'Review Agent', role: 'reviewer', modelProvider: 'openai', modelName: 'gpt-4', status: 'idle', userId: null, createdAt: now, updatedAt: now },
+    { id: uuidv4(), name: 'Test Agent', role: 'tester', modelProvider: 'openai', modelName: 'gpt-4', status: 'offline', userId: null, createdAt: now, updatedAt: now },
   ]
 
-  // Demo projects
+  // Demo projects (new model)
   db.projects = [
-    { id: uuidv4(), name: 'E-commerce API', description: '电商后端API开发', status: 'in_progress', github_repo: '', created_at: new Date().toISOString() },
-    { id: uuidv4(), name: 'Data Pipeline', description: '数据清洗管道', status: 'pending', github_repo: '', created_at: new Date().toISOString() },
-    { id: uuidv4(), name: 'AI Chatbot', description: '智能客服机器人', status: 'completed', github_repo: '', created_at: new Date().toISOString() },
+    { id: uuidv4(), name: 'E-commerce API', description: '电商后端API开发', status: 'active', userId: null, createdAt: now, updatedAt: now },
+    { id: uuidv4(), name: 'Data Pipeline', description: '数据清洗管道', status: 'active', userId: null, createdAt: now, updatedAt: now },
+    { id: uuidv4(), name: 'AI Chatbot', description: '智能客服机器人', status: 'completed', userId: null, createdAt: now, updatedAt: now },
   ]
 
-  // Demo tasks
+  // Demo tasks (new model)
   db.tasks = [
-    { id: uuidv4(), project_id: db.projects[0].id, title: '设计RESTful API', description: '完成用户模块API设计', status: 'in_progress', assigned_agent_id: db.agents[1].id },
-    { id: uuidv4(), project_id: db.projects[0].id, title: '数据库建模', description: '设计商品表结构', status: 'completed', assigned_agent_id: db.agents[0].id },
-    { id: uuidv4(), project_id: db.projects[0].id, title: '单元测试', description: '编写API单元测试', status: 'pending', assigned_agent_id: db.agents[3].id },
+    { id: uuidv4(), projectId: db.projects[0].id, title: '设计RESTful API', description: '完成用户模块API设计', status: 'in_progress', priority: 'high', assigneeId: db.agents[1].id, createdAt: now, updatedAt: now },
+    { id: uuidv4(), projectId: db.projects[0].id, title: '数据库建模', description: '设计商品表结构', status: 'completed', priority: 'high', assigneeId: db.agents[0].id, createdAt: now, updatedAt: now },
+    { id: uuidv4(), projectId: db.projects[0].id, title: '单元测试', description: '编写API单元测试', status: 'pending', priority: 'medium', assigneeId: db.agents[3].id, createdAt: now, updatedAt: now },
   ]
 
   // Demo knowledge
@@ -88,100 +90,321 @@ app.get('/api/status', (req, res) => {
   })
 })
 
-// ==================== Projects APIs ====================
+// ==================== Projects APIs (Phase 1) ====================
 
+// GET /api/projects - List all projects (legacy)
 app.get('/api/projects', (req, res) => {
-  res.json(db.projects)
+  res.json({ success: true, data: db.projects })
 })
 
+// POST /api/projects - Create a new project
 app.post('/api/projects', (req, res) => {
+  const { name, description, userId } = req.body
+  
+  if (!name) {
+    return res.status(400).json({ success: false, error: 'Project name is required' })
+  }
+  
+  const now = new Date().toISOString()
   const project = {
     id: uuidv4(),
-    name: req.body.name,
-    description: req.body.description || '',
-    status: 'pending',
-    github_repo: '',
-    created_at: new Date().toISOString()
+    name,
+    description: description || '',
+    status: 'active',
+    userId: userId || null,
+    createdAt: now,
+    updatedAt: now
   }
+  
   db.projects.push(project)
-  res.json(project)
+  res.status(201).json({ success: true, data: project })
 })
 
+// GET /api/projects/:id - Get project details
 app.get('/api/projects/:id', (req, res) => {
   const project = db.projects.find(p => p.id === req.params.id)
-  if (!project) return res.status(404).json({ error: 'Project not found' })
+  if (!project) {
+    return res.status(404).json({ success: false, error: 'Project not found' })
+  }
   
-  const tasks = db.tasks.filter(t => t.project_id === project.id)
-  res.json({ ...project, tasks })
+  const tasks = db.tasks.filter(t => t.projectId === project.id)
+  res.json({ success: true, data: { ...project, tasks } })
 })
 
+// PUT /api/projects/:id - Update project
 app.put('/api/projects/:id', (req, res) => {
   const index = db.projects.findIndex(p => p.id === req.params.id)
-  if (index === -1) return res.status(404).json({ error: 'Project not found' })
-  
-  db.projects[index] = { ...db.projects[index], ...req.body }
-  res.json(db.projects[index])
-})
-
-// ==================== Tasks APIs ====================
-
-app.get('/api/tasks', (req, res) => {
-  const { project_id } = req.query
-  if (project_id) {
-    return res.json(db.tasks.filter(t => t.project_id === project_id))
+  if (index === -1) {
+    return res.status(404).json({ success: false, error: 'Project not found' })
   }
-  res.json(db.tasks)
+  
+  const { name, description, status, userId } = req.body
+  const project = db.projects[index]
+  
+  if (name !== undefined) project.name = name
+  if (description !== undefined) project.description = description
+  if (status !== undefined) project.status = status
+  if (userId !== undefined) project.userId = userId
+  project.updatedAt = new Date().toISOString()
+  
+  res.json({ success: true, data: project })
 })
 
+// DELETE /api/projects/:id - Delete project
+app.delete('/api/projects/:id', (req, res) => {
+  const index = db.projects.findIndex(p => p.id === req.params.id)
+  if (index === -1) {
+    return res.status(404).json({ success: false, error: 'Project not found' })
+  }
+  
+  // Delete associated tasks
+  db.tasks = db.tasks.filter(t => t.projectId !== req.params.id)
+  db.projects.splice(index, 1)
+  
+  res.json({ success: true, data: { message: 'Project deleted successfully' } })
+})
+
+// GET /api/projects/:id/stats - Get project statistics
+app.get('/api/projects/:id/stats', (req, res) => {
+  const project = db.projects.find(p => p.id === req.params.id)
+  if (!project) {
+    return res.status(404).json({ success: false, error: 'Project not found' })
+  }
+  
+  const tasks = db.tasks.filter(t => t.projectId === project.id)
+  
+  const stats = {
+    projectId: project.id,
+    projectName: project.name,
+    totalTasks: tasks.length,
+    pendingTasks: tasks.filter(t => t.status === 'pending').length,
+    inProgressTasks: tasks.filter(t => t.status === 'in_progress').length,
+    completedTasks: tasks.filter(t => t.status === 'completed').length,
+    failedTasks: tasks.filter(t => t.status === 'failed').length,
+    tasksByPriority: {
+      low: tasks.filter(t => t.priority === 'low').length,
+      medium: tasks.filter(t => t.priority === 'medium').length,
+      high: tasks.filter(t => t.priority === 'high').length,
+      critical: tasks.filter(t => t.priority === 'critical').length
+    }
+  }
+  
+  res.json({ success: true, data: stats })
+})
+
+// ==================== Tasks APIs (Phase 1) ====================
+
+// GET /api/tasks - List all tasks (legacy)
+app.get('/api/tasks', (req, res) => {
+  const { projectId } = req.query
+  if (projectId) {
+    return res.json({ success: true, data: db.tasks.filter(t => t.projectId === projectId) })
+  }
+  res.json({ success: true, data: db.tasks })
+})
+
+// POST /api/tasks - Create a new task
 app.post('/api/tasks', (req, res) => {
+  const { projectId, title, description, priority, assigneeId } = req.body
+  
+  if (!projectId || !title) {
+    return res.status(400).json({ success: false, error: 'projectId and title are required' })
+  }
+  
+  // Verify project exists
+  const project = db.projects.find(p => p.id === projectId)
+  if (!project) {
+    return res.status(404).json({ success: false, error: 'Project not found' })
+  }
+  
+  const now = new Date().toISOString()
   const task = {
     id: uuidv4(),
-    project_id: req.body.project_id,
-    title: req.body.title,
-    description: req.body.description || '',
+    projectId,
+    title,
+    description: description || '',
     status: 'pending',
-    assigned_agent_id: req.body.assigned_agent_id || null,
-    created_at: new Date().toISOString()
+    priority: priority || 'medium',
+    assigneeId: assigneeId || null,
+    createdAt: now,
+    updatedAt: now
   }
+  
   db.tasks.push(task)
-  res.json(task)
+  res.status(201).json({ success: true, data: task })
 })
 
+// GET /api/tasks/:id - Get task details
+app.get('/api/tasks/:id', (req, res) => {
+  const task = db.tasks.find(t => t.id === req.params.id)
+  if (!task) {
+    return res.status(404).json({ success: false, error: 'Task not found' })
+  }
+  
+  res.json({ success: true, data: task })
+})
+
+// PUT /api/tasks/:id - Update task
 app.put('/api/tasks/:id', (req, res) => {
   const index = db.tasks.findIndex(t => t.id === req.params.id)
-  if (index === -1) return res.status(404).json({ error: 'Task not found' })
+  if (index === -1) {
+    return res.status(404).json({ success: false, error: 'Task not found' })
+  }
   
-  db.tasks[index] = { ...db.tasks[index], ...req.body }
-  res.json(db.tasks[index])
+  const { title, description, status, priority, assigneeId, projectId } = req.body
+  const task = db.tasks[index]
+  
+  if (title !== undefined) task.title = title
+  if (description !== undefined) task.description = description
+  if (status !== undefined) task.status = status
+  if (priority !== undefined) task.priority = priority
+  if (assigneeId !== undefined) task.assigneeId = assigneeId
+  if (projectId !== undefined) task.projectId = projectId
+  task.updatedAt = new Date().toISOString()
+  
+  res.json({ success: true, data: task })
 })
 
-// ==================== Agents APIs ====================
+// DELETE /api/tasks/:id - Delete task
+app.delete('/api/tasks/:id', (req, res) => {
+  const index = db.tasks.findIndex(t => t.id === req.params.id)
+  if (index === -1) {
+    return res.status(404).json({ success: false, error: 'Task not found' })
+  }
+  
+  db.tasks.splice(index, 1)
+  res.json({ success: true, data: { message: 'Task deleted successfully' } })
+})
 
+// PUT /api/tasks/:id/status - Update task status only
+app.put('/api/tasks/:id/status', (req, res) => {
+  const index = db.tasks.findIndex(t => t.id === req.params.id)
+  if (index === -1) {
+    return res.status(404).json({ success: false, error: 'Task not found' })
+  }
+  
+  const { status } = req.body
+  const validStatuses = ['pending', 'in_progress', 'completed', 'failed']
+  
+  if (!status || !validStatuses.includes(status)) {
+    return res.status(400).json({ 
+      success: false, 
+      error: `Invalid status. Must be one of: ${validStatuses.join(', ')}` 
+    })
+  }
+  
+  db.tasks[index].status = status
+  db.tasks[index].updatedAt = new Date().toISOString()
+  
+  res.json({ success: true, data: db.tasks[index] })
+})
+
+// ==================== Agents APIs (Phase 1) ====================
+
+// GET /api/agents - List all agents (legacy)
 app.get('/api/agents', (req, res) => {
-  res.json(db.agents)
+  res.json({ success: true, data: db.agents })
 })
 
+// POST /api/agents - Create a new agent
 app.post('/api/agents', (req, res) => {
+  const { name, role, modelProvider, modelName, userId } = req.body
+  
+  if (!name || !role) {
+    return res.status(400).json({ success: false, error: 'name and role are required' })
+  }
+  
+  const validRoles = ['pm', 'architect', 'coder', 'reviewer', 'tester', 'deployer']
+  if (!validRoles.includes(role)) {
+    return res.status(400).json({ 
+      success: false, 
+      error: `Invalid role. Must be one of: ${validRoles.join(', ')}` 
+    })
+  }
+  
+  const now = new Date().toISOString()
   const agent = {
     id: uuidv4(),
-    name: req.body.name,
-    role: req.body.role || 'coder',
+    name,
+    role,
+    modelProvider: modelProvider || 'openai',
+    modelName: modelName || 'gpt-4',
     status: 'offline',
-    model_provider: req.body.model_provider || 'openai',
-    model_name: req.body.model_name || 'gpt-4',
-    enabled: true,
-    created_at: new Date().toISOString()
+    userId: userId || null,
+    createdAt: now,
+    updatedAt: now
   }
+  
   db.agents.push(agent)
-  res.json(agent)
+  res.status(201).json({ success: true, data: agent })
 })
 
+// GET /api/agents/:id - Get agent details
+app.get('/api/agents/:id', (req, res) => {
+  const agent = db.agents.find(a => a.id === req.params.id)
+  if (!agent) {
+    return res.status(404).json({ success: false, error: 'Agent not found' })
+  }
+  
+  // Get tasks assigned to this agent
+  const tasks = db.tasks.filter(t => t.assigneeId === agent.id)
+  
+  res.json({ success: true, data: { ...agent, tasks } })
+})
+
+// PUT /api/agents/:id - Update agent
 app.put('/api/agents/:id', (req, res) => {
   const index = db.agents.findIndex(a => a.id === req.params.id)
-  if (index === -1) return res.status(404).json({ error: 'Agent not found' })
+  if (index === -1) {
+    return res.status(404).json({ success: false, error: 'Agent not found' })
+  }
   
-  db.agents[index] = { ...db.agents[index], ...req.body }
-  res.json(db.agents[index])
+  const { name, role, modelProvider, modelName, status, userId } = req.body
+  const agent = db.agents[index]
+  
+  if (name !== undefined) agent.name = name
+  if (role !== undefined) agent.role = role
+  if (modelProvider !== undefined) agent.modelProvider = modelProvider
+  if (modelName !== undefined) agent.modelName = modelName
+  if (status !== undefined) agent.status = status
+  if (userId !== undefined) agent.userId = userId
+  agent.updatedAt = new Date().toISOString()
+  
+  res.json({ success: true, data: agent })
+})
+
+// DELETE /api/agents/:id - Delete agent
+app.delete('/api/agents/:id', (req, res) => {
+  const index = db.agents.findIndex(a => a.id === req.params.id)
+  if (index === -1) {
+    return res.status(404).json({ success: false, error: 'Agent not found' })
+  }
+  
+  db.agents.splice(index, 1)
+  res.json({ success: true, data: { message: 'Agent deleted successfully' } })
+})
+
+// PUT /api/agents/:id/status - Update agent status only
+app.put('/api/agents/:id/status', (req, res) => {
+  const index = db.agents.findIndex(a => a.id === req.params.id)
+  if (index === -1) {
+    return res.status(404).json({ success: false, error: 'Agent not found' })
+  }
+  
+  const { status } = req.body
+  const validStatuses = ['online', 'busy', 'idle', 'offline']
+  
+  if (!status || !validStatuses.includes(status)) {
+    return res.status(400).json({ 
+      success: false, 
+      error: `Invalid status. Must be one of: ${validStatuses.join(', ')}` 
+    })
+  }
+  
+  db.agents[index].status = status
+  db.agents[index].updatedAt = new Date().toISOString()
+  
+  res.json({ success: true, data: db.agents[index] })
 })
 
 // ==================== Knowledge APIs ====================
