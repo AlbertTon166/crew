@@ -12,7 +12,7 @@ interface LoginModalProps {
 
 export default function LoginModal({ isOpen, onClose }: LoginModalProps) {
   const navigate = useNavigate()
-  const { users, user: authUser, login, logout } = useAuth()
+  const { users, user: authUser, quickLogin, addUser, logout } = useAuth()
   const { language } = useLanguage()
   const { loadDemoData, clearDemoData, isDemoMode } = useDemo()
   
@@ -52,19 +52,14 @@ export default function LoginModal({ isOpen, onClose }: LoginModalProps) {
 
     await new Promise(resolve => setTimeout(resolve, 500))
     
-    // Use AuthContext.login to properly set user state
-    const result = login({ username: foundUser.username, password: '' }, true)
-    
-    if (result.success) {
-      setSuccess(language === 'zh' ? '登录成功！' : 'Login successful!')
-      setTimeout(() => {
-        clearDemoData() // Clear any demo data
-        onClose()
-        navigate('/dashboard')
-      }, 500)
-    } else {
-      setError(result.error || (language === 'zh' ? '登录失败' : 'Login failed'))
-    }
+    // Use quickLogin to directly set user state
+    quickLogin(foundUser)
+    setSuccess(language === 'zh' ? '登录成功！' : 'Login successful!')
+    setTimeout(() => {
+      clearDemoData() // Clear any demo data
+      onClose()
+      navigate('/dashboard')
+    }, 500)
     
     setIsLoading(false)
   }
@@ -108,22 +103,17 @@ export default function LoginModal({ isOpen, onClose }: LoginModalProps) {
     }
     
     // Add user to AuthContext users
-    const updatedUsers = [...users, newUser]
-    localStorage.setItem('auth_users', JSON.stringify(updatedUsers))
+    addUser(newUser)
     
-    // Use AuthContext.login to properly set user state
-    const result = login({ username, password: '' }, true)
+    // Use quickLogin to directly set user state
+    quickLogin(newUser)
     
-    if (result.success) {
-      setSuccess(language === 'zh' ? '注册成功！正在进入...' : 'Registered successfully! Entering...')
-      setTimeout(() => {
-        clearDemoData()
-        onClose()
-        navigate('/dashboard')
-      }, 500)
-    } else {
-      setError(result.error || (language === 'zh' ? '注册失败' : 'Registration failed'))
-    }
+    setSuccess(language === 'zh' ? '注册成功！正在进入...' : 'Registered successfully! Entering...')
+    setTimeout(() => {
+      clearDemoData()
+      onClose()
+      navigate('/dashboard')
+    }, 500)
     
     setIsLoading(false)
   }

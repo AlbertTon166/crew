@@ -9,11 +9,14 @@ interface AuthContextType {
   tokens: AuthToken[]
   login: (credentials: LoginCredentials, remember?: boolean) => { success: boolean; error?: string }
   logout: () => void
+  // Quick login for localStorage-based users (bypasses password validation)
+  quickLogin: (user: User) => void
   setPassword: (userId: string, password: string) => boolean
   generateToken: (userId: string, userName: string) => AuthToken | null
   revokeToken: (tokenId: string) => boolean
   getUserTokens: (userId: string) => AuthToken[]
   users: User[]
+  addUser: (user: User) => void
   updateUser: (userId: string, updates: Partial<User>) => boolean
   deleteUser: (userId: string) => boolean
   auditLogs: AuditLog[]
@@ -278,6 +281,21 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     return { success: true }
   }, [users, tokens, loginAttempts, addAuditLog])
 
+  // Quick login - directly set user without password validation
+  const quickLogin = useCallback((loginUser: User) => {
+    setUser(loginUser)
+    localStorage.setItem('auth_user', JSON.stringify(loginUser))
+    localStorage.setItem('auth_session_expiry', (Date.now() + 30 * 24 * 60 * 60 * 1000).toString())
+  }, [])
+
+  // Add a new user to the users list
+  const addUser = useCallback((newUser: User) => {
+    setUsers(prev => [...prev, newUser])
+    const savedUsers = localStorage.getItem('auth_users')
+    const currentUsers = savedUsers ? JSON.parse(savedUsers) : []
+    localStorage.setItem('auth_users', JSON.stringify([...currentUsers, newUser]))
+  }, [])
+
   const logout = useCallback(() => {
     if (user) {
       addAuditLog('LOGOUT', user.id)
@@ -366,11 +384,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         tokens,
         login,
         logout,
+        quickLogin,
         setPassword,
         generateToken,
         revokeToken,
         getUserTokens,
         users,
+        addUser,
         updateUser,
         deleteUser,
         auditLogs,
