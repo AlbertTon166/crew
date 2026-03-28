@@ -100,11 +100,25 @@ export default function LoginModal({ isOpen, onClose }: LoginModalProps) {
 
   const handleDemo = async () => {
     setIsLoading(true)
+    
+    // Set demo user in localStorage so ProtectedRoute allows access
+    const demoUser = {
+      id: 'demo_user',
+      username: 'demo_user',
+      email: 'demo@demo.local',
+      isAdmin: false,
+      createdAt: new Date().toISOString(),
+      isDemo: true,
+    }
+    localStorage.setItem('auth_user', JSON.stringify(demoUser))
+    localStorage.setItem('auth_session_expiry', (Date.now() + 24 * 60 * 60 * 1000).toString())
+    
     await loadDemoData()
+    
+    // Close modal and navigate - onClose already handles navigation
     setTimeout(() => {
       onClose()
-      navigate('/dashboard')
-    }, 500)
+    }, 300)
     setIsLoading(false)
   }
 
