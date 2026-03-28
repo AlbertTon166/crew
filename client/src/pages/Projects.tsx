@@ -86,7 +86,6 @@ const timeoutStrategyConfig = {
   fallback: { label: '降级', labelEn: 'Fallback', color: '#8B5CF6' },
   interrupt: { label: '中断', labelEn: 'Interrupt', color: '#EF4444' },
 }
-]
 
 // Priority badge
 function PriorityBadge({ priority }: { priority: string }) {
