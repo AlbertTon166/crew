@@ -224,7 +224,7 @@ export default function Landing() {
       </footer>
 
       {/* Login Modal */}
-      {loginOpen && <LoginModal onClose={() => {
+      {loginOpen && <LoginModal isOpen={loginOpen} onClose={() => {
         setLoginOpen(false)
         // 登录成功后跳转 Dashboard
         navigate('/dashboard')
