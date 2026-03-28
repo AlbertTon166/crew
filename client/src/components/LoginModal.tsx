@@ -116,9 +116,6 @@ export default function LoginModal({ isOpen, onClose }: LoginModalProps) {
     setIsLoading(false)
   }
 
-    setIsLoading(false)
-  }
-
   if (!isOpen) return null
 
   return (
