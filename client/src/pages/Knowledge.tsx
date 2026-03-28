@@ -35,7 +35,7 @@ const categoryConfig = {
 }
 
 // Mock data - discovered jobs
-const mockJobs: JobKnowledge[] = [
+const mockJobs: JobKnowledge[] = [] // No mock data
   {
     id: 'job-1',
     title: '前端开发工程师',

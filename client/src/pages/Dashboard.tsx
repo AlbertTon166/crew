@@ -63,7 +63,7 @@ const mockAgents = [
   { id: '5', name: 'Deployer', role: 'deployer', status: 'offline', model: 'GPT-4o-mini', tasks: 0 },
 ]
 
-const mockActivities = [
+const mockActivities = [] // No mock activities
   { id: '1', type: 'task', agent: 'Coder', content: '完成了 API 集成模块', time: '2min ago' },
   { id: '2', type: 'review', agent: 'Reviewer', content: '通过代码审查 #23', time: '5min ago' },
   { id: '3', type: 'deploy', agent: 'Deployer', content: '上线版本 v2.1.0', time: '12min ago' },
@@ -71,14 +71,6 @@ const mockActivities = [
   { id: '5', type: 'message', agent: 'PM', content: '确认需求：支付模块', time: '2h ago' },
 ]
 
-const mockStats = {
-  activeAgents: 4,
-  totalTasks: 12,
-  completedToday: 3,
-  pendingTasks: 7,
-  totalTokens: 2847293,
-  todayCost: 10.53,
-}
 
 // Quick action
 function QuickAction({ icon, label, color, onClick }: {

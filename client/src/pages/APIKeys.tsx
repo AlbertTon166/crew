@@ -27,55 +27,28 @@ const providerConfig = {
     color: '#10A37F',
     models: ['gpt-4o', 'gpt-4o-mini', 'gpt-4-turbo', 'gpt-3.5-turbo'],
     placeholder: 'sk-...',
-  },
   anthropic: { 
     label: 'Anthropic', 
     icon: Bot, 
     color: '#CC785C',
     models: ['claude-3-5-sonnet', 'claude-3-opus', 'claude-3-haiku'],
     placeholder: 'sk-ant-...',
-  },
   deepseek: { 
     label: 'DeepSeek', 
     icon: Cpu, 
     color: '#0066CC',
     models: ['deepseek-chat', 'deepseek-coder'],
     placeholder: 'sk-...',
-  },
   other: { 
     label: 'Other', 
     icon: Settings, 
     color: '#8B5CF6',
     models: [],
     placeholder: 'API Key',
-  },
 }
 
 // Mock data
-const mockKeys: APIKey[] = [
-  {
-    id: 'key-1',
-    name: 'Production OpenAI',
-    key: 'sk-proj-xxxxxxxxxxxx',
-    prefix: 'sk-proj-xxx',
-    model: 'openai',
-    status: 'active',
-    createdAt: '2026-03-01',
-    lastUsed: '2026-03-25',
-    usageCount: 1247,
-  },
-  {
-    id: 'key-2',
-    name: 'Dev Anthropic',
-    key: 'sk-ant-xxxxxxxxxxxx',
-    prefix: 'sk-ant-xxx',
-    model: 'anthropic',
-    status: 'active',
-    createdAt: '2026-03-10',
-    lastUsed: '2026-03-24',
-    usageCount: 342,
-  },
-]
+const mockKeys: APIKey[] = [] // Empty - no mock data
 
 // Status badge
 function StatusBadge({ status, language }: { status: string; language: 'en' | 'zh' }) {
@@ -124,10 +97,8 @@ export default function APIKeys() {
   const [showCreateModal, setShowCreateModal] = useState(false)
   const [revealedKeys, setRevealedKeys] = useState<Set<string>>(new Set())
   const [newKeyForm, setNewKeyForm] = useState({
-    name: '',
     provider: 'openai' as 'openai' | 'anthropic' | 'deepseek' | 'other',
     apiKey: '',
-    model: '',
   })
   
   // Copy to clipboard

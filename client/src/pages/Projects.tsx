@@ -81,7 +81,7 @@ const timeoutStrategyConfig = {
 }
 
 // Mock data
-const mockProjects: Project[] = [
+const mockProjects: Project[] = [] // No mock data
   {
     id: 'proj-1',
     name: 'E-commerce API',

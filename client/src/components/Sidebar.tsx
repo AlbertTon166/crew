@@ -272,7 +272,7 @@ const [theme, setTheme] = useState<'dark' | 'light' | 'auto'>('dark')
             <NavLink
               key={item.path}
               to={item.path}
-              end={item.path === '/'}
+              end={item.path === '/dashboard'}
               onClick={onClose}
               style={{ 
                 display: 'flex',
