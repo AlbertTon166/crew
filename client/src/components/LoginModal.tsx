@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom'
 import { X, Lock, Mail, AlertCircle, Check, Sparkles, Loader2, User } from 'lucide-react'
 import { useAuth } from '../context/AuthContext'
 import { useLanguage } from '../context/LanguageContext'
+import { useDemo } from '../context/DemoContext'
 
 interface LoginModalProps {
   isOpen: boolean
@@ -13,6 +14,7 @@ export default function LoginModal({ isOpen, onClose }: LoginModalProps) {
   const navigate = useNavigate()
   const { users, quickLogin, addUser } = useAuth()
   const { language } = useLanguage()
+  const { clearDemoData } = useDemo()
   
   const [formMode, setFormMode] = useState<'login' | 'register'>('register')
   const [email, setEmail] = useState('')
