@@ -12,7 +12,7 @@ import UsageStats from './pages/UsageStats'
 import Resources from './pages/Resources'
 import Settings from './pages/Settings'
 import ProtectedRoute from './components/ProtectedRoute'
-// import Office3D from './pages/Office3D' // Temporarily disabled - requires @react-three/fiber
+import Office3D from './pages/3DOffice'
 import { AuthProvider } from './context/AuthContext'
 import { LanguageProvider } from './context/LanguageContext'
 import { DeployModeProvider } from './context/DeployModeContext'
@@ -45,7 +45,7 @@ function App() {
                   <Route path="usage" element={<UsageStats />} />
                   <Route path="settings" element={<Settings />} />
                   <Route path="resources" element={<Resources />} />
-                  {/* <Route path="office3d" element={<Office3D />} /> */}
+                  <Route path="office3d" element={<Office3D />} />
                 </Route>
               </Routes>
             </BrowserRouter>

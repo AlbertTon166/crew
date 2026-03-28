@@ -279,6 +279,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       localStorage.setItem('auth_session_expiry', (Date.now() + 24 * 60 * 60 * 1000).toString())
     }
 
+    // Store tenant ID for multi-tenancy support
+    if (foundUser.tenantId) {
+      localStorage.setItem('tenantId', foundUser.tenantId)
+    } else {
+      // Default tenant for local mode
+      localStorage.setItem('tenantId', 'default')
+    }
+
     setUser(foundUser)
     addAuditLog('LOGIN_SUCCESS', foundUser.id, remember ? 'Remember me' : 'Default session')
     return { success: true }
@@ -289,6 +297,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setUser(loginUser)
     localStorage.setItem('auth_user', JSON.stringify(loginUser))
     localStorage.setItem('auth_session_expiry', (Date.now() + 30 * 24 * 60 * 60 * 1000).toString())
+    // Store tenant ID for multi-tenancy support
+    if (loginUser.tenantId) {
+      localStorage.setItem('tenantId', loginUser.tenantId)
+    } else {
+      localStorage.setItem('tenantId', 'default')
+    }
   }, [])
 
   // Add a new user to the users list
@@ -306,6 +320,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setUser(null)
     localStorage.removeItem('auth_user')
     localStorage.removeItem('auth_session_expiry')
+    localStorage.removeItem('tenantId') // Clear tenant ID on logout
   }, [user, addAuditLog])
 
   const setPassword = useCallback((userId: string, password: string): boolean => {

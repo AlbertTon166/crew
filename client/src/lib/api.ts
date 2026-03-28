@@ -15,13 +15,26 @@ class TimeoutError extends Error {
   }
 }
 
+// Get tenant ID from localStorage (set during login)
+function getTenantId(): string | null {
+  return localStorage.getItem('tenantId')
+}
+
 async function request(endpoint: string, options?: RequestInit) {
   const controller = new AbortController()
   const timeoutId = setTimeout(() => controller.abort(), REQUEST_TIMEOUT)
+  
+  const tenantId = getTenantId()
+  const headers: Record<string, string> = { 'Content-Type': 'application/json' }
+  
+  // Add tenant ID header for multi-tenancy support
+  if (tenantId) {
+    headers['X-Tenant-ID'] = tenantId
+  }
 
   try {
     const res = await fetch(`${API_BASE}${endpoint}`, {
-      headers: { 'Content-Type': 'application/json' },
+      headers,
       signal: controller.signal,
       ...options,
     })
