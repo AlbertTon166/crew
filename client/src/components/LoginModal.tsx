@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { X, Lock, Mail, User, AlertCircle, Check, Sparkles, Eye, Loader2 } from 'lucide-react'
+import { X, Lock, Mail, AlertCircle, Check, Sparkles, Eye, Loader2, Zap } from 'lucide-react'
 import { useAuth } from '../context/AuthContext'
 import { useLanguage } from '../context/LanguageContext'
 import { useDemo } from '../context/DemoContext'
@@ -14,12 +14,19 @@ export default function LoginModal({ isOpen, onClose }: LoginModalProps) {
   const { language } = useLanguage()
   const { loadDemoData } = useDemo()
   
-  const [mode, setMode] = useState<'register' | 'demo'>('register')
+  const [mode, setMode] = useState<'register' | 'demo'>('demo')
   const [email, setEmail] = useState('')
-  const [username, setUsername] = useState('')
   const [error, setError] = useState('')
   const [success, setSuccess] = useState('')
   const [isLoading, setIsLoading] = useState(false)
+
+  // Auto-generate username from email
+  const generateUsername = (email: string) => {
+    const localPart = email.split('@')[0]
+    const cleanPart = localPart.replace(/[^a-zA-Z0-9]/g, '')
+    const randomNum = Math.floor(Math.random() * 9000) + 1000
+    return `${cleanPart}${randomNum}`.substring(0, 20)
+  }
 
   const handleRegister = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -27,23 +34,25 @@ export default function LoginModal({ isOpen, onClose }: LoginModalProps) {
     setSuccess('')
     setIsLoading(true)
 
-    // Validate
+    // Validate email only
     if (!email.trim()) {
-      setError(language === 'zh' ? '请输入邮箱地址' : 'Please enter email')
+      setError(language === 'zh' ? '请输入邮箱地址' : 'Please enter your email')
       setIsLoading(false)
       return
     }
     
-    if (!username.trim()) {
-      setError(language === 'zh' ? '请输入用户名' : 'Please enter username')
+    // Basic email format validation
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
+    if (!emailRegex.test(email.trim())) {
+      setError(language === 'zh' ? '请输入有效的邮箱地址' : 'Please enter a valid email address')
       setIsLoading(false)
       return
     }
     
     // Check if email already exists
-    const emailExists = users.some(u => u.email === email.trim())
+    const emailExists = users.some(u => u.email === email.trim().toLowerCase())
     if (emailExists) {
-      setError(language === 'zh' ? '该邮箱已被注册' : 'Email already registered')
+      setError(language === 'zh' ? '该邮箱已被注册，请直接登录' : 'Email already registered, please login')
       setIsLoading(false)
       return
     }
@@ -51,16 +60,19 @@ export default function LoginModal({ isOpen, onClose }: LoginModalProps) {
     // Simulate network delay
     await new Promise(resolve => setTimeout(resolve, 800))
 
-    // In demo mode, just auto-login with the new account
+    // Auto-generate username
+    const username = generateUsername(email)
+
+    // Create new user
     const newUser = {
       id: `user_${Date.now()}`,
-      username: username.trim(),
-      email: email.trim(),
+      username: username,
+      email: email.trim().toLowerCase(),
       isAdmin: false,
       createdAt: new Date().toISOString(),
     }
     
-    // Add to users (in real app this would be an API call)
+    // Save to localStorage (in real app this would be an API call)
     const updatedUsers = [...users, newUser]
     localStorage.setItem('auth_users', JSON.stringify(updatedUsers))
     localStorage.setItem('auth_user', JSON.stringify(newUser))
@@ -93,7 +105,8 @@ export default function LoginModal({ isOpen, onClose }: LoginModalProps) {
         position: 'fixed',
         inset: 0,
         background: 'rgba(0, 0, 0, 0.9)',
-        backdropFilter: 'blur(12px)',
+        backdropFilter: 'blur(16px)',
+        WebkitBackdropFilter: 'blur(16px)',
         zIndex: 99999,
         display: 'flex',
         alignItems: 'center',
@@ -107,12 +120,12 @@ export default function LoginModal({ isOpen, onClose }: LoginModalProps) {
       <div
         style={{
           width: '100%',
-          maxWidth: '420px',
-          background: 'var(--bg-secondary)',
-          borderRadius: '20px',
-          border: '1px solid var(--border)',
+          maxWidth: '400px',
+          background: 'linear-gradient(180deg, #18181B 0%, #09090B 100%)',
+          borderRadius: '24px',
+          border: '1px solid rgba(255, 255, 255, 0.08)',
           overflow: 'hidden',
-          boxShadow: '0 24px 64px rgba(0, 0, 0, 0.6)',
+          boxShadow: '0 32px 80px rgba(0, 0, 0, 0.8), 0 0 0 1px rgba(255, 255, 255, 0.05) inset',
         }}
       >
         {/* Header */}
@@ -121,126 +134,212 @@ export default function LoginModal({ isOpen, onClose }: LoginModalProps) {
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'space-between',
-            padding: '20px 24px',
-            borderBottom: '1px solid var(--border)',
+            padding: '24px 28px',
+            borderBottom: '1px solid rgba(255, 255, 255, 0.05)',
           }}
         >
-          <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '14px' }}>
+            {/* Logo */}
             <div
               style={{
-                width: '40px',
-                height: '40px',
-                borderRadius: '12px',
-                background: 'linear-gradient(135deg, var(--primary), var(--accent-violet))',
+                width: '44px',
+                height: '44px',
+                borderRadius: '14px',
+                background: 'linear-gradient(135deg, #6366F1 0%, #8B5CF6 100%)',
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'center',
+                boxShadow: '0 8px 24px rgba(99, 102, 241, 0.4)',
+                position: 'relative'
               }}
             >
               <Lock size={20} style={{ color: '#fff' }} />
+              <div 
+                style={{
+                  position: 'absolute',
+                  inset: -4,
+                  borderRadius: '18px',
+                  background: 'linear-gradient(135deg, rgba(99, 102, 241, 0.4), rgba(139, 92, 246, 0.4))',
+                  filter: 'blur(12px)',
+                  zIndex: -1
+                }}
+              />
             </div>
             <div>
               <h2
                 style={{
-                  fontSize: '16px',
-                  fontWeight: '600',
-                  color: 'var(--text-primary)',
+                  fontSize: '18px',
+                  fontWeight: '700',
+                  color: '#FAFAFA',
                   margin: 0,
+                  fontFamily: "'Cabinet Grotesk', sans-serif",
+                  letterSpacing: '-0.02em'
                 }}
               >
-                {language === 'zh' ? '开始使用 CrewForce' : 'Get Started with CrewForce'}
+                {language === 'zh' ? '开始使用' : 'Get Started'}
               </h2>
               <p
                 style={{
-                  fontSize: '12px',
-                  color: 'var(--text-tertiary)',
-                  margin: 0,
+                  fontSize: '13px',
+                  color: '#71717A',
+                  margin: '2px 0 0 0',
                 }}
               >
                 {mode === 'register' 
-                  ? (language === 'zh' ? '注册新账号' : 'Create new account')
-                  : (language === 'zh' ? '体验演示版本' : 'Try demo version')}
+                  ? (language === 'zh' ? '创建免费账号' : 'Create free account')
+                  : (language === 'zh' ? '无需注册立即体验' : 'Try without signing up')}
               </p>
             </div>
           </div>
           <button
             onClick={onClose}
             style={{
-              padding: '8px',
-              background: 'var(--bg-tertiary)',
-              border: 'none',
-              borderRadius: '8px',
+              padding: '10px',
+              background: 'rgba(255, 255, 255, 0.04)',
+              border: '1px solid rgba(255, 255, 255, 0.06)',
+              borderRadius: '10px',
               cursor: 'pointer',
+              transition: 'all 0.2s',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center'
+            }}
+            onMouseEnter={(e) => {
+              e.currentTarget.style.background = 'rgba(255, 255, 255, 0.08)'
+              e.currentTarget.style.borderColor = 'rgba(255, 255, 255, 0.1)'
+            }}
+            onMouseLeave={(e) => {
+              e.currentTarget.style.background = 'rgba(255, 255, 255, 0.04)'
+              e.currentTarget.style.borderColor = 'rgba(255, 255, 255, 0.06)'
             }}
           >
-            <X size={18} style={{ color: 'var(--text-tertiary)' }} />
+            <X size={18} style={{ color: '#71717A' }} />
           </button>
         </div>
 
-        {/* Mode Tabs */}
-        <div style={{ display: 'flex', borderBottom: '1px solid var(--border)' }}>
+        {/* Content */}
+        <div style={{ padding: '28px' }}>
+          {/* Demo Mode - Primary CTA */}
           <button
-            onClick={() => { setMode('register'); setError(''); setSuccess(''); }}
+            onClick={handleDemo}
+            disabled={isLoading}
             style={{
-              flex: 1,
-              padding: '14px',
-              background: mode === 'register' ? 'var(--bg-tertiary)' : 'transparent',
-              border: 'none',
-              borderBottom: mode === 'register' ? '2px solid var(--primary)' : '2px solid transparent',
-              color: mode === 'register' ? 'var(--primary)' : 'var(--text-tertiary)',
-              fontSize: '14px',
-              fontWeight: '600',
-              cursor: 'pointer',
-              transition: 'all 0.2s',
+              width: '100%',
+              padding: '20px',
+              background: mode === 'demo' 
+                ? 'linear-gradient(135deg, rgba(99, 102, 241, 0.15) 0%, rgba(139, 92, 246, 0.15) 100%)'
+                : 'rgba(30, 41, 59, 0.5)',
+              border: mode === 'demo'
+                ? '1px solid rgba(99, 102, 241, 0.4)'
+                : '1px solid rgba(255, 255, 255, 0.06)',
+              borderRadius: '16px',
+              cursor: isLoading ? 'not-allowed' : 'pointer',
+              transition: 'all 0.3s',
+              marginBottom: '16px',
+              position: 'relative',
+              overflow: 'hidden'
+            }}
+            onMouseEnter={(e) => {
+              if (!isLoading) {
+                e.currentTarget.style.transform = 'translateY(-2px)'
+                e.currentTarget.style.boxShadow = '0 8px 32px rgba(99, 102, 241, 0.3)'
+              }
+            }}
+            onMouseLeave={(e) => {
+              e.currentTarget.style.transform = 'translateY(0)'
+              e.currentTarget.style.boxShadow = 'none'
             }}
           >
-            {language === 'zh' ? '邮箱注册' : 'Email Register'}
+            {/* Glow effect when active */}
+            {mode === 'demo' && (
+              <div style={{
+                position: 'absolute',
+                inset: 0,
+                background: 'radial-gradient(circle at center, rgba(99, 102, 241, 0.2) 0%, transparent 70%)',
+                pointerEvents: 'none'
+              }} />
+            )}
+            
+            <div style={{ display: 'flex', alignItems: 'center', gap: '14px', position: 'relative' }}>
+              <div
+                style={{
+                  width: '52px',
+                  height: '52px',
+                  borderRadius: '14px',
+                  background: 'linear-gradient(135deg, #6366F1 0%, #8B5CF6 100%)',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  boxShadow: '0 4px 16px rgba(99, 102, 241, 0.4)',
+                  flexShrink: 0
+                }}
+              >
+                <Zap size={24} style={{ color: '#fff' }} />
+              </div>
+              <div style={{ textAlign: 'left' }}>
+                <div style={{ 
+                  fontSize: '16px', 
+                  fontWeight: '700', 
+                  color: mode === 'demo' ? '#FAFAFA' : '#A1A1AA',
+                  fontFamily: "'Cabinet Grotesk', sans-serif",
+                  marginBottom: '4px'
+                }}>
+                  {language === 'zh' ? '快速体验 Demo' : 'Quick Demo'}
+                </div>
+                <div style={{ 
+                  fontSize: '13px', 
+                  color: '#71717A'
+                }}>
+                  {language === 'zh' 
+                    ? '浏览示例数据，无需注册' 
+                    : 'Browse sample data, no signup needed'}
+                </div>
+              </div>
+              <ChevronRightIcon className="ml-auto" />
+            </div>
           </button>
-          <button
-            onClick={() => { setMode('demo'); setError(''); setSuccess(''); }}
-            style={{
-              flex: 1,
-              padding: '14px',
-              background: mode === 'demo' ? 'var(--bg-tertiary)' : 'transparent',
-              border: 'none',
-              borderBottom: mode === 'demo' ? '2px solid var(--primary)' : '2px solid transparent',
-              color: mode === 'demo' ? 'var(--primary)' : 'var(--text-tertiary)',
-              fontSize: '14px',
-              fontWeight: '600',
-              cursor: 'pointer',
-              transition: 'all 0.2s',
-            }}
-          >
-            {language === 'zh' ? '游客体验' : 'Demo Mode'}
-          </button>
-        </div>
 
-        {/* Register Form */}
-        {mode === 'register' && (
-          <form onSubmit={handleRegister} style={{ padding: '24px' }}>
-            {/* Email */}
+          {/* Divider */}
+          <div style={{ 
+            display: 'flex', 
+            alignItems: 'center', 
+            gap: '16px', 
+            margin: '20px 0',
+            opacity: 0.5
+          }}>
+            <div style={{ flex: 1, height: '1px', background: 'rgba(255, 255, 255, 0.08)' }} />
+            <span style={{ fontSize: '12px', color: '#71717A', textTransform: 'uppercase', letterSpacing: '0.1em' }}>
+              {language === 'zh' ? '或' : 'or'}
+            </span>
+            <div style={{ flex: 1, height: '1px', background: 'rgba(255, 255, 255, 0.08)' }} />
+          </div>
+
+          {/* Register Form */}
+          <form onSubmit={handleRegister}>
             <div style={{ marginBottom: '16px' }}>
               <label
                 style={{
                   display: 'block',
                   fontSize: '12px',
                   fontWeight: '600',
-                  color: 'var(--text-secondary)',
-                  marginBottom: '6px',
+                  color: '#A1A1AA',
+                  marginBottom: '8px',
                   textTransform: 'uppercase',
+                  letterSpacing: '0.05em'
                 }}
               >
-                {language === 'zh' ? '邮箱' : 'Email'}
+                {language === 'zh' ? '邮箱地址' : 'Email Address'}
               </label>
               <div style={{ position: 'relative' }}>
                 <Mail
-                  size={16}
+                  size={18}
                   style={{
                     position: 'absolute',
-                    left: '14px',
+                    left: '16px',
                     top: '50%',
                     transform: 'translateY(-50%)',
-                    color: 'var(--text-tertiary)',
+                    color: '#71717A',
+                    pointerEvents: 'none'
                   }}
                 />
                 <input
@@ -250,64 +349,26 @@ export default function LoginModal({ isOpen, onClose }: LoginModalProps) {
                   placeholder={language === 'zh' ? 'your@email.com' : 'your@email.com'}
                   style={{
                     width: '100%',
-                    padding: '12px 14px 12px 42px',
-                    background: 'var(--bg-tertiary)',
-                    border: '1px solid var(--border)',
-                    borderRadius: '10px',
-                    fontSize: '14px',
-                    color: 'var(--text-primary)',
+                    padding: '14px 16px 14px 48px',
+                    background: 'rgba(30, 41, 59, 0.6)',
+                    border: '1px solid rgba(255, 255, 255, 0.08)',
+                    borderRadius: '12px',
+                    fontSize: '15px',
+                    color: '#FAFAFA',
                     outline: 'none',
-                    transition: 'border-color 0.2s',
+                    transition: 'all 0.2s',
+                    fontFamily: 'inherit'
                   }}
-                  onFocus={(e) => (e.target.style.borderColor = 'var(--primary)')}
-                  onBlur={(e) => (e.target.style.borderColor = 'var(--border)')}
-                />
-              </div>
-            </div>
-
-            {/* Username */}
-            <div style={{ marginBottom: '20px' }}>
-              <label
-                style={{
-                  display: 'block',
-                  fontSize: '12px',
-                  fontWeight: '600',
-                  color: 'var(--text-secondary)',
-                  marginBottom: '6px',
-                  textTransform: 'uppercase',
-                }}
-              >
-                {language === 'zh' ? '用户名' : 'Username'}
-              </label>
-              <div style={{ position: 'relative' }}>
-                <User
-                  size={16}
-                  style={{
-                    position: 'absolute',
-                    left: '14px',
-                    top: '50%',
-                    transform: 'translateY(-50%)',
-                    color: 'var(--text-tertiary)',
+                  onFocus={(e) => {
+                    e.target.style.borderColor = 'rgba(99, 102, 241, 0.5)'
+                    e.target.style.boxShadow = '0 0 0 3px rgba(99, 102, 241, 0.15)'
+                    e.target.style.background = 'rgba(30, 41, 59, 0.8)'
                   }}
-                />
-                <input
-                  type="text"
-                  value={username}
-                  onChange={(e) => setUsername(e.target.value)}
-                  placeholder={language === 'zh' ? '选择用户名' : 'Choose username'}
-                  style={{
-                    width: '100%',
-                    padding: '12px 14px 12px 42px',
-                    background: 'var(--bg-tertiary)',
-                    border: '1px solid var(--border)',
-                    borderRadius: '10px',
-                    fontSize: '14px',
-                    color: 'var(--text-primary)',
-                    outline: 'none',
-                    transition: 'border-color 0.2s',
+                  onBlur={(e) => {
+                    e.target.style.borderColor = 'rgba(255, 255, 255, 0.08)'
+                    e.target.style.boxShadow = 'none'
+                    e.target.style.background = 'rgba(30, 41, 59, 0.6)'
                   }}
-                  onFocus={(e) => (e.target.style.borderColor = 'var(--primary)')}
-                  onBlur={(e) => (e.target.style.borderColor = 'var(--border)')}
                 />
               </div>
             </div>
@@ -318,15 +379,15 @@ export default function LoginModal({ isOpen, onClose }: LoginModalProps) {
                 style={{
                   display: 'flex',
                   alignItems: 'center',
-                  gap: '8px',
-                  padding: '12px',
+                  gap: '10px',
+                  padding: '12px 16px',
                   background: 'rgba(248, 113, 113, 0.1)',
-                  border: '1px solid rgba(248, 113, 113, 0.3)',
-                  borderRadius: '10px',
+                  border: '1px solid rgba(248, 113, 113, 0.2)',
+                  borderRadius: '12px',
                   marginBottom: '16px',
                 }}
               >
-                <AlertCircle size={16} style={{ color: '#F87171' }} />
+                <AlertCircle size={16} style={{ color: '#F87171', flexShrink: 0 }} />
                 <span style={{ fontSize: '13px', color: '#F87171' }}>{error}</span>
               </div>
             )}
@@ -337,15 +398,15 @@ export default function LoginModal({ isOpen, onClose }: LoginModalProps) {
                 style={{
                   display: 'flex',
                   alignItems: 'center',
-                  gap: '8px',
-                  padding: '12px',
+                  gap: '10px',
+                  padding: '12px 16px',
                   background: 'rgba(52, 211, 153, 0.1)',
-                  border: '1px solid rgba(52, 211, 153, 0.3)',
-                  borderRadius: '10px',
+                  border: '1px solid rgba(52, 211, 153, 0.2)',
+                  borderRadius: '12px',
                   marginBottom: '16px',
                 }}
               >
-                <Check size={16} style={{ color: '#34D399' }} />
+                <Check size={16} style={{ color: '#34D399', flexShrink: 0 }} />
                 <span style={{ fontSize: '13px', color: '#34D399' }}>{success}</span>
               </div>
             )}
@@ -356,130 +417,88 @@ export default function LoginModal({ isOpen, onClose }: LoginModalProps) {
               disabled={isLoading}
               style={{
                 width: '100%',
-                padding: '14px',
+                padding: '16px',
                 background: isLoading
-                  ? 'var(--bg-tertiary)'
-                  : 'linear-gradient(135deg, var(--primary), var(--accent-violet))',
+                  ? 'rgba(30, 41, 59, 0.5)'
+                  : 'linear-gradient(135deg, #6366F1 0%, #8B5CF6 100%)',
                 border: 'none',
-                borderRadius: '12px',
-                color: isLoading ? 'var(--text-tertiary)' : '#fff',
-                fontSize: '14px',
+                borderRadius: '14px',
+                color: isLoading ? '#71717A' : '#fff',
+                fontSize: '15px',
                 fontWeight: '600',
                 cursor: isLoading ? 'not-allowed' : 'pointer',
-                transition: 'all 0.2s',
+                transition: 'all 0.3s',
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'center',
-                gap: '8px',
+                gap: '10px',
+                fontFamily: "'Cabinet Grotesk', sans-serif",
+                boxShadow: isLoading ? 'none' : '0 8px 24px rgba(99, 102, 241, 0.35)'
+              }}
+              onMouseEnter={(e) => {
+                if (!isLoading) {
+                  e.currentTarget.style.transform = 'translateY(-2px)'
+                  e.currentTarget.style.boxShadow = '0 12px 32px rgba(99, 102, 241, 0.45)'
+                }
+              }}
+              onMouseLeave={(e) => {
+                e.currentTarget.style.transform = 'translateY(0)'
+                e.currentTarget.style.boxShadow = isLoading ? 'none' : '0 8px 24px rgba(99, 102, 241, 0.35)'
               }}
             >
               {isLoading ? (
                 <>
-                  <Loader2 size={16} className="animate-spin" />
-                  {language === 'zh' ? '注册中...' : 'Registering...'}
+                  <Loader2 size={18} style={{ animation: 'spin 1s linear infinite' }} />
+                  {language === 'zh' ? '处理中...' : 'Processing...'}
                 </>
               ) : (
                 <>
-                  <Sparkles size={16} />
-                  {language === 'zh' ? '创建账号' : 'Create Account'}
+                  <Sparkles size={18} />
+                  {language === 'zh' ? '创建免费账号' : 'Create Free Account'}
                 </>
               )}
             </button>
           </form>
-        )}
 
-        {/* Demo Mode */}
-        {mode === 'demo' && (
-          <div style={{ padding: '24px' }}>
-            <div
-              style={{
-                textAlign: 'center',
-                padding: '20px',
-                background: 'linear-gradient(135deg, rgba(139, 92, 246, 0.1), rgba(59, 130, 246, 0.1))',
-                borderRadius: '16px',
-                border: '1px solid rgba(139, 92, 246, 0.2)',
-                marginBottom: '20px',
-              }}
-            >
-              <div
-                style={{
-                  width: '60px',
-                  height: '60px',
-                  borderRadius: '50%',
-                  background: 'linear-gradient(135deg, var(--primary), var(--accent-violet))',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  margin: '0 auto 16px',
-                }}
-              >
-                <Eye size={28} style={{ color: '#fff' }} />
-              </div>
-              <h3 style={{ fontSize: '16px', fontWeight: '600', color: 'var(--text-primary)', margin: '0 0 8px' }}>
-                {language === 'zh' ? '游客体验模式' : 'Demo Mode'}
-              </h3>
-              <p style={{ fontSize: '13px', color: 'var(--text-tertiary)', margin: 0 }}>
-                {language === 'zh' 
-                  ? '浏览完整功能示例，了解 CrewForce 如何帮助您管理AI智能体团队' 
-                  : 'Browse sample data and see how CrewForce helps you manage AI agent teams'}
-              </p>
-            </div>
-
-            <div style={{ marginBottom: '20px' }}>
-              <h4 style={{ fontSize: '13px', fontWeight: '600', color: 'var(--text-secondary)', marginBottom: '12px' }}>
-                {language === 'zh' ? '示例数据包含：' : 'Sample data includes:'}
-              </h4>
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-                {[
-                  { icon: '🤖', text: language === 'zh' ? '5个AI智能体' : '5 AI Agents' },
-                  { icon: '📁', text: language === 'zh' ? '3个项目' : '3 Projects' },
-                  { icon: '✅', text: language === 'zh' ? '多个已完成任务' : 'Several completed tasks' },
-                  { icon: '📋', text: language === 'zh' ? '预置需求池' : 'Pre-loaded requirements' },
-                ].map((item, i) => (
-                  <div key={i} style={{ display: 'flex', alignItems: 'center', gap: '10px', fontSize: '13px', color: 'var(--text-secondary)' }}>
-                    <span>{item.icon}</span>
-                    <span>{item.text}</span>
-                  </div>
-                ))}
-              </div>
-            </div>
-
-            <button
-              onClick={handleDemo}
-              disabled={isLoading}
-              style={{
-                width: '100%',
-                padding: '14px',
-                background: isLoading
-                  ? 'var(--bg-tertiary)'
-                  : 'linear-gradient(135deg, #8B5CF6, #3B82F6)',
-                border: 'none',
-                borderRadius: '12px',
-                color: isLoading ? 'var(--text-tertiary)' : '#fff',
-                fontSize: '14px',
-                fontWeight: '600',
-                cursor: isLoading ? 'not-allowed' : 'pointer',
-                transition: 'all 0.2s',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                gap: '8px',
-              }}
-            >
-              {isLoading ? (
-                <>
-                  <Loader2 size={16} className="animate-spin" />
-                  {language === 'zh' ? '加载中...' : 'Loading...'}
-                </>
-              ) : (
-                <>
-                  <Eye size={16} />
-                  {language === 'zh' ? '进入演示模式' : 'Enter Demo Mode'}
-                </>
-              )}
-            </button>
+          {/* Sample data info */}
+          <div style={{
+            marginTop: '16px',
+            padding: '14px',
+            background: 'rgba(52, 211, 153, 0.05)',
+            border: '1px solid rgba(52, 211, 153, 0.1)',
+            borderRadius: '12px',
+            display: 'flex',
+            alignItems: 'center',
+            gap: '10px'
+          }}>
+            <Eye size={16} style={{ color: '#34D399', flexShrink: 0 }} />
+            <span style={{ fontSize: '12px', color: '#71717A' }}>
+              {language === 'zh' 
+                ? '注册只需邮箱，用户名将自动生成' 
+                : 'Registration only needs email, username auto-generated'}
+            </span>
           </div>
-        )}
+        </div>
+
+        {/* Footer */}
+        <div style={{
+          padding: '16px 28px',
+          borderTop: '1px solid rgba(255, 255, 255, 0.05)',
+          textAlign: 'center'
+        }}>
+          <span style={{ fontSize: '12px', color: '#52525B' }}>
+            {language === 'zh' 
+              ? '点击"快速体验"即表示同意' 
+              : 'By clicking Quick Demo, you agree to our'}{' '}
+            <a href="#" style={{ color: '#6366F1', textDecoration: 'none' }}>
+              {language === 'zh' ? '服务条款' : 'Terms'}
+            </a>
+            {' '}&{' '}
+            <a href="#" style={{ color: '#6366F1', textDecoration: 'none' }}>
+              {language === 'zh' ? '隐私政策' : 'Privacy'}
+            </a>
+          </span>
+        </div>
       </div>
 
       <style>{`
@@ -487,10 +506,27 @@ export default function LoginModal({ isOpen, onClose }: LoginModalProps) {
           from { transform: rotate(0deg); }
           to { transform: rotate(360deg); }
         }
-        .animate-spin {
-          animation: spin 1s linear infinite;
-        }
       `}</style>
     </div>
+  )
+}
+
+// ChevronRight icon component
+function ChevronRightIcon({ className }: { className?: string }) {
+  return (
+    <svg 
+      className={className}
+      width="20" 
+      height="20" 
+      viewBox="0 0 24 24" 
+      fill="none" 
+      stroke="currentColor" 
+      strokeWidth="2" 
+      strokeLinecap="round" 
+      strokeLinejoin="round"
+      style={{ color: '#71717A' }}
+    >
+      <polyline points="9 18 15 12 9 6" />
+    </svg>
   )
 }
