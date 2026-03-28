@@ -11,6 +11,7 @@ import QuickStart from './pages/QuickStart'
 import UsageStats from './pages/UsageStats'
 import Resources from './pages/Resources'
 import Settings from './pages/Settings'
+import ProtectedRoute from './components/ProtectedRoute'
 // import Office3D from './pages/Office3D' // Temporarily disabled - requires @react-three/fiber
 import { AuthProvider } from './context/AuthContext'
 import { LanguageProvider } from './context/LanguageContext'
@@ -25,8 +26,15 @@ function App() {
           <DemoProvider>
             <BrowserRouter>
               <Routes>
+                {/* Public landing page */}
                 <Route path="/" element={<Landing />} />
-                <Route path="/dashboard" element={<Layout />}>
+                
+                {/* Protected routes - require login */}
+                <Route path="/dashboard" element={
+                  <ProtectedRoute>
+                    <Layout />
+                  </ProtectedRoute>
+                }>
                   <Route index element={<Dashboard />} />
                   <Route path="projects" element={<Projects />} />
                   <Route path="requirements" element={<Requirements />} />

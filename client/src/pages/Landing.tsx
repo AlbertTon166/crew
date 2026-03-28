@@ -53,7 +53,7 @@ export default function Landing() {
               <div className="w-10 h-10 bg-gradient-to-br from-indigo-500 to-purple-600 rounded-xl flex items-center justify-center">
                 <Bot className="w-6 h-6 text-white" />
               </div>
-              <span className="text-xl font-bold text-white">Crew</span>
+              <span className="text-xl font-bold text-white">CrewForce</span>
               <span className="text-xs text-slate-400 bg-slate-700/50 px-2 py-0.5 rounded">v0.3</span>
             </div>
             
@@ -129,7 +129,7 @@ export default function Landing() {
           </h1>
           
           <p className="text-lg md:text-xl text-slate-400 mb-10 max-w-2xl mx-auto">
-           Crew 是一个多智能体协作平台，让AI产品经理、架构师、开发者、测试员组成团队，
+           CrewForce 是一个多智能体协作平台，让AI产品经理、架构师、开发者、测试员组成团队，
             像管理人类团队一样管理AI，共同完成软件项目。
           </p>
 
@@ -160,7 +160,7 @@ export default function Landing() {
       <section id="features" className="py-20 px-4 bg-slate-800/50">
         <div className="max-w-6xl mx-auto">
           <div className="text-center mb-16">
-            <h2 className="text-3xl md:text-4xl font-bold text-white mb-4">为什么选择 Crew？</h2>
+            <h2 className="text-3xl md:text-4xl font-bold text-white mb-4">为什么选择 CrewForce？</h2>
             <p className="text-slate-400">强大的功能，简洁的体验</p>
           </div>
 
@@ -215,7 +215,7 @@ export default function Landing() {
             <div className="w-8 h-8 bg-gradient-to-br from-indigo-500 to-purple-600 rounded-lg flex items-center justify-center">
               <Bot className="w-5 h-5 text-white" />
             </div>
-            <span className="text-white font-medium">Crew</span>
+            <span className="text-white font-medium">CrewForce</span>
           </div>
           <div className="text-sm text-slate-400">
             © 2026 Crew. AI Agent Teams Orchestrator.

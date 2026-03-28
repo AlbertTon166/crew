@@ -43,39 +43,39 @@ interface SidebarProps {
 }
 
 const navItems = [
-  { path: '/', icon: LayoutDashboard, color: '#E879F9', cloudOnly: false },
-  { path: '/projects', icon: FolderKanban, color: '#22D3EE', cloudOnly: false },
-  { path: '/requirements', icon: MessageCircle, color: '#A78BFA', cloudOnly: false },
-  { path: '/agents', icon: Bot, color: '#34D399', cloudOnly: false },
-  { path: '/knowledge', icon: BookOpen, color: '#FBBF24', cloudOnly: false },
-  { path: '/api-keys', icon: Key, color: '#6366F1', cloudOnly: false },
-  { path: '/quickstart', icon: Rocket, color: '#F59E0B', cloudOnly: false },
-  { path: '/usage', icon: TrendingUp, color: '#34D399', cloudOnly: false },
-  { path: '/resources', icon: SettingsIcon, color: '#8B5CF6', cloudOnly: true },
+  { path: '/dashboard', icon: LayoutDashboard, color: '#E879F9', cloudOnly: false },
+  { path: '/dashboard/projects', icon: FolderKanban, color: '#22D3EE', cloudOnly: false },
+  { path: '/dashboard/requirements', icon: MessageCircle, color: '#A78BFA', cloudOnly: false },
+  { path: '/dashboard/agents', icon: Bot, color: '#34D399', cloudOnly: false },
+  { path: '/dashboard/knowledge', icon: BookOpen, color: '#FBBF24', cloudOnly: false },
+  { path: '/dashboard/api-keys', icon: Key, color: '#6366F1', cloudOnly: false },
+  { path: '/dashboard/quickstart', icon: Rocket, color: '#F59E0B', cloudOnly: false },
+  { path: '/dashboard/usage', icon: TrendingUp, color: '#34D399', cloudOnly: false },
+  { path: '/dashboard/resources', icon: SettingsIcon, color: '#8B5CF6', cloudOnly: true },
 ]
 
 const navLabels: Record<string, { en: string; zh: string }> = {
-  '/': { en: 'Workspace', zh: '工作区' },
-  '/projects': { en: 'Projects', zh: '项目' },
-  '/requirements': { en: 'Requirements', zh: '需求池' },
-  '/agents': { en: 'Agents', zh: '智能体' },
-  '/knowledge': { en: 'Knowledge', zh: '知识库' },
-  '/api-keys': { en: 'API Keys', zh: 'API密钥' },
-  '/quickstart': { en: 'Quick Start', zh: '快速上手' },
-  '/usage': { en: 'Usage Stats', zh: '使用统计' },
-  '/resources': { en: 'Resources', zh: '资源管理' },
+  '/dashboard': { en: 'Workspace', zh: '工作区' },
+  '/dashboard/projects': { en: 'Projects', zh: '项目' },
+  '/dashboard/requirements': { en: 'Requirements', zh: '需求池' },
+  '/dashboard/agents': { en: 'Agents', zh: '智能体' },
+  '/dashboard/knowledge': { en: 'Knowledge', zh: '知识库' },
+  '/dashboard/api-keys': { en: 'API Keys', zh: 'API密钥' },
+  '/dashboard/quickstart': { en: 'Quick Start', zh: '快速上手' },
+  '/dashboard/usage': { en: 'Usage Stats', zh: '使用统计' },
+  '/dashboard/resources': { en: 'Resources', zh: '资源管理' },
 }
 
 const navDescs: Record<string, { en: string; zh: string }> = {
-  '/': { en: 'Workspace overview', zh: '工作区概览' },
-  '/projects': { en: 'Manage projects', zh: '管理项目' },
-  '/requirements': { en: 'Requirement pool', zh: '需求池' },
-  '/agents': { en: 'AI agents', zh: 'AI智能体' },
-  '/knowledge': { en: 'Knowledge base', zh: '知识库' },
-  '/api-keys': { en: 'API keys management', zh: '管理AI模型密钥' },
-  '/quickstart': { en: 'Get started guide', zh: '5分钟快速上手' },
-  '/usage': { en: 'Token & cost analytics', zh: 'Token消耗与成本分析' },
-  '/resources': { en: 'Shared keys & server management', zh: '共享密钥与服务器管理' },
+  '/dashboard': { en: 'Workspace overview', zh: '工作区概览' },
+  '/dashboard/projects': { en: 'Manage projects', zh: '管理项目' },
+  '/dashboard/requirements': { en: 'Requirement pool', zh: '需求池' },
+  '/dashboard/agents': { en: 'AI agents', zh: 'AI智能体' },
+  '/dashboard/knowledge': { en: 'Knowledge base', zh: '知识库' },
+  '/dashboard/api-keys': { en: 'API keys management', zh: '管理AI模型密钥' },
+  '/dashboard/quickstart': { en: 'Get started guide', zh: '5分钟快速上手' },
+  '/dashboard/usage': { en: 'Token & cost analytics', zh: 'Token消耗与成本分析' },
+  '/dashboard/resources': { en: 'Shared keys & server management', zh: '共享密钥与服务器管理' },
 }
 
 export default function Sidebar({ isOpen = false, onClose }: SidebarProps) {
@@ -534,6 +534,55 @@ const [theme, setTheme] = useState<'dark' | 'light' | 'auto'>('dark')
               color: 'var(--text-tertiary)'
             }}>
               {language === 'en' ? 'Configure' : '配置'}
+            </div>
+          </div>
+        </button>
+
+        {/* Logout Button */}
+        <button 
+          onClick={() => {
+            logout()
+            navigate('/')
+          }}
+          style={{ 
+            width: '100%',
+            display: 'flex',
+            alignItems: 'center',
+            gap: '12px',
+            padding: '14px 16px',
+            borderRadius: '14px',
+            background: 'rgba(239, 68, 68, 0.1)',
+            border: '1px solid rgba(239, 68, 68, 0.3)',
+            cursor: 'pointer',
+            transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)'
+          }}
+          className="hover-lift"
+        >
+          <div style={{ 
+            width: '40px',
+            height: '40px',
+            borderRadius: '10px',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            background: 'rgba(239, 68, 68, 0.2)',
+            border: '1px solid rgba(239, 68, 68, 0.3)'
+          }}>
+            <LogOut size={18} style={{ color: '#EF4444' }} />
+          </div>
+          <div style={{ textAlign: 'left' }}>
+            <div style={{ 
+              fontSize: '13px', 
+              fontWeight: '500',
+              color: '#EF4444'
+            }}>
+              {language === 'en' ? 'Logout' : '退出登录'}
+            </div>
+            <div style={{ 
+              fontSize: '11px', 
+              color: 'rgba(239, 68, 68, 0.7)'
+            }}>
+              {user?.username || language === 'en' ? 'Sign out' : '退出当前账户'}
             </div>
           </div>
         </button>
