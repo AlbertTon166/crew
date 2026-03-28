@@ -1,14 +1,48 @@
 const API_BASE = import.meta.env.VITE_API_BASE || ''
+const REQUEST_TIMEOUT = 10000 // 10 seconds
+
+class NetworkError extends Error {
+  constructor(message: string) {
+    super(message)
+    this.name = 'NetworkError'
+  }
+}
+
+class TimeoutError extends Error {
+  constructor(message: string = 'Request timed out') {
+    super(message)
+    this.name = 'TimeoutError'
+  }
+}
 
 async function request(endpoint: string, options?: RequestInit) {
-  const res = await fetch(`${API_BASE}${endpoint}`, {
-    headers: { 'Content-Type': 'application/json' },
-    ...options,
-  })
-  const data = await res.json()
-  if (!res.ok) throw new Error(data.error || 'Request failed')
-  return data
+  const controller = new AbortController()
+  const timeoutId = setTimeout(() => controller.abort(), REQUEST_TIMEOUT)
+
+  try {
+    const res = await fetch(`${API_BASE}${endpoint}`, {
+      headers: { 'Content-Type': 'application/json' },
+      signal: controller.signal,
+      ...options,
+    })
+    clearTimeout(timeoutId)
+
+    const data = await res.json()
+    if (!res.ok) throw new Error(data.error || `Request failed (${res.status})`)
+    return data
+  } catch (err: any) {
+    clearTimeout(timeoutId)
+    if (err.name === 'AbortError') {
+      throw new TimeoutError('Request timed out after 10 seconds')
+    }
+    if (err instanceof TypeError && err.message.includes('fetch')) {
+      throw new NetworkError('Network connection failed. Please check your network.')
+    }
+    throw err
+  }
 }
+
+export { NetworkError, TimeoutError }
 
 export const api = {
   // Projects

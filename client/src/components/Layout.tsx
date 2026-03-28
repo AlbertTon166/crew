@@ -154,6 +154,21 @@ export default function Layout() {
         onClose={() => setSidebarOpen(false)} 
       />
 
+      {/* Mobile Overlay */}
+      {sidebarOpen && (
+        <div 
+          className="sidebar-overlay"
+          onClick={() => setSidebarOpen(false)}
+          style={{
+            position: 'fixed',
+            inset: 0,
+            background: 'rgba(0, 0, 0, 0.5)',
+            zIndex: 999,
+            display: 'none',
+          }}
+        />
+      )}
+
       {/* Main Content */}
       <main 
         style={{ 
@@ -410,6 +425,10 @@ export default function Layout() {
         @media (max-width: 768px) {
           .mobile-menu-btn {
             display: flex !important;
+          }
+          
+          .sidebar-overlay {
+            display: block !important;
           }
           
           .tour-btn {

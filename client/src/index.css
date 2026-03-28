@@ -695,13 +695,98 @@ h1, h2, h3, h4, h5, h6 {
   .main-content {
     margin-left: 0;
   }
-  
+
   .page-container {
     padding: var(--space-lg);
     padding-top: 80px;
   }
-  
+
   .hide-mobile {
     display: none !important;
   }
+}
+
+/* ==================== RESPONSIVE TABLE ==================== */
+.table-container {
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+  border-radius: var(--radius-lg);
+}
+
+.table-container table {
+  min-width: 600px;
+}
+
+@media (max-width: 768px) {
+  .table-container {
+    margin: 0 calc(var(--space-lg) * -1);
+    border-radius: 0;
+    padding: 0 var(--space-lg);
+  }
+}
+
+/* ==================== RESPONSIVE CARD GRID ==================== */
+@media (max-width: 640px) {
+  .card-grid {
+    grid-template-columns: 1fr !important;
+  }
+}
+
+/* ==================== SKELETON LOADING ==================== */
+.skeleton {
+  background: linear-gradient(
+    90deg,
+    var(--bg-tertiary) 25%,
+    var(--bg-secondary) 50%,
+    var(--bg-tertiary) 75%
+  );
+  background-size: 200% 100%;
+  animation: skeleton-loading 1.5s infinite;
+  border-radius: var(--radius-sm);
+}
+
+@keyframes skeleton-loading {
+  0% { background-position: 200% 0; }
+  100% { background-position: -200% 0; }
+}
+
+/* ==================== ERROR STATE ==================== */
+.error-state {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 60px 20px;
+  gap: 16px;
+  text-align: center;
+}
+
+.error-state-icon {
+  color: var(--error);
+}
+
+.error-state-message {
+  color: var(--text-secondary);
+  font-size: 14px;
+  max-width: 300px;
+}
+
+/* ==================== LOADING STATE ==================== */
+.loading-state {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 80px 20px;
+  gap: 16px;
+}
+
+.loading-spinner {
+  color: var(--primary);
+  animation: spin 1s linear infinite;
+}
+
+.loading-message {
+  color: var(--text-secondary);
+  font-size: 14px;
 }
