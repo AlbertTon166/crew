@@ -1,9 +1,8 @@
 import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { X, Lock, Mail, AlertCircle, Check, Sparkles, Eye, Loader2, User } from 'lucide-react'
+import { X, Lock, Mail, AlertCircle, Check, Sparkles, Loader2, User } from 'lucide-react'
 import { useAuth } from '../context/AuthContext'
 import { useLanguage } from '../context/LanguageContext'
-import { useDemo } from '../context/DemoContext'
 
 interface LoginModalProps {
   isOpen: boolean
@@ -12,9 +11,8 @@ interface LoginModalProps {
 
 export default function LoginModal({ isOpen, onClose }: LoginModalProps) {
   const navigate = useNavigate()
-  const { users, user: authUser, quickLogin, addUser, logout } = useAuth()
+  const { users, quickLogin, addUser } = useAuth()
   const { language } = useLanguage()
-  const { loadDemoData, clearDemoData, isDemoMode } = useDemo()
   
   const [formMode, setFormMode] = useState<'login' | 'register'>('register')
   const [email, setEmail] = useState('')
@@ -118,34 +116,6 @@ export default function LoginModal({ isOpen, onClose }: LoginModalProps) {
     setIsLoading(false)
   }
 
-  const handleDemo = async () => {
-    setIsLoading(true)
-    
-    const demoUser = {
-      id: 'demo_user',
-      username: 'demo_user',
-      email: 'demo@demo.local',
-      isAdmin: false,
-      createdAt: new Date().toISOString(),
-      isDemo: true,
-    }
-    
-    // Clear any existing user data first
-    logout() // This should clear auth_user
-    clearDemoData() // Clear any demo data
-    
-    // Set demo user
-    localStorage.setItem('auth_user', JSON.stringify(demoUser))
-    localStorage.setItem('auth_session_expiry', (Date.now() + 24 * 60 * 60 * 1000).toString())
-    
-    // Load demo data
-    await loadDemoData()
-    
-    setTimeout(() => {
-      onClose()
-      navigate('/dashboard')
-    }, 500)
-    
     setIsLoading(false)
   }
 
@@ -330,30 +300,6 @@ export default function LoginModal({ isOpen, onClose }: LoginModalProps) {
             </>
           )}
 
-          {/* Divider */}
-          <div style={{ display: 'flex', alignItems: 'center', gap: '16px', margin: '24px 0' }}>
-            <div style={{ flex: 1, height: '1px', background: 'rgba(255, 255, 255, 0.05)' }} />
-            <span style={{ color: '#52525B', fontSize: '12px' }}>OR</span>
-            <div style={{ flex: 1, height: '1px', background: 'rgba(255, 255, 255, 0.05)' }} />
-          </div>
-
-          {/* Demo Button */}
-          <button
-            onClick={handleDemo}
-            disabled={isLoading}
-            style={{
-              width: '100%', padding: '16px', borderRadius: '12px', border: '1px solid rgba(99, 102, 241, 0.3)',
-              background: 'rgba(99, 102, 241, 0.1)',
-              color: '#FAFAFA', fontSize: '14px', fontWeight: '600',
-              cursor: isLoading ? 'not-allowed' : 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px',
-            }}
-          >
-            {isLoading ? <Loader2 size={16} style={{ animation: 'spin 1s linear infinite' }} /> : <Eye size={16} />}
-            {language === 'zh' ? '体验 Demo（无需注册）' : 'Try Demo (No Registration)'}
-          </button>
-          <p style={{ textAlign: 'center', color: '#52525B', fontSize: '11px', marginTop: '8px' }}>
-            {language === 'zh' ? '浏览示例数据，体验完整功能' : 'Browse sample data, try all features'}
-          </p>
         </div>
       </div>
 
