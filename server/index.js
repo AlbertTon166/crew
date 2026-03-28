@@ -19,7 +19,79 @@ const db = {
   tasks: [],
   agents: [],
   requirements: [],
-  knowledge: []
+  knowledge: [],
+  workflows: [],
+  ragDocuments: [],
+  apiKeys: [],
+  usageRecords: []
+}
+
+// Initialize demo usage data
+function initUsageDemoData() {
+  const now = new Date()
+  const days = 7
+  
+  // Generate daily usage records
+  for (let i = 0; i < days; i++) {
+    const date = new Date(now)
+    date.setDate(date.getDate() - i)
+    const dateStr = date.toISOString().split('T')[0]
+    
+    const tokens = Math.floor(Math.random() * 100000) + 50000
+    const cost = tokens * 0.00001 // $0.00001 per token
+    
+    db.usageRecords.push({
+      id: uuidv4(),
+      date: dateStr,
+      tokens,
+      cost,
+      agentId: db.agents[i % db.agents.length]?.id || null,
+      projectId: db.projects[i % db.projects.length]?.id || null,
+    })
+  }
+  
+  console.log('✅ Usage demo data initialized')
+}
+
+// Initialize API keys demo data
+function initApiKeysDemoData() {
+  db.apiKeys = [
+    {
+      id: uuidv4(),
+      name: 'Production OpenAI',
+      key: 'sk-proj-' + uuidv4().replace(/-/g, '').substring(0, 32),
+      prefix: 'sk-proj-xxx',
+      provider: 'openai',
+      model: 'gpt-4',
+      status: 'active',
+      createdAt: new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString(),
+      lastUsed: new Date(Date.now() - 2 * 60 * 60 * 1000).toISOString(),
+    },
+    {
+      id: uuidv4(),
+      name: 'Development Anthropic',
+      key: 'sk-ant-' + uuidv4().replace(/-/g, '').substring(0, 32),
+      prefix: 'sk-ant-xxx',
+      provider: 'anthropic',
+      model: 'claude-3-opus',
+      status: 'active',
+      createdAt: new Date(Date.now() - 15 * 24 * 60 * 60 * 1000).toISOString(),
+      lastUsed: new Date(Date.now() - 1 * 24 * 60 * 60 * 1000).toISOString(),
+    },
+    {
+      id: uuidv4(),
+      name: 'DeepSeek API',
+      key: 'sk-dd-' + uuidv4().replace(/-/g, '').substring(0, 32),
+      prefix: 'sk-dd-xxx',
+      provider: 'deepseek',
+      model: 'deepseek-chat',
+      status: 'revoked',
+      createdAt: new Date(Date.now() - 60 * 24 * 60 * 60 * 1000).toISOString(),
+      lastUsed: null,
+    },
+  ]
+  
+  console.log('✅ API keys demo data initialized')
 }
 
 // Initialize with demo data
@@ -59,6 +131,8 @@ function initDemoData() {
 }
 
 initDemoData()
+initUsageDemoData()
+initApiKeysDemoData()
 
 // Health check
 app.get('/api/health', (req, res) => {
@@ -661,6 +735,184 @@ app.get('/api/team-templates', (req, res) => {
     { id: 2, name: '中团队', roles: ['architect', 'coder', 'reviewer', 'tester'], description: '4-5人完整团队' },
     { id: 3, name: '大团队', roles: ['architect', 'pm', 'coder', 'reviewer', 'tester', 'devops'], description: '6人以上专业团队' },
   ])
+})
+
+// ==================== Usage Stats APIs (Phase 4) ====================
+
+// GET /api/usage/stats - Get total usage statistics
+app.get('/api/usage/stats', (req, res) => {
+  const totalTokens = db.usageRecords.reduce((sum, r) => sum + r.tokens, 0)
+  const totalCost = db.usageRecords.reduce((sum, r) => sum + r.cost, 0)
+  
+  // Calculate daily usage
+  const dailyMap = new Map()
+  db.usageRecords.forEach(r => {
+    const existing = dailyMap.get(r.date) || { date: r.date, tokens: 0, cost: 0 }
+    existing.tokens += r.tokens
+    existing.cost += r.cost
+    dailyMap.set(r.date, existing)
+  })
+  const dailyUsage = Array.from(dailyMap.values()).sort((a, b) => b.date.localeCompare(a.date))
+  
+  // Calculate project stats
+  const projectMap = new Map()
+  db.usageRecords.forEach(r => {
+    if (!r.projectId) return
+    const project = db.projects.find(p => p.id === r.projectId)
+    if (!project) return
+    const existing = projectMap.get(r.projectId) || { 
+      projectId: r.projectId, 
+      projectName: project.name, 
+      tasks: 0, 
+      tokens: 0, 
+      cost: 0 
+    }
+    existing.tokens += r.tokens
+    existing.cost += r.cost
+    existing.tasks += 1
+    projectMap.set(r.projectId, existing)
+  })
+  const projectStats = Array.from(projectMap.values())
+  
+  res.json({
+    success: true,
+    data: {
+      totalTokens,
+      totalCost,
+      agentUsage: [], // populated by /api/usage/agents
+      dailyUsage,
+      projectStats,
+    }
+  })
+})
+
+// GET /api/usage/agents - Get agent usage statistics
+app.get('/api/usage/agents', (req, res) => {
+  const agentMap = new Map()
+  
+  db.usageRecords.forEach(r => {
+    if (!r.agentId) return
+    const agent = db.agents.find(a => a.id === r.agentId)
+    if (!agent) return
+    const existing = agentMap.get(r.agentId) || {
+      agentId: r.agentId,
+      agentName: agent.name,
+      tokenUsage: 0,
+      cost: 0,
+    }
+    existing.tokenUsage += r.tokens
+    existing.cost += r.cost
+    agentMap.set(r.agentId, existing)
+  })
+  
+  const agentUsage = Array.from(agentMap.values())
+  
+  res.json({ success: true, data: agentUsage })
+})
+
+// GET /api/usage/costs - Get cost statistics
+app.get('/api/usage/costs', (req, res) => {
+  const totalCost = db.usageRecords.reduce((sum, r) => sum + r.cost, 0)
+  
+  // Cost by provider
+  const providerMap = new Map()
+  db.apiKeys.forEach(key => {
+    if (key.status !== 'active') return
+    const existing = providerMap.get(key.provider) || { provider: key.provider, cost: 0, keys: 0 }
+    existing.keys += 1
+    // Simulated cost distribution
+    const randomCost = Math.random() * 10
+    existing.cost += randomCost
+    providerMap.set(key.provider, existing)
+  })
+  
+  // Cost by day
+  const dailyMap = new Map()
+  db.usageRecords.forEach(r => {
+    const existing = dailyMap.get(r.date) || { date: r.date, cost: 0 }
+    existing.cost += r.cost
+    dailyMap.set(r.date, existing)
+  })
+  
+  const costsByDay = Array.from(dailyMap.values()).sort((a, b) => b.date.localeCompare(a.date))
+  const costsByProvider = Array.from(providerMap.values())
+  
+  res.json({
+    success: true,
+    data: {
+      totalCost,
+      costsByDay,
+      costsByProvider,
+    }
+  })
+})
+
+// ==================== API Keys APIs (Phase 4) ====================
+
+// POST /api/api-keys - Create a new API key
+app.post('/api/api-keys', (req, res) => {
+  const { name, provider, model } = req.body
+  
+  if (!name || !provider) {
+    return res.status(400).json({ success: false, error: 'name and provider are required' })
+  }
+  
+  const validProviders = ['openai', 'anthropic', 'deepseek']
+  if (!validProviders.includes(provider)) {
+    return res.status(400).json({
+      success: false,
+      error: `Invalid provider. Must be one of: ${validProviders.join(', ')}`
+    })
+  }
+  
+  const id = uuidv4()
+  const prefix = `sk-${provider.substring(0, 3)}-`
+  const randomPart = uuidv4().replace(/-/g, '').substring(0, 24)
+  const fullKey = prefix + randomPart
+  
+  const now = new Date().toISOString()
+  const apiKey = {
+    id,
+    name,
+    key: fullKey, // Only returned on creation
+    prefix: prefix + 'xxx',
+    provider,
+    model: model || 'default',
+    status: 'active',
+    createdAt: now,
+    lastUsed: null,
+  }
+  
+  db.apiKeys.push(apiKey)
+  res.status(201).json({ success: true, data: apiKey })
+})
+
+// GET /api/api-keys - Get API key list (without full keys)
+app.get('/api/api-keys', (req, res) => {
+  const keysWithoutSecrets = db.apiKeys.map(k => ({
+    id: k.id,
+    name: k.name,
+    key: k.key, // Frontend should only display k.key (which is the masked version from storage)
+    prefix: k.prefix,
+    provider: k.provider,
+    model: k.model,
+    status: k.status,
+    createdAt: k.createdAt,
+    lastUsed: k.lastUsed,
+  }))
+  
+  res.json({ success: true, data: keysWithoutSecrets })
+})
+
+// DELETE /api/api-keys/:id - Delete an API key
+app.delete('/api/api-keys/:id', (req, res) => {
+  const index = db.apiKeys.findIndex(k => k.id === req.params.id)
+  if (index === -1) {
+    return res.status(404).json({ success: false, error: 'API key not found' })
+  }
+  
+  db.apiKeys.splice(index, 1)
+  res.json({ success: true, data: { message: 'API key deleted successfully' } })
 })
 
 // ==================== Demo APIs ====================
