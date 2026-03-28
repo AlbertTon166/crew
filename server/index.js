@@ -359,11 +359,6 @@ app.get('/api/demo/roles', (req, res) => {
     ]
   })
 })
-      { role: 'reviewer', agent_count: 1, agents: 'Review Agent' },
-      { role: 'tester', agent_count: 1, agents: 'Test Agent' },
-    ]
-  })
-})
 
 // Start server
 app.listen(PORT, () => {
