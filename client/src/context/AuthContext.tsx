@@ -5,6 +5,7 @@ import { mockUsers, mockTokens } from '../types/auth'
 interface AuthContextType {
   user: User | null
   isAuthenticated: boolean
+  isInitialized: boolean
   isAdmin: boolean
   tokens: AuthToken[]
   login: (credentials: LoginCredentials, remember?: boolean) => { success: boolean; error?: string }
@@ -83,6 +84,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [tokens, setTokens] = useState<AuthToken[]>(mockTokens)
   const [auditLogs, setAuditLogs] = useState<AuditLog[]>([])
   const [loginAttempts, setLoginAttempts] = useState<Record<string, LoginAttempt>>({})
+  const [isInitialized, setIsInitialized] = useState(false)
 
   // Load from localStorage on mount
   useEffect(() => {
@@ -131,6 +133,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         console.error('Failed to parse audit logs', e)
       }
     }
+    setIsInitialized(true)
   }, [])
 
   // Save to localStorage when state changes
@@ -380,6 +383,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       value={{
         user,
         isAuthenticated: !!user,
+        isInitialized,
         isAdmin: user?.isAdmin || false,
         tokens,
         login,

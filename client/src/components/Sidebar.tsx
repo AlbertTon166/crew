@@ -248,7 +248,7 @@ const [theme, setTheme] = useState<'dark' | 'light' | 'auto'>('dark')
             WebkitBackgroundClip: 'text',
             WebkitTextFillColor: 'transparent',
             backgroundClip: 'text',
-          }}>Crew</h1>
+          }}>CrewForce</h1>
           <p style={{ 
             fontSize: '10px', 
             color: 'var(--text-tertiary)',
@@ -257,7 +257,7 @@ const [theme, setTheme] = useState<'dark' | 'light' | 'auto'>('dark')
             whiteSpace: 'nowrap',
             overflow: 'hidden',
             textOverflow: 'ellipsis'
-          }}>Agent Teams Orchestrator</p>
+          }}>AI Agent Teams</p>
         </div>
       </div>
 

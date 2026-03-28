@@ -1,4 +1,3 @@
-import { useEffect } from 'react'
 import { Navigate } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext'
 
@@ -7,9 +6,14 @@ interface ProtectedRouteProps {
 }
 
 export default function ProtectedRoute({ children }: ProtectedRouteProps) {
-  const { isAuthenticated, user } = useAuth()
+  const { isAuthenticated, isInitialized } = useAuth()
 
-  if (!isAuthenticated || !user) {
+  // Wait for auth to be initialized before redirecting
+  if (!isInitialized) {
+    return null // or a loading spinner
+  }
+
+  if (!isAuthenticated) {
     return <Navigate to="/" replace />
   }
 

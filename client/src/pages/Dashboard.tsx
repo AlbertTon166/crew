@@ -185,6 +185,11 @@ export default function Dashboard() {
   const { language } = useLanguage()
   const { agents, stats, projects, resources, setAgents } = useDashboardStore()
   const { isConnected } = useDeployMode()
+  
+  // Compute stats from actual data
+  const activeAgents = agents.filter(a => a.status === 'online' || a.status === 'busy').length
+  const totalTasks = Object.values({}).length // No tasks in store yet
+  const pendingTasks = projects.filter(p => p.status === 'pending' || p.status === 'in_progress').length
 
   // Quick actions handler
   const quickActions = [
@@ -267,10 +272,10 @@ export default function Dashboard() {
           {/* Stats Row */}
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '12px' }}>
             {[
-              { icon: <Bot size={18} />, value: mockStats.activeAgents, label: language === 'zh' ? '活跃智能体' : 'Active Agents', color: '#34D399' },
-              { icon: <CheckCircle size={18} />, value: mockStats.completedToday, label: language === 'zh' ? '今日完成' : 'Done Today', color: '#3B82F6' },
-              { icon: <Clock size={18} />, value: mockStats.pendingTasks, label: language === 'zh' ? '待处理任务' : 'Pending Tasks', color: '#F59E0B' },
-              { icon: <Coins size={18} />, value: `$${mockStats.todayCost.toFixed(2)}`, label: language === 'zh' ? '今日消耗' : "Today's Cost", color: '#8B5CF6' },
+              { icon: <Bot size={18} />, value: activeAgents, label: language === 'zh' ? '活跃智能体' : 'Active Agents', color: '#34D399' },
+              { icon: <CheckCircle size={18} />, value: stats.completed || 0, label: language === 'zh' ? '已完成' : 'Completed', color: '#3B82F6' },
+              { icon: <Clock size={18} />, value: pendingTasks, label: language === 'zh' ? '进行中' : 'In Progress', color: '#F59E0B' },
+              { icon: <Folder size={18} />, value: stats.totalProjects || projects.length, label: language === 'zh' ? '项目总数' : 'Projects', color: '#8B5CF6' },
             ].map((stat, i) => (
               <div key={i} style={{
                 background: 'var(--bg-secondary)',
@@ -400,7 +405,7 @@ export default function Dashboard() {
           <div style={{ display: 'flex', gap: '8px', marginBottom: '16px' }}>
             {(['online', 'busy', 'idle', 'thinking'] as const).map(status => {
               const cfg = agentStatusConfig[status]
-              const count = mockAgents.filter(a => a.status === status).length
+              const count = agents.filter(a => a.status === status).length
               return (
                 <div key={status} style={{
                   flex: 1,
@@ -429,7 +434,7 @@ export default function Dashboard() {
           
           {/* Agent list */}
           <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-            {mockAgents.slice(0, 5).map(agent => (
+            {agents.slice(0, 5).map(agent => (
               <AgentMiniCard key={agent.id} agent={agent} language={language} />
             ))}
           </div>
