@@ -18,6 +18,7 @@ const db = {
   projects: [],
   tasks: [],
   agents: [],
+  requirements: [],
   knowledge: []
 }
 
@@ -407,77 +408,230 @@ app.put('/api/agents/:id/status', (req, res) => {
   res.json({ success: true, data: db.agents[index] })
 })
 
-// ==================== Knowledge APIs ====================
+// ==================== Knowledge APIs (Phase 1) ====================
 
+// GET /api/knowledge - List all knowledge entries
 app.get('/api/knowledge', (req, res) => {
-  res.json(db.knowledge)
+  const { category } = req.query
+  if (category) {
+    return res.json({ success: true, data: db.knowledge.filter(k => k.category === category) })
+  }
+  res.json({ success: true, data: db.knowledge })
 })
 
+// POST /api/knowledge - Create a new knowledge entry
 app.post('/api/knowledge', (req, res) => {
-  const item = {
-    id: uuidv4(),
-    title: req.body.title,
-    content: req.body.content,
-    created_at: new Date().toISOString()
-  }
-  db.knowledge.push(item)
-  res.json(item)
-})
-
-// ==================== Requirements APIs (Routes to PM Agent) ====================
-
-// Get PM agent
-app.get('/api/pm-agent', (req, res) => {
-  const pmAgent = db.agents.find(a => a.role === 'pm' && a.enabled)
-  if (!pmAgent) {
-    return res.status(404).json({ error: 'Product Manager agent not found or disabled' })
-  }
-  res.json(pmAgent)
-})
-
-// Send requirement to PM agent for processing
-app.post('/api/requirements', (req, res) => {
-  const { content, project_id } = req.body
+  const { title, content, category, tags } = req.body
   
-  // Find enabled PM agent
-  const pmAgent = db.agents.find(a => a.role === 'pm' && a.enabled)
-  if (!pmAgent) {
-    return res.status(503).json({ 
-      error: 'Product Manager agent not available',
-      message: '产品经理智能体未连接'
+  if (!title || !content) {
+    return res.status(400).json({ success: false, error: 'title and content are required' })
+  }
+  
+  const validCategories = ['role', 'skill', 'workflow', 'other']
+  if (category && !validCategories.includes(category)) {
+    return res.status(400).json({ 
+      success: false, 
+      error: `Invalid category. Must be one of: ${validCategories.join(', ')}` 
     })
   }
   
-  // Create requirement record
-  const requirement = {
+  const now = new Date().toISOString()
+  const knowledge = {
     id: uuidv4(),
+    title,
     content,
-    project_id: project_id || null,
-    status: 'pending',
-    assigned_agent_id: pmAgent.id,
-    created_at: new Date().toISOString()
+    category: category || 'other',
+    tags: tags || [],
+    createdAt: now,
+    updatedAt: now
   }
   
-  // In a real implementation, this would queue the requirement for the PM agent to process
-  // For now, we just acknowledge receipt
-  res.json({
-    requirement,
-    pm_agent: pmAgent,
-    message: `需求已发送给产品经理智能体: ${pmAgent.name}`
-  })
+  db.knowledge.push(knowledge)
+  res.status(201).json({ success: true, data: knowledge })
 })
 
-// Get requirements for a project
+// GET /api/knowledge/:id - Get knowledge details
+app.get('/api/knowledge/:id', (req, res) => {
+  const knowledge = db.knowledge.find(k => k.id === req.params.id)
+  if (!knowledge) {
+    return res.status(404).json({ success: false, error: 'Knowledge not found' })
+  }
+  
+  res.json({ success: true, data: knowledge })
+})
+
+// PUT /api/knowledge/:id - Update knowledge
+app.put('/api/knowledge/:id', (req, res) => {
+  const index = db.knowledge.findIndex(k => k.id === req.params.id)
+  if (index === -1) {
+    return res.status(404).json({ success: false, error: 'Knowledge not found' })
+  }
+  
+  const { title, content, category, tags } = req.body
+  const knowledge = db.knowledge[index]
+  
+  if (title !== undefined) knowledge.title = title
+  if (content !== undefined) knowledge.content = content
+  if (category !== undefined) knowledge.category = category
+  if (tags !== undefined) knowledge.tags = tags
+  knowledge.updatedAt = new Date().toISOString()
+  
+  res.json({ success: true, data: knowledge })
+})
+
+// DELETE /api/knowledge/:id - Delete knowledge
+app.delete('/api/knowledge/:id', (req, res) => {
+  const index = db.knowledge.findIndex(k => k.id === req.params.id)
+  if (index === -1) {
+    return res.status(404).json({ success: false, error: 'Knowledge not found' })
+  }
+  
+  db.knowledge.splice(index, 1)
+  res.json({ success: true, data: { message: 'Knowledge deleted successfully' } })
+})
+
+// GET /api/knowledge/search?q= - Search knowledge
+app.get('/api/knowledge/search', (req, res) => {
+  const { q, category } = req.query
+  
+  if (!q) {
+    return res.status(400).json({ success: false, error: 'Search query q is required' })
+  }
+  
+  let results = db.knowledge.filter(k => 
+    k.title.toLowerCase().includes(q.toLowerCase()) ||
+    k.content.toLowerCase().includes(q.toLowerCase()) ||
+    k.tags.some(tag => tag.toLowerCase().includes(q.toLowerCase()))
+  )
+  
+  if (category) {
+    results = results.filter(k => k.category === category)
+  }
+  
+  res.json({ success: true, data: results })
+})
+
+// ==================== Requirements APIs (Phase 1) ====================
+
+// GET /api/requirements - List all requirements
 app.get('/api/requirements', (req, res) => {
-  const { project_id } = req.query
-  // In a real implementation, this would fetch from a requirements table
-  // For demo, return empty array
-  res.json([])
+  const { projectId, status } = req.query
+  let results = db.requirements
+  
+  if (projectId) {
+    results = results.filter(r => r.projectId === projectId)
+  }
+  if (status) {
+    results = results.filter(r => r.status === status)
+  }
+  
+  res.json({ success: true, data: results })
 })
 
-// Update requirement status
+// POST /api/requirements - Create a new requirement
+app.post('/api/requirements', (req, res) => {
+  const { projectId, title, description, priority } = req.body
+  
+  if (!projectId || !title) {
+    return res.status(400).json({ success: false, error: 'projectId and title are required' })
+  }
+  
+  // Verify project exists
+  const project = db.projects.find(p => p.id === projectId)
+  if (!project) {
+    return res.status(404).json({ success: false, error: 'Project not found' })
+  }
+  
+  const now = new Date().toISOString()
+  const requirement = {
+    id: uuidv4(),
+    projectId,
+    title,
+    description: description || '',
+    status: 'pending',
+    priority: priority || 'medium',
+    createdAt: now,
+    updatedAt: now
+  }
+  
+  db.requirements.push(requirement)
+  res.status(201).json({ success: true, data: requirement })
+})
+
+// GET /api/requirements/:id - Get requirement details
+app.get('/api/requirements/:id', (req, res) => {
+  const requirement = db.requirements.find(r => r.id === req.params.id)
+  if (!requirement) {
+    return res.status(404).json({ success: false, error: 'Requirement not found' })
+  }
+  
+  res.json({ success: true, data: requirement })
+})
+
+// PUT /api/requirements/:id - Update requirement
 app.put('/api/requirements/:id', (req, res) => {
-  res.json({ message: 'Requirement updated' })
+  const index = db.requirements.findIndex(r => r.id === req.params.id)
+  if (index === -1) {
+    return res.status(404).json({ success: false, error: 'Requirement not found' })
+  }
+  
+  const { title, description, status, priority, projectId } = req.body
+  const requirement = db.requirements[index]
+  
+  if (title !== undefined) requirement.title = title
+  if (description !== undefined) requirement.description = description
+  if (status !== undefined) requirement.status = status
+  if (priority !== undefined) requirement.priority = priority
+  if (projectId !== undefined) requirement.projectId = projectId
+  requirement.updatedAt = new Date().toISOString()
+  
+  res.json({ success: true, data: requirement })
+})
+
+// DELETE /api/requirements/:id - Delete requirement
+app.delete('/api/requirements/:id', (req, res) => {
+  const index = db.requirements.findIndex(r => r.id === req.params.id)
+  if (index === -1) {
+    return res.status(404).json({ success: false, error: 'Requirement not found' })
+  }
+  
+  db.requirements.splice(index, 1)
+  res.json({ success: true, data: { message: 'Requirement deleted successfully' } })
+})
+
+// POST /api/requirements/:id/analyze - AI analyze requirement (mock)
+app.post('/api/requirements/:id/analyze', (req, res) => {
+  const requirement = db.requirements.find(r => r.id === req.params.id)
+  if (!requirement) {
+    return res.status(404).json({ success: false, error: 'Requirement not found' })
+  }
+  
+  // Mock AI analysis result
+  const analysisResult = {
+    requirementId: requirement.id,
+    summary: `需求「${requirement.title}」分析完成`,
+    suggestedTasks: [
+      { title: '技术方案设计', description: '为该需求设计技术实现方案', priority: 'high' },
+      { title: '功能开发', description: '实现需求核心功能', priority: 'high' },
+      { title: '测试验证', description: '编写测试用例并验证', priority: 'medium' }
+    ],
+    estimatedComplexity: 'medium',
+    suggestedAgents: ['architect', 'coder'],
+    risks: ['可能涉及多方系统对接', '需要考虑性能优化'],
+    recommendations: [
+      '建议先完成技术方案评审',
+      '注意与现有系统的兼容性',
+      '建议分阶段交付'
+    ],
+    analyzedAt: new Date().toISOString()
+  }
+  
+  // Update requirement status to analyzed
+  const index = db.requirements.findIndex(r => r.id === req.params.id)
+  db.requirements[index].status = 'analyzed'
+  db.requirements[index].updatedAt = new Date().toISOString()
+  
+  res.json({ success: true, data: analysisResult })
 })
 
 // ==================== Dashboard Stats ====================
