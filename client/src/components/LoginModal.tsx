@@ -12,11 +12,10 @@ interface LoginModalProps {
 
 export default function LoginModal({ isOpen, onClose }: LoginModalProps) {
   const navigate = useNavigate()
-  const { users } = useAuth()
+  const { users, user: authUser, login, logout } = useAuth()
   const { language } = useLanguage()
-  const { loadDemoData, isDemoMode } = useDemo()
+  const { loadDemoData, clearDemoData, isDemoMode } = useDemo()
   
-  // 'register' or 'login' - demo is always available as a big button
   const [formMode, setFormMode] = useState<'login' | 'register'>('register')
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
@@ -41,7 +40,8 @@ export default function LoginModal({ isOpen, onClose }: LoginModalProps) {
       setIsLoading(false)
       return
     }
-
+    
+    // Find user by email
     const foundUser = users.find(u => u.email === email.trim().toLowerCase())
     
     if (!foundUser) {
@@ -52,15 +52,19 @@ export default function LoginModal({ isOpen, onClose }: LoginModalProps) {
 
     await new Promise(resolve => setTimeout(resolve, 500))
     
-    localStorage.setItem('auth_user', JSON.stringify(foundUser))
-    localStorage.setItem('auth_session_expiry', (Date.now() + 30 * 24 * 60 * 60 * 1000).toString())
+    // Use AuthContext.login to properly set user state
+    const result = login({ username: foundUser.username, password: '' }, true)
     
-    setSuccess(language === 'zh' ? '登录成功！' : 'Login successful!')
-    
-    setTimeout(() => {
-      onClose()
-      navigate('/dashboard')
-    }, 500)
+    if (result.success) {
+      setSuccess(language === 'zh' ? '登录成功！' : 'Login successful!')
+      setTimeout(() => {
+        clearDemoData() // Clear any demo data
+        onClose()
+        navigate('/dashboard')
+      }, 500)
+    } else {
+      setError(result.error || (language === 'zh' ? '登录失败' : 'Login failed'))
+    }
     
     setIsLoading(false)
   }
@@ -103,17 +107,23 @@ export default function LoginModal({ isOpen, onClose }: LoginModalProps) {
       createdAt: new Date().toISOString(),
     }
     
+    // Add user to AuthContext users
     const updatedUsers = [...users, newUser]
     localStorage.setItem('auth_users', JSON.stringify(updatedUsers))
-    localStorage.setItem('auth_user', JSON.stringify(newUser))
-    localStorage.setItem('auth_session_expiry', (Date.now() + 30 * 24 * 60 * 60 * 1000).toString())
     
-    setSuccess(language === 'zh' ? '注册成功！正在进入...' : 'Registered successfully! Entering...')
+    // Use AuthContext.login to properly set user state
+    const result = login({ username, password: '' }, true)
     
-    setTimeout(() => {
-      onClose()
-      navigate('/dashboard')
-    }, 500)
+    if (result.success) {
+      setSuccess(language === 'zh' ? '注册成功！正在进入...' : 'Registered successfully! Entering...')
+      setTimeout(() => {
+        clearDemoData()
+        onClose()
+        navigate('/dashboard')
+      }, 500)
+    } else {
+      setError(result.error || (language === 'zh' ? '注册失败' : 'Registration failed'))
+    }
     
     setIsLoading(false)
   }
@@ -130,10 +140,15 @@ export default function LoginModal({ isOpen, onClose }: LoginModalProps) {
       isDemo: true,
     }
     
+    // Clear any existing user data first
+    logout() // This should clear auth_user
+    clearDemoData() // Clear any demo data
+    
+    // Set demo user
     localStorage.setItem('auth_user', JSON.stringify(demoUser))
     localStorage.setItem('auth_session_expiry', (Date.now() + 24 * 60 * 60 * 1000).toString())
     
-    // Load demo data from the demo API
+    // Load demo data
     await loadDemoData()
     
     setTimeout(() => {

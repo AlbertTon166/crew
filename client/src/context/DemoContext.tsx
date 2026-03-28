@@ -80,6 +80,16 @@ export function DemoProvider({ children }: { children: ReactNode }) {
     setError(null)
     setAgents([])
     setProjects([])
+    
+    // Also clear demo user from localStorage if it exists
+    const authUser = localStorage.getItem('auth_user')
+    if (authUser) {
+      const user = JSON.parse(authUser)
+      if (user?.isDemo) {
+        localStorage.removeItem('auth_user')
+        localStorage.removeItem('auth_session_expiry')
+      }
+    }
   }
 
   return (

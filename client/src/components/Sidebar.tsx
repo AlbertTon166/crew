@@ -35,6 +35,7 @@ import { useDashboardStore } from '../stores/dashboardStore'
 import { useLanguage } from '../context/LanguageContext'
 import { useDeployMode } from '../context/DeployModeContext'
 import { useAuth } from '../context/AuthContext'
+import { useDemo } from '../context/DemoContext'
 
 interface SidebarProps {
   isOpen?: boolean
@@ -84,6 +85,7 @@ export default function Sidebar({ isOpen = false, onClose }: SidebarProps) {
   const navigate = useNavigate()
   const { mode } = useDeployMode()
   const { user, isAuthenticated, isAdmin, logout, tokens, generateToken, revokeToken, setPassword, users, deleteUser, auditLogs } = useAuth()
+  const { clearDemoData } = useDemo()
   
 const [theme, setTheme] = useState<'dark' | 'light' | 'auto'>('dark')
   const [accentColor, setAccentColor] = useState('#E879F9')
@@ -543,7 +545,10 @@ const [theme, setTheme] = useState<'dark' | 'light' | 'auto'>('dark')
           /* Demo Mode: Show register button */
           <button 
             onClick={() => {
+              logout() // Clear auth state
+              clearDemoData() // Clear demo data
               navigate('/')
+              window.location.reload() // Reload to reset all state
             }}
             style={{ 
               width: '100%',
