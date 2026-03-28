@@ -3,22 +3,21 @@ import {
   Send, CheckCircle, XCircle, Loader2, Filter, FolderKanban, 
   FileText, ClipboardCheck, WifiOff, AlertCircle, MessageSquare,
   ChevronRight, Sparkles, Clock, User, Target, Scale, Calendar,
-  ArrowRight, RefreshCw, Check, X, AlertTriangle
+  ArrowRight, RefreshCw, Check, X, AlertTriangle, Plus, Trash2
 } from 'lucide-react'
 import { useDashboardStore } from '../stores/dashboardStore'
 import { useLanguage } from '../context/LanguageContext'
 import { useDeployMode } from '../context/DeployModeContext'
+import { api } from '../lib/api'
 
-// Requirement interface
+// Requirement interface (from API)
 interface Requirement {
   id: string
   projectId: string
-  content: string
-  contentZh: string
-  status: 'pending' | 'clarifying' | 'confirmed' | 'rejected' | 'draft'
-  source: 'user' | 'pm'
-  rounds: number
-  confirmations: ConfirmationBlock[]
+  title: string
+  description: string
+  status: 'pending' | 'clarifying' | 'confirmed' | 'rejected' | 'draft' | string
+  priority: 'low' | 'medium' | 'high' | 'P0' | 'P1' | 'P2' | 'P3'
   createdAt: string
   updatedAt: string
 }
@@ -32,18 +31,6 @@ interface Project {
   status: string
   createdAt: string
   updatedAt: string
-}
-
-// PM structured confirmation block
-interface ConfirmationBlock {
-  id: string
-  type: 'context' | 'clarification' | 'missing_info' | 'confirmation' | 'final'
-  question: string
-  questionZh: string
-  options?: string[]
-  optionsZh?: string[]
-  answer?: string
-  answerZh?: string
 }
 
 // Status config
@@ -63,299 +50,33 @@ const statusConfigZh = {
   draft: { label: '草稿', color: '#94A3B8', bg: 'rgba(148, 163, 184, 0.12)', icon: FileText },
 }
 
-// PM Agent persona
-const pmPrompt = {
-  welcome: {
-    en: "Hi! I'm your PM Agent. To confirm your requirement efficiently, I follow a 3-round process. Please describe what you need.",
-    zh: "你好！我是 PM Agent。为了高效确认需求，我会遵循3轮对话流程。请描述你的需求。"
-  },
-  phase1: {
-    question: {
-      en: "Got it! To understand better, please tell me:\n1. **What problem** does this solve?\n2. **Which systems/roles** are involved?\n3. **Any reference cases or constraints**?",
-      zh: "收到！为了更好理解，请告诉我：\n1. 这个需求**解决什么问题**？\n2. **涉及哪些系统/角色**？\n3. 有无**参考案例或约束条件**？"
-    }
-  },
-  phase2: {
-    intro: {
-      en: "My understanding so far:",
-      zh: "目前我的理解是："
-    },
-    confirmPrompt: {
-      en: "Please confirm or correct:\n• **Goal**: [summary]\n• **Scope**: [in/out]\n• **Priority**: [P0/P1/P2]\n• **Deadline**: [date or TBD]",
-      zh: "请确认或纠正：\n• **目标**：[摘要]\n• **范围**：[做什么/不做什么]\n• **优先级**：[P0/P1/P2]\n• **截止时间**：[日期或待定]"
-    }
-  },
-  phase3: {
-    missing: {
-      en: "To proceed, I need:\n□ [Missing info 1]\n□ [Missing info 2]\n\nPlease fill in, or tell me which can be added later.",
-      zh: "还缺以下信息才能排期：\n□ [缺失项1]\n□ [缺失项2]\n\n请补充，或告诉我哪些可以后补。"
-    }
-  },
-  fuzzy: {
-    prompt: {
-      en: "I couldn't understand this clearly. Could you describe it in a complete sentence?\n**[Who]** + **[does what]** + **[gets what result]**\n\nExample: '让用户可以通过微信登录'",
-      zh: "这个描述我还没理解清楚。能否用一个完整的句子描述：\n**[谁]** + **[做什么]** + **[得到什么结果]**\n\n例如：'让用户可以通过微信登录'"
-    }
-  },
-  confirmed: {
-    en: "✅ Requirement confirmed! Generating structured summary...",
-    zh: "✅ 需求已确认！正在生成结构化摘要..."
-  },
-  draft: {
-    en: "⚠️ This requirement is still unclear after 3 rounds. Marked as draft. You can补充信息后重新激活.",
-    zh: "⚠️ 此需求经3轮对话仍不清晰，已标记为草稿。可补充信息后重新激活。"
-  }
-}
-
 // Priority options
 const priorityOptions = ['P0 - 紧急', 'P1 - 高', 'P2 - 中', 'P3 - 低']
 const priorityOptionsEn = ['P0 - Urgent', 'P1 - High', 'P2 - Medium', 'P3 - Low']
 
-// Requirement confirmation card
-function RequirementConfirmationCard({ 
-  req, 
-  onAnswer,
-  language 
-}: { 
-  req: Requirement
-  onAnswer: (reqId: string, answer: string, type: string) => void
-  language: 'en' | 'zh'
-}) {
-  const lastConfirmation = req.confirmations[req.confirmations.length - 1]
-  const isMultiChoice = lastConfirmation?.options && lastConfirmation.options.length > 0
-  
-  return (
-    <div style={{
-      background: 'linear-gradient(135deg, rgba(139, 92, 246, 0.08), rgba(139, 92, 246, 0.02))',
-      border: '1px solid rgba(139, 92, 246, 0.2)',
-      borderRadius: '16px',
-      padding: '20px',
-      marginTop: '12px',
-    }}>
-      {/* PM Agent header */}
-      <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '16px' }}>
-        <div style={{
-          width: 36, height: 36, borderRadius: '10px',
-          background: 'linear-gradient(135deg, #8B5CF6, #6366F1)',
-          display: 'flex', alignItems: 'center', justifyContent: 'center',
-        }}>
-          <Sparkles size={16} style={{ color: 'white' }} />
-        </div>
-        <div>
-          <div style={{ fontWeight: '600', fontSize: '14px', color: 'var(--text-primary)' }}>
-            PM Agent
-          </div>
-          <div style={{ fontSize: '11px', color: 'var(--text-tertiary)' }}>
-            {language === 'zh' ? '结构化需求确认' : 'Structured Requirement Confirmation'}
-          </div>
-        </div>
-      </div>
-
-      {/* Question */}
-      <div style={{
-        background: 'var(--bg-tertiary)',
-        borderRadius: '12px',
-        padding: '14px 16px',
-        marginBottom: '12px',
-      }}>
-        <p style={{ 
-          fontSize: '14px', 
-          color: 'var(--text-primary)',
-          lineHeight: 1.6,
-          whiteSpace: 'pre-wrap',
-          margin: 0,
-        }}>
-          {lastConfirmation ? (language === 'zh' ? lastConfirmation.questionZh : lastConfirmation.question) : (language === 'zh' ? pmPrompt.welcome.zh : pmPrompt.welcome.en)}
-        </p>
-      </div>
-
-      {/* Options or input */}
-      {isMultiChoice ? (
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-          {(language === 'zh' ? (lastConfirmation.optionsZh || lastConfirmation.options) : lastConfirmation.options)?.map((opt, i) => (
-            <button
-              key={i}
-              onClick={() => onAnswer(req.id, opt, 'choice')}
-              style={{
-                display: 'flex',
-                alignItems: 'center',
-                gap: '10px',
-                padding: '12px 14px',
-                borderRadius: '10px',
-                background: 'var(--bg-tertiary)',
-                border: '1px solid var(--border)',
-                cursor: 'pointer',
-                textAlign: 'left',
-                transition: 'all 0.2s',
-              }}
-              onMouseEnter={e => {
-                e.currentTarget.style.borderColor = '#8B5CF6'
-                e.currentTarget.style.background = 'rgba(139, 92, 246, 0.08)'
-              }}
-              onMouseLeave={e => {
-                e.currentTarget.style.borderColor = 'var(--border)'
-                e.currentTarget.style.background = 'var(--bg-tertiary)'
-              }}
-            >
-              <div style={{
-                width: 20, height: 20, borderRadius: '6px',
-                border: '2px solid var(--border)',
-                display: 'flex', alignItems: 'center', justifyContent: 'center',
-              }}>
-                <ChevronRight size={12} style={{ color: 'var(--text-tertiary)' }} />
-              </div>
-              <span style={{ fontSize: '13px', color: 'var(--text-primary)' }}>{opt}</span>
-            </button>
-          ))}
-        </div>
-      ) : (
-        <div style={{ display: 'flex', gap: '8px' }}>
-          <input
-            type="text"
-            placeholder={language === 'zh' ? '输入你的回答...' : 'Type your answer...'}
-            style={{
-              flex: 1,
-              padding: '10px 14px',
-              borderRadius: '10px',
-              border: '1px solid var(--border)',
-              background: 'var(--bg-tertiary)',
-              color: 'var(--text-primary)',
-              fontSize: '13px',
-              outline: 'none',
-            }}
-            onKeyDown={e => {
-              if (e.key === 'Enter') {
-                const value = (e.target as HTMLInputElement).value
-                if (value.trim()) {
-                  onAnswer(req.id, value, 'text')
-                  ;(e.target as HTMLInputElement).value = ''
-                }
-              }
-            }}
-          />
-          <button
-            onClick={e => {
-              const input = e.currentTarget.parentElement?.querySelector('input') as HTMLInputElement
-              if (input?.value.trim()) {
-                onAnswer(req.id, input.value.trim(), 'text')
-                input.value = ''
-              }
-            }}
-            style={{
-              padding: '10px 16px',
-              borderRadius: '10px',
-              background: 'linear-gradient(135deg, #8B5CF6, #6366F1)',
-              border: 'none',
-              color: 'white',
-              fontSize: '13px',
-              fontWeight: '500',
-              cursor: 'pointer',
-            }}
-          >
-            <Send size={14} />
-          </button>
-        </div>
-      )}
-    </div>
-  )
-}
-
-// Final requirement summary card
-function RequirementSummaryCard({ req, language }: { req: Requirement; language: 'en' | 'zh' }) {
-  const confirmations = req.confirmations
-  
-  // Extract info from confirmations
-  const getField = (type: string) => {
-    const c = confirmations.find(c => c.type === type)
-    return c ? (language === 'zh' ? c.answerZh : c.answer) : null
+// Priority badge
+function PriorityBadge({ priority, language }: { priority: string; language: 'en' | 'zh' }) {
+  const config: Record<string, { color: string; label: string; labelEn: string }> = {
+    P0: { color: '#EF4444', label: '紧急', labelEn: 'Urgent' },
+    P1: { color: '#F97316', label: '高', labelEn: 'High' },
+    P2: { color: '#EAB308', label: '中', labelEn: 'Medium' },
+    P3: { color: '#64748B', label: '低', labelEn: 'Low' },
+    high: { color: '#F97316', label: '高', labelEn: 'High' },
+    medium: { color: '#EAB308', label: '中', labelEn: 'Medium' },
+    low: { color: '#64748B', label: '低', labelEn: 'Low' },
   }
-  
-  const goal = getField('goal') || getField('context') || confirmations[0]?.answer || '-'
-  const scope = getField('scope') || '-'
-  const priority = getField('priority') || 'P2'
-  const deadline = getField('deadline') || (language === 'zh' ? '待定' : 'TBD')
-  const target = getField('target') || '-'
-  const constraint = getField('constraint') || '-'
-  
+  const cfg = config[priority] || config.medium
   return (
-    <div style={{
-      background: 'linear-gradient(135deg, rgba(52, 211, 153, 0.08), rgba(52, 211, 153, 0.02))',
-      border: '1px solid rgba(52, 211, 153, 0.2)',
-      borderRadius: '16px',
-      padding: '20px',
-      marginTop: '12px',
+    <span style={{
+      fontSize: '10px',
+      fontWeight: '600',
+      padding: '2px 6px',
+      borderRadius: '4px',
+      background: `${cfg.color}20`,
+      color: cfg.color,
     }}>
-      {/* Header */}
-      <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '16px' }}>
-        <div style={{
-          width: 36, height: 36, borderRadius: '10px',
-          background: 'linear-gradient(135deg, #34D399, #10B981)',
-          display: 'flex', alignItems: 'center', justifyContent: 'center',
-        }}>
-          <CheckCircle size={16} style={{ color: 'white' }} />
-        </div>
-        <div>
-          <div style={{ fontWeight: '600', fontSize: '14px', color: 'var(--text-primary)' }}>
-            {language === 'zh' ? '需求确认单' : 'Requirement Confirmation'}
-          </div>
-          <div style={{ fontSize: '11px', color: 'var(--text-tertiary)' }}>
-            ID: {req.id.slice(0, 8).toUpperCase()}
-          </div>
-        </div>
-      </div>
-
-      {/* Fields grid */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '12px' }}>
-        {[
-          { label: language === 'zh' ? '标题' : 'Title', value: goal, icon: Target },
-          { label: language === 'zh' ? '目标' : 'Goal', value: target, icon: Sparkles },
-          { label: language === 'zh' ? '范围' : 'Scope', value: scope, icon: Scale },
-          { label: language === 'zh' ? '优先级' : 'Priority', value: priority, icon: AlertTriangle, highlight: true },
-          { label: language === 'zh' ? '截止时间' : 'Deadline', value: deadline, icon: Calendar },
-          { label: language === 'zh' ? '约束条件' : 'Constraints', value: constraint, icon: FileText },
-        ].map((field, i) => (
-          <div key={i} style={{
-            background: 'var(--bg-tertiary)',
-            borderRadius: '10px',
-            padding: '12px',
-          }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '6px' }}>
-              <field.icon size={12} style={{ color: field.highlight ? '#FBBF24' : 'var(--text-tertiary)' }} />
-              <span style={{ fontSize: '10px', color: 'var(--text-tertiary)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
-                {field.label}
-              </span>
-            </div>
-            <div style={{ 
-              fontSize: '13px', 
-              fontWeight: field.highlight ? '600' : '400',
-              color: field.highlight ? '#FBBF24' : 'var(--text-primary)',
-            }}>
-              {field.value}
-            </div>
-          </div>
-        ))}
-      </div>
-
-      {/* Status badge */}
-      <div style={{ marginTop: '16px', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-        <div style={{
-          display: 'flex',
-          alignItems: 'center',
-          gap: '6px',
-          padding: '6px 12px',
-          borderRadius: '8px',
-          background: 'rgba(52, 211, 153, 0.15)',
-        }}>
-          <Check size={12} style={{ color: '#34D399' }} />
-          <span style={{ fontSize: '12px', fontWeight: '500', color: '#34D399' }}>
-            {language === 'zh' ? '已确认' : 'Confirmed'}
-          </span>
-        </div>
-        <span style={{ fontSize: '11px', color: 'var(--text-tertiary)' }}>
-          {language === 'zh' ? '可进入项目规划' : 'Ready for project planning'}
-        </span>
-      </div>
-    </div>
+      {language === 'zh' ? cfg.label : cfg.labelEn}
+    </span>
   )
 }
 
@@ -368,8 +89,13 @@ export default function Requirements() {
   const [inputMessage, setInputMessage] = useState('')
   const [sending, setSending] = useState(false)
   const [selectedReq, setSelectedReq] = useState<string | null>(null)
+  const [loading, setLoading] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+  const [showCreateModal, setShowCreateModal] = useState(false)
+  const [newReqForm, setNewReqForm] = useState({ title: '', description: '', priority: 'P2' })
   const messagesEndRef = useRef<HTMLDivElement>(null)
 
+  // Fetch requirements when project changes
   useEffect(() => {
     if (projects.length > 0 && !selectedProject) {
       setSelectedProject(projects[0] as Project)
@@ -378,147 +104,80 @@ export default function Requirements() {
 
   useEffect(() => {
     if (selectedProject) {
-      setRequirements([])
-      setSelectedReq(null)
+      fetchRequirements()
     }
   }, [selectedProject])
 
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' })
-  }, [requirements])
+  }, [requirements, selectedReq])
 
-  // Analyze requirement for vagueness
-  const analyzeRequirement = (content: string): { isFuzzy: boolean; reason: string } => {
-    const hasVerb = /[做|实现|添加|创建|修改|删除|优化|修复|提供|支持]/i.test(content)
-    const hasSubject = /[用户|系统|管理员|客户|员工]/i.test(content)
-    const hasObject = /[功能|页面|模块|接口|流程|数据]/i.test(content)
-    
-    if (!hasVerb || (!hasSubject && !hasObject)) {
-      return { isFuzzy: true, reason: 'missing_structure' }
+  const fetchRequirements = async () => {
+    if (!selectedProject) return
+    setLoading(true)
+    setError(null)
+    try {
+      const res = await api.requirements.list({ projectId: selectedProject.id })
+      setRequirements(res.data || [])
+    } catch (err: any) {
+      setError(err.message || 'Failed to load requirements')
+    } finally {
+      setLoading(false)
     }
-    return { isFuzzy: false, reason: '' }
   }
 
-  // Handle answer from PM confirmation
-  const handleAnswer = (reqId: string, answer: string, type: string) => {
-    setRequirements(prev => prev.map(req => {
-      if (req.id !== reqId) return req
-      
-      const newConfirmation: ConfirmationBlock = {
-        id: `cf-${Date.now()}`,
-        type: 'confirmation',
-        question: 'Your answer',
-        questionZh: '你的回答',
-        answer: answer,
-        answerZh: answer,
-      }
-      
-      const newRounds = req.rounds + 1
-      const newConfirmations = [...req.confirmations, newConfirmation]
-      
-      // Check if confirmed (after enough rounds)
-      if (newRounds >= 3 && type === 'choice' && answer.includes('Confirm')) {
-        return {
-          ...req,
-          status: 'confirmed' as const,
-          rounds: newRounds,
-          confirmations: newConfirmations,
-          updatedAt: new Date().toISOString(),
-        }
-      }
-      
-      // Generate next question based on round
-      let nextConfirmation: ConfirmationBlock
-      
-      if (req.rounds === 0) {
-        // Phase 1: Ask about context
-        nextConfirmation = {
-          id: `cf-${Date.now()}`,
-          type: 'context',
-          question: pmPrompt.phase1.question.en,
-          questionZh: pmPrompt.phase1.question.zh,
-        }
-      } else if (req.rounds === 1) {
-        // Phase 2: Ask for structured confirmation
-        nextConfirmation = {
-          id: `cf-${Date.now()}`,
-          type: 'confirmation',
-          question: pmPrompt.phase2.confirmPrompt.en,
-          questionZh: pmPrompt.phase2.confirmPrompt.zh,
-          options: ['✅ Confirm & continue', '❌ Needs correction'],
-          optionsZh: ['✅ 确认并继续', '❌ 需要修改'],
-        }
-      } else if (req.rounds === 2) {
-        // Phase 3: Ask for missing info
-        nextConfirmation = {
-          id: `cf-${Date.now()}`,
-          type: 'missing_info',
-          question: pmPrompt.phase3.missing.en,
-          questionZh: pmPrompt.phase3.missing.zh,
-          options: ['📋 Add missing info', '⏭️ Add later'],
-          optionsZh: ['📋 补充缺失信息', '⏭️ 稍后补充'],
-        }
-      } else {
-        // Too many rounds - mark as draft
-        nextConfirmation = {
-          id: `cf-${Date.now()}`,
-          type: 'final',
-          question: pmPrompt.draft.en,
-          questionZh: pmPrompt.draft.zh,
-        }
-        return {
-          ...req,
-          status: 'draft' as const,
-          rounds: newRounds,
-          confirmations: [...newConfirmations.slice(0, -1), nextConfirmation],
-          updatedAt: new Date().toISOString(),
-        }
-      }
-      
-      return {
-        ...req,
-        status: 'clarifying' as const,
-        rounds: newRounds,
-        confirmations: [...newConfirmations.slice(0, -1), nextConfirmation],
-        updatedAt: new Date().toISOString(),
-      }
-    }))
-  }
-
-  // Submit new requirement
-  const handleSend = async () => {
-    if (!inputMessage.trim() || !selectedProject) return
+  // Create new requirement
+  const handleCreateRequirement = async () => {
+    if (!newReqForm.title.trim() || !selectedProject) return
     setSending(true)
-    
-    const analysis = analyzeRequirement(inputMessage)
-    
-    const newReq: Requirement = {
-      id: `req-${Date.now()}`,
-      projectId: selectedProject.id,
-      content: inputMessage,
-      contentZh: inputMessage,
-      status: analysis.isFuzzy ? 'clarifying' : 'pending',
-      source: 'user',
-      rounds: 0,
-      confirmations: analysis.isFuzzy ? [{
-        id: `cf-${Date.now()}`,
-        type: 'clarification',
-        question: pmPrompt.fuzzy.prompt.en,
-        questionZh: pmPrompt.fuzzy.prompt.zh,
-      }] : [{
-        id: `cf-${Date.now()}`,
-        type: 'context',
-        question: pmPrompt.phase1.question.en,
-        questionZh: pmPrompt.phase1.question.zh,
-      }],
-      createdAt: new Date().toISOString(),
-      updatedAt: new Date().toISOString(),
+    try {
+      const res = await api.requirements.create({
+        projectId: selectedProject.id,
+        title: newReqForm.title,
+        description: newReqForm.description,
+        priority: newReqForm.priority.toLowerCase(),
+      })
+      setRequirements(prev => [...prev, res.data])
+      setShowCreateModal(false)
+      setNewReqForm({ title: '', description: '', priority: 'P2' })
+    } catch (err: any) {
+      alert(err.message || 'Failed to create requirement')
+    } finally {
+      setSending(false)
     }
-    
-    setRequirements(prev => [...prev, newReq])
-    setSelectedReq(newReq.id)
-    setInputMessage('')
-    setSending(false)
+  }
+
+  // Update requirement status
+  const handleUpdateStatus = async (id: string, status: string) => {
+    try {
+      const res = await api.requirements.update(id, { status })
+      setRequirements(prev => prev.map(r => r.id === id ? res.data : r))
+    } catch (err: any) {
+      alert(err.message || 'Failed to update requirement')
+    }
+  }
+
+  // Delete requirement
+  const handleDelete = async (id: string) => {
+    if (!confirm(language === 'zh' ? '确定删除此需求？' : 'Delete this requirement?')) return
+    try {
+      await api.requirements.delete(id)
+      setRequirements(prev => prev.filter(r => r.id !== id))
+      if (selectedReq === id) setSelectedReq(null)
+    } catch (err: any) {
+      alert(err.message || 'Failed to delete requirement')
+    }
+  }
+
+  // Analyze requirement
+  const handleAnalyze = async (id: string) => {
+    try {
+      await api.requirements.analyze(id)
+      // Refresh to get updated data
+      fetchRequirements()
+    } catch (err: any) {
+      alert(err.message || 'Failed to analyze requirement')
+    }
   }
 
   const getStatusConfig = (status: string) => {
@@ -535,6 +194,37 @@ export default function Requirements() {
     rejected: requirements.filter(r => r.status === 'rejected').length,
   }
 
+  // Not connected state
+  if (!isConnected) {
+    return (
+      <div 
+        className="page-container animate-fade-in"
+        style={{ 
+          background: 'var(--bg-primary)',
+          backgroundImage: 'linear-gradient(rgba(255, 255, 255, 0.015) 1px, transparent 1px), linear-gradient(90deg, rgba(255, 255, 255, 0.015) 1px, transparent 1px)',
+          backgroundSize: '40px 40px'
+        }}
+      >
+        <div style={{ 
+          display: 'flex', 
+          flexDirection: 'column', 
+          alignItems: 'center', 
+          justifyContent: 'center', 
+          padding: '80px 20px',
+          textAlign: 'center'
+        }}>
+          <Loader2 size={40} style={{ color: 'var(--text-tertiary)', margin: '0 auto 24px', animation: 'spin 2s linear infinite' }} />
+          <h2 style={{ fontSize: '20px', fontWeight: '600', color: 'var(--text-primary)', marginBottom: '8px' }}>
+            {language === 'zh' ? '等待连接...' : 'Waiting for connection...'}
+          </h2>
+          <p style={{ fontSize: '14px', color: 'var(--text-secondary)', maxWidth: '400px' }}>
+            {language === 'zh' ? '正在尝试连接服务器，请稍候' : 'Attempting to connect to server, please wait'}
+          </p>
+        </div>
+      </div>
+    )
+  }
+
   return (
     <div 
       className="page-container animate-fade-in"
@@ -546,13 +236,74 @@ export default function Requirements() {
     >
       {/* Header */}
       <div style={{ marginBottom: '24px' }}>
-        <h1 style={{ fontSize: '28px', fontWeight: '700', color: 'var(--text-primary)', marginBottom: '4px' }}>
-          {language === 'zh' ? '需求池' : 'Requirements'}
-        </h1>
-        <p style={{ fontSize: '15px', color: 'var(--text-secondary)' }}>
-          {language === 'zh' ? 'PM Agent 结构化需求确认 · 3轮内明确需求' : 'PM Agent Structured Requirement Confirmation · 3 Rounds to Clarity'}
-        </p>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+          <div>
+            <h1 style={{ fontSize: '28px', fontWeight: '700', color: 'var(--text-primary)', marginBottom: '4px' }}>
+              {language === 'zh' ? '需求池' : 'Requirements'}
+            </h1>
+            <p style={{ fontSize: '15px', color: 'var(--text-secondary)' }}>
+              {language === 'zh' ? '管理项目需求和优先级' : 'Manage project requirements and priorities'}
+            </p>
+          </div>
+          <div style={{ display: 'flex', gap: '10px' }}>
+            <button
+              onClick={fetchRequirements}
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: '6px',
+                padding: '10px 16px',
+                borderRadius: '10px',
+                background: 'var(--bg-secondary)',
+                border: '1px solid var(--border)',
+                color: 'var(--text-secondary)',
+                fontSize: '13px',
+                fontWeight: '500',
+                cursor: 'pointer',
+              }}
+            >
+              <RefreshCw size={14} />
+            </button>
+            <button
+              onClick={() => setShowCreateModal(true)}
+              disabled={!selectedProject}
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: '6px',
+                padding: '10px 18px',
+                borderRadius: '10px',
+                background: selectedProject ? 'linear-gradient(135deg, #6366F1, #8B5CF6)' : 'var(--bg-tertiary)',
+                border: 'none',
+                color: selectedProject ? 'white' : 'var(--text-tertiary)',
+                fontSize: '13px',
+                fontWeight: '600',
+                cursor: selectedProject ? 'pointer' : 'not-allowed',
+              }}
+            >
+              <Plus size={14} />
+              {language === 'zh' ? '添加需求' : 'Add Requirement'}
+            </button>
+          </div>
+        </div>
       </div>
+
+      {/* Error state */}
+      {error && (
+        <div style={{
+          padding: '16px 20px',
+          background: 'rgba(248, 113, 113, 0.1)',
+          border: '1px solid rgba(248, 113, 113, 0.3)',
+          borderRadius: '12px',
+          marginBottom: '16px',
+          display: 'flex',
+          alignItems: 'center',
+          gap: '10px',
+        }}>
+          <AlertCircle size={18} style={{ color: '#F87171' }} />
+          <span style={{ fontSize: '14px', color: '#F87171' }}>{error}</span>
+        </div>
+      )}
 
       {/* Main Layout */}
       <div style={{ display: 'grid', gridTemplateColumns: '320px 1fr', gap: '20px', height: 'calc(100vh - 200px)' }} className="requirements-grid">
@@ -595,14 +346,21 @@ export default function Requirements() {
               {language === 'zh' ? '需求列表' : 'Requirements'}
             </div>
             
-            {requirements.length === 0 ? (
+            {loading ? (
+              <div style={{ textAlign: 'center', padding: '32px 16px' }}>
+                <Loader2 size={24} style={{ color: 'var(--text-tertiary)', margin: '0 auto 12px', animation: 'spin 1s linear infinite' }} />
+                <p style={{ fontSize: '12px', color: 'var(--text-secondary)' }}>
+                  {language === 'zh' ? '加载中...' : 'Loading...'}
+                </p>
+              </div>
+            ) : requirements.length === 0 ? (
               <div style={{ textAlign: 'center', padding: '32px 16px' }}>
                 <MessageSquare size={32} style={{ color: 'var(--text-tertiary)', margin: '0 auto 12px' }} />
                 <p style={{ fontSize: '13px', color: 'var(--text-secondary)' }}>
                   {language === 'zh' ? '暂无需求' : 'No requirements yet'}
                 </p>
                 <p style={{ fontSize: '11px', color: 'var(--text-tertiary)' }}>
-                  {language === 'zh' ? '在右侧输入需求开始对话' : 'Type a requirement on the right to start'}
+                  {language === 'zh' ? '点击右上角添加需求' : 'Click top right to add a requirement'}
                 </p>
               </div>
             ) : (
@@ -640,15 +398,13 @@ export default function Requirements() {
                             textOverflow: 'ellipsis',
                             whiteSpace: 'nowrap',
                           }}>
-                            {req.content}
+                            {req.title}
                           </p>
                           <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginTop: '6px' }}>
                             <span style={{ fontSize: '10px', color: cfg.color, fontWeight: '500' }}>
                               {cfg.label}
                             </span>
-                            <span style={{ fontSize: '10px', color: 'var(--text-tertiary)' }}>
-                              · {req.rounds}/3
-                            </span>
+                            <PriorityBadge priority={req.priority} language={language} />
                           </div>
                         </div>
                       </div>
@@ -680,169 +436,331 @@ export default function Requirements() {
                 <Sparkles size={32} style={{ color: '#8B5CF6' }} />
               </div>
               <h3 style={{ fontSize: '18px', fontWeight: '600', color: 'var(--text-primary)', marginBottom: '8px' }}>
-                {language === 'zh' ? 'PM Agent 需求确认' : 'PM Agent Requirement Confirmation'}
+                {language === 'zh' ? '需求详情' : 'Requirement Details'}
               </h3>
               <p style={{ fontSize: '14px', color: 'var(--text-tertiary)', textAlign: 'center', maxWidth: '400px' }}>
                 {language === 'zh' 
-                  ? '在下方输入需求，PM Agent 会通过3轮结构化对话帮你明确需求，确保不遗漏关键信息。'
-                  : 'Type a requirement below and PM Agent will clarify it through 3 rounds of structured dialogue.'}
+                  ? '从左侧列表选择一个需求查看详情'
+                  : 'Select a requirement from the left list to view details'}
               </p>
-              
-              {/* Process steps */}
-              <div style={{ display: 'flex', gap: '16px', marginTop: '24px' }}>
-                {[
-                  { num: '1', label: language === 'zh' ? '开放提问' : 'Open Questions' },
-                  { num: '2', label: language === 'zh' ? '结构确认' : 'Confirmation' },
-                  { num: '3', label: language === 'zh' ? '信息补全' : 'Fill Gaps' },
-                ].map((step, i) => (
-                  <div key={i} style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                    <div style={{
-                      width: 28, height: 28, borderRadius: '8px',
-                      background: 'rgba(139, 92, 246, 0.15)',
-                      display: 'flex', alignItems: 'center', justifyContent: 'center',
-                      fontSize: '12px', fontWeight: '700', color: '#8B5CF6',
-                    }}>
-                      {step.num}
-                    </div>
-                    <span style={{ fontSize: '12px', color: 'var(--text-secondary)' }}>
-                      {step.label}
-                    </span>
-                    {i < 2 && <ArrowRight size={14} style={{ color: 'var(--text-tertiary)' }} />}
-                  </div>
-                ))}
-              </div>
             </div>
           ) : (
             <>
               {/* Selected requirement detail */}
-              <div style={{ padding: '20px', borderBottom: '1px solid var(--border)' }}>
-                <div style={{ display: 'flex', alignItems: 'flex-start', gap: '12px' }}>
-                  <div style={{
-                    width: 40, height: 40, borderRadius: '12px',
-                    background: 'linear-gradient(135deg, #8B5CF6, #6366F1)',
-                    display: 'flex', alignItems: 'center', justifyContent: 'center',
-                    flexShrink: 0,
-                  }}>
-                    <User size={18} style={{ color: 'white' }} />
-                  </div>
-                  <div style={{ flex: 1 }}>
-                    <p style={{ fontSize: '15px', fontWeight: '500', color: 'var(--text-primary)', margin: 0 }}>
-                      {requirements.find(r => r.id === selectedReq)?.content}
-                    </p>
-                    <span style={{ fontSize: '11px', color: 'var(--text-tertiary)', marginTop: '4px', display: 'block' }}>
-                      {new Date(requirements.find(r => r.id === selectedReq)?.createdAt || '').toLocaleString()}
-                    </span>
-                  </div>
-                </div>
-              </div>
-              
-              {/* Chat/Confirmation area */}
-              <div style={{ flex: 1, overflow: 'auto', padding: '20px' }}>
-                {/* User message */}
-                <div style={{ display: 'flex', gap: '12px', marginBottom: '16px' }}>
-                  <div style={{
-                    width: 32, height: 32, borderRadius: '10px',
-                    background: 'var(--bg-tertiary)',
-                    display: 'flex', alignItems: 'center', justifyContent: 'center',
-                    flexShrink: 0,
-                  }}>
-                    <User size={14} style={{ color: 'var(--text-secondary)' }} />
-                  </div>
-                  <div style={{
-                    flex: 1,
-                    padding: '12px 16px',
-                    borderRadius: '14px 14px 14px 4px',
-                    background: 'var(--bg-tertiary)',
-                    border: '1px solid var(--border)',
-                  }}>
-                    <p style={{ fontSize: '14px', color: 'var(--text-primary)', margin: 0 }}>
-                      {requirements.find(r => r.id === selectedReq)?.content}
-                    </p>
-                  </div>
-                </div>
+              {(() => {
+                const req = requirements.find(r => r.id === selectedReq)
+                if (!req) return null
+                const cfg = getStatusConfig(req.status)
+                return (
+                  <>
+                    <div style={{ padding: '20px', borderBottom: '1px solid var(--border)' }}>
+                      <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between' }}>
+                        <div style={{ display: 'flex', alignItems: 'flex-start', gap: '12px' }}>
+                          <div style={{
+                            width: 40, height: 40, borderRadius: '12px',
+                            background: `${cfg.color}20`,
+                            display: 'flex', alignItems: 'center', justifyContent: 'center',
+                            flexShrink: 0,
+                          }}>
+                            <FileText size={18} style={{ color: cfg.color }} />
+                          </div>
+                          <div style={{ flex: 1 }}>
+                            <h2 style={{ fontSize: '16px', fontWeight: '600', color: 'var(--text-primary)', margin: 0 }}>
+                              {req.title}
+                            </h2>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginTop: '6px' }}>
+                              <span style={{
+                                fontSize: '11px',
+                                fontWeight: '500',
+                                padding: '2px 8px',
+                                borderRadius: '4px',
+                                background: cfg.bg,
+                                color: cfg.color,
+                              }}>
+                                {cfg.label}
+                              </span>
+                              <PriorityBadge priority={req.priority} language={language} />
+                              <span style={{ fontSize: '11px', color: 'var(--text-tertiary)' }}>
+                                {new Date(req.createdAt).toLocaleDateString()}
+                              </span>
+                            </div>
+                          </div>
+                        </div>
+                        <div style={{ display: 'flex', gap: '8px' }}>
+                          <button
+                            onClick={() => handleAnalyze(req.id)}
+                            style={{
+                              padding: '8px 12px',
+                              borderRadius: '8px',
+                              background: 'var(--bg-tertiary)',
+                              border: '1px solid var(--border)',
+                              color: 'var(--text-secondary)',
+                              fontSize: '12px',
+                              fontWeight: '500',
+                              cursor: 'pointer',
+                              display: 'flex',
+                              alignItems: 'center',
+                              gap: '4px',
+                            }}
+                            title={language === 'zh' ? 'AI 分析' : 'AI Analyze'}
+                          >
+                            <Sparkles size={14} />
+                          </button>
+                          <button
+                            onClick={() => handleDelete(req.id)}
+                            style={{
+                              padding: '8px',
+                              borderRadius: '8px',
+                              background: 'var(--bg-tertiary)',
+                              border: '1px solid var(--border)',
+                              color: '#F87171',
+                              cursor: 'pointer',
+                              display: 'flex',
+                              alignItems: 'center',
+                            }}
+                            title={language === 'zh' ? '删除' : 'Delete'}
+                          >
+                            <Trash2 size={14} />
+                          </button>
+                        </div>
+                      </div>
+                    </div>
+                    
+                    <div style={{ flex: 1, overflow: 'auto', padding: '20px' }}>
+                      {/* Description */}
+                      {req.description && (
+                        <div style={{ marginBottom: '20px' }}>
+                          <h4 style={{ fontSize: '12px', fontWeight: '600', color: 'var(--text-tertiary)', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '8px' }}>
+                            {language === 'zh' ? '描述' : 'Description'}
+                          </h4>
+                          <div style={{
+                            padding: '14px',
+                            borderRadius: '10px',
+                            background: 'var(--bg-tertiary)',
+                            fontSize: '14px',
+                            color: 'var(--text-primary)',
+                            lineHeight: 1.6,
+                          }}>
+                            {req.description}
+                          </div>
+                        </div>
+                      )}
 
-                {/* PM Confirmation card */}
-                <RequirementConfirmationCard 
-                  req={requirements.find(r => r.id === selectedReq)!}
-                  onAnswer={handleAnswer}
-                  language={language}
-                />
+                      {/* Status actions */}
+                      <div style={{ marginBottom: '20px' }}>
+                        <h4 style={{ fontSize: '12px', fontWeight: '600', color: 'var(--text-tertiary)', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '8px' }}>
+                          {language === 'zh' ? '更新状态' : 'Update Status'}
+                        </h4>
+                        <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
+                          {['pending', 'clarifying', 'confirmed', 'rejected', 'draft'].map(status => {
+                            const sCfg = getStatusConfig(status)
+                            const StatusIcon = sCfg.icon
+                            return (
+                              <button
+                                key={status}
+                                onClick={() => handleUpdateStatus(req.id, status)}
+                                disabled={req.status === status}
+                                style={{
+                                  display: 'flex',
+                                  alignItems: 'center',
+                                  gap: '6px',
+                                  padding: '8px 14px',
+                                  borderRadius: '8px',
+                                  background: req.status === status ? sCfg.bg : 'var(--bg-tertiary)',
+                                  border: `1px solid ${req.status === status ? sCfg.color : 'var(--border)'}`,
+                                  color: req.status === status ? sCfg.color : 'var(--text-secondary)',
+                                  fontSize: '12px',
+                                  fontWeight: '500',
+                                  cursor: req.status === status ? 'not-allowed' : 'pointer',
+                                  opacity: req.status === status ? 1 : 0.7,
+                                }}
+                              >
+                                <StatusIcon size={12} />
+                                {sCfg.label}
+                              </button>
+                            )
+                          })}
+                        </div>
+                      </div>
 
-                {/* Final summary if confirmed */}
-                {requirements.find(r => r.id === selectedReq)?.status === 'confirmed' && (
-                  <RequirementSummaryCard 
-                    req={requirements.find(r => r.id === selectedReq)!}
-                    language={language}
-                  />
-                )}
-              </div>
+                      {/* Metadata */}
+                      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
+                        <div style={{ padding: '12px', borderRadius: '10px', background: 'var(--bg-tertiary)' }}>
+                          <div style={{ fontSize: '10px', color: 'var(--text-tertiary)', textTransform: 'uppercase', marginBottom: '4px' }}>
+                            {language === 'zh' ? '创建时间' : 'Created'}
+                          </div>
+                          <div style={{ fontSize: '13px', color: 'var(--text-primary)' }}>
+                            {new Date(req.createdAt).toLocaleString()}
+                          </div>
+                        </div>
+                        <div style={{ padding: '12px', borderRadius: '10px', background: 'var(--bg-tertiary)' }}>
+                          <div style={{ fontSize: '10px', color: 'var(--text-tertiary)', textTransform: 'uppercase', marginBottom: '4px' }}>
+                            {language === 'zh' ? '更新时间' : 'Updated'}
+                          </div>
+                          <div style={{ fontSize: '13px', color: 'var(--text-primary)' }}>
+                            {new Date(req.updatedAt).toLocaleString()}
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  </>
+                )
+              })()}
             </>
           )}
+        </div>
+      </div>
 
-          {/* Input area */}
-          <div style={{ padding: '16px 20px', borderTop: '1px solid var(--border)' }}>
-            <div style={{ display: 'flex', gap: '10px', alignItems: 'flex-end' }}>
-              <textarea
-                value={inputMessage}
-                onChange={e => setInputMessage(e.target.value)}
-                onKeyDown={e => {
-                  if (e.key === 'Enter' && !e.shiftKey) {
-                    e.preventDefault()
-                    handleSend()
-                  }
-                }}
-                placeholder={language === 'zh' 
-                  ? '描述你的需求，按 Enter 发送...' 
-                  : 'Describe your requirement, press Enter to send...'}
+      {/* Create modal */}
+      {showCreateModal && (
+        <div
+          style={{
+            position: 'fixed', inset: 0,
+            background: 'rgba(0,0,0,0.6)',
+            backdropFilter: 'blur(4px)',
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+            zIndex: 1000,
+          }}
+          onClick={() => setShowCreateModal(false)}
+        >
+          <div
+            style={{
+              background: 'var(--bg-secondary)',
+              borderRadius: '20px',
+              border: '1px solid var(--border)',
+              width: '90%',
+              maxWidth: '480px',
+              padding: '24px',
+            }}
+            onClick={e => e.stopPropagation()}
+          >
+            <h2 style={{ fontSize: '18px', fontWeight: '600', color: 'var(--text-primary)', marginBottom: '20px' }}>
+              {language === 'zh' ? '添加需求' : 'Add Requirement'}
+            </h2>
+            
+            {/* Title */}
+            <div style={{ marginBottom: '16px' }}>
+              <label style={{ fontSize: '12px', fontWeight: '600', color: 'var(--text-tertiary)', display: 'block', marginBottom: '6px' }}>
+                {language === 'zh' ? '标题' : 'Title'} *
+              </label>
+              <input
+                type="text"
+                value={newReqForm.title}
+                onChange={e => setNewReqForm(prev => ({ ...prev, title: e.target.value }))}
+                placeholder={language === 'zh' ? '输入需求标题' : 'Enter requirement title'}
                 style={{
-                  flex: 1,
-                  padding: '12px 16px',
-                  borderRadius: '14px',
+                  width: '100%',
+                  padding: '12px 14px',
+                  borderRadius: '10px',
                   border: '1px solid var(--border)',
                   background: 'var(--bg-tertiary)',
                   color: 'var(--text-primary)',
                   fontSize: '14px',
-                  resize: 'none',
-                  minHeight: '48px',
-                  maxHeight: '120px',
                   outline: 'none',
+                }}
+              />
+            </div>
+            
+            {/* Description */}
+            <div style={{ marginBottom: '16px' }}>
+              <label style={{ fontSize: '12px', fontWeight: '600', color: 'var(--text-tertiary)', display: 'block', marginBottom: '6px' }}>
+                {language === 'zh' ? '描述' : 'Description'}
+              </label>
+              <textarea
+                value={newReqForm.description}
+                onChange={e => setNewReqForm(prev => ({ ...prev, description: e.target.value }))}
+                placeholder={language === 'zh' ? '详细描述需求内容' : 'Describe the requirement in detail'}
+                rows={4}
+                style={{
+                  width: '100%',
+                  padding: '12px 14px',
+                  borderRadius: '10px',
+                  border: '1px solid var(--border)',
+                  background: 'var(--bg-tertiary)',
+                  color: 'var(--text-primary)',
+                  fontSize: '14px',
+                  outline: 'none',
+                  resize: 'vertical',
                   fontFamily: 'inherit',
                 }}
-                rows={1}
               />
+            </div>
+            
+            {/* Priority */}
+            <div style={{ marginBottom: '20px' }}>
+              <label style={{ fontSize: '12px', fontWeight: '600', color: 'var(--text-tertiary)', display: 'block', marginBottom: '6px' }}>
+                {language === 'zh' ? '优先级' : 'Priority'}
+              </label>
+              <div style={{ display: 'flex', gap: '8px' }}>
+                {['P0', 'P1', 'P2', 'P3'].map(p => (
+                  <button
+                    key={p}
+                    onClick={() => setNewReqForm(prev => ({ ...prev, priority: p }))}
+                    style={{
+                      flex: 1,
+                      padding: '10px',
+                      borderRadius: '8px',
+                      border: newReqForm.priority === p ? `2px solid ${{ P0: '#EF4444', P1: '#F97316', P2: '#EAB308', P3: '#64748B' }[p]}` : '1px solid var(--border)',
+                      background: newReqForm.priority === p ? `${ { P0: '#EF4444', P1: '#F97316', P2: '#EAB308', P3: '#64748B' }[p]}15` : 'var(--bg-tertiary)',
+                      color: newReqForm.priority === p ? { P0: '#EF4444', P1: '#F97316', P2: '#EAB308', P3: '#64748B' }[p] : 'var(--text-secondary)',
+                      fontSize: '12px',
+                      fontWeight: '600',
+                      cursor: 'pointer',
+                    }}
+                  >
+                    {p}
+                  </button>
+                ))}
+              </div>
+            </div>
+            
+            {/* Actions */}
+            <div style={{ display: 'flex', gap: '10px', justifyContent: 'flex-end' }}>
               <button
-                onClick={handleSend}
-                disabled={sending || !inputMessage.trim()}
+                onClick={() => setShowCreateModal(false)}
+                disabled={sending}
                 style={{
-                  width: 48, height: 48,
-                  borderRadius: '14px',
-                  background: inputMessage.trim() 
-                    ? 'linear-gradient(135deg, #8B5CF6, #6366F1)'
-                    : 'var(--bg-tertiary)',
+                  padding: '12px 20px',
+                  borderRadius: '10px',
+                  border: '1px solid var(--border)',
+                  background: 'var(--bg-tertiary)',
+                  color: 'var(--text-secondary)',
+                  fontSize: '14px',
+                  fontWeight: '500',
+                  cursor: 'pointer',
+                }}
+              >
+                {language === 'zh' ? '取消' : 'Cancel'}
+              </button>
+              <button
+                onClick={handleCreateRequirement}
+                disabled={!newReqForm.title.trim() || sending}
+                style={{
+                  padding: '12px 20px',
+                  borderRadius: '10px',
                   border: 'none',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  cursor: inputMessage.trim() ? 'pointer' : 'not-allowed',
-                  opacity: inputMessage.trim() ? 1 : 0.5,
-                  transition: 'all 0.2s',
+                  background: newReqForm.title.trim() && !sending
+                    ? 'linear-gradient(135deg, #6366F1, #8B5CF6)'
+                    : 'var(--bg-tertiary)',
+                  color: newReqForm.title.trim() && !sending ? 'white' : 'var(--text-tertiary)',
+                  fontSize: '14px',
+                  fontWeight: '600',
+                  cursor: newReqForm.title.trim() && !sending ? 'pointer' : 'not-allowed',
                 }}
               >
                 {sending ? (
-                  <Loader2 size={18} style={{ color: 'white', animation: 'spin 1s linear infinite' }} />
+                  <span style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                    <Loader2 size={14} style={{ animation: 'spin 1s linear infinite' }} />
+                    {language === 'zh' ? '创建中...' : 'Creating...'}
+                  </span>
                 ) : (
-                  <Send size={18} style={{ color: 'white' }} />
+                  language === 'zh' ? '创建' : 'Create'
                 )}
               </button>
             </div>
-            <p style={{ fontSize: '11px', color: 'var(--text-tertiary)', marginTop: '8px', textAlign: 'center' }}>
-              {language === 'zh' 
-                ? 'PM Agent 会在3轮对话内明确你的需求，超时自动标记为草稿'
-                : 'PM Agent will clarify your requirement in 3 rounds, auto-drafts if unclear'}
-            </p>
           </div>
         </div>
-      </div>
+      )}
 
       <style>{`
         @keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }

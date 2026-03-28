@@ -1,43 +1,33 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { 
   Search, BookOpen, Star, Users, Plus, ChevronRight, 
   Code, Palette, LineChart, Settings, Shield, Zap,
   CheckCircle, ExternalLink, Clock, TrendingUp, Filter,
-  Edit2, Eye, Bookmark, BookmarkCheck
+  Edit2, Eye, Bookmark, BookmarkCheck, Loader2, AlertCircle
 } from 'lucide-react'
 import { useLanguage } from '../context/LanguageContext'
+import { api } from '../lib/api'
 
-// Job knowledge model
-interface JobKnowledge {
+// Knowledge model from API
+interface KnowledgeItem {
   id: string
   title: string
-  titleEn: string
-  category: 'engineering' | 'product' | 'design' | 'operations'
-  summary: string
-  summaryZh: string
-  capabilities: string[]       // 核心能力
-  tools: { name: string; link?: string }[]
-  bestPractices: string[]
-  completeness: number          // 完善度 0-100
-  qualityScore: number          // 质量评分 0-5
-  subscribers: number           // 订阅数
-  lastUpdatedBy: string
-  updatedAt: string
+  content?: string
+  category: 'role' | 'skill' | 'workflow' | 'other'
   tags: string[]
+  createdAt: string
+  updatedAt: string
 }
 
 // Category config
 const categoryConfig = {
-  engineering: { label: '工程', labelEn: 'Engineering', color: '#3B82F6', icon: Code },
-  product: { label: '产品', labelEn: 'Product', color: '#8B5CF6', icon: LineChart },
-  design: { label: '设计', labelEn: 'Design', color: '#EC4899', icon: Palette },
-  operations: { label: '运营', labelEn: 'Operations', color: '#F59E0B', icon: Settings },
+  role: { label: '角色', labelEn: 'Role', color: '#8B5CF6', icon: Users },
+  skill: { label: '技能', labelEn: 'Skill', color: '#3B82F6', icon: Code },
+  workflow: { label: '流程', labelEn: 'Workflow', color: '#F59E0B', icon: LineChart },
+  other: { label: '其他', labelEn: 'Other', color: '#64748B', icon: Settings },
 }
 
-// Mock data - discovered jobs
-const mockJobs: JobKnowledge[] = [] // No mock data
-
-// Completeness bar
+// Completeness bar (mock for now - API doesn't provide these)
 function CompletenessBar({ value }: { value: number }) {
   const color = value > 70 ? '#34D399' : value > 40 ? '#FBBF24' : '#F87171'
   return (
@@ -50,7 +40,7 @@ function CompletenessBar({ value }: { value: number }) {
   )
 }
 
-// Quality stars
+// Quality stars (mock for now)
 function QualityStars({ score }: { score: number }) {
   return (
     <div style={{ display: 'flex', alignItems: 'center', gap: '2px' }}>
@@ -68,15 +58,15 @@ function QualityStars({ score }: { score: number }) {
   )
 }
 
-// Job card
-function JobCard({ job, onSubscribe, onView, isSubscribed, language }: {
-  job: JobKnowledge
+// Knowledge card
+function KnowledgeCard({ item, onSubscribe, onView, isSubscribed, language }: {
+  item: KnowledgeItem
   onSubscribe: (id: string) => void
-  onView: (job: JobKnowledge) => void
+  onView: (item: KnowledgeItem) => void
   isSubscribed: boolean
   language: 'en' | 'zh'
 }) {
-  const catCfg = categoryConfig[job.category]
+  const catCfg = categoryConfig[item.category] || categoryConfig.other
   const CategoryIcon = catCfg.icon
   
   return (
@@ -90,7 +80,7 @@ function JobCard({ job, onSubscribe, onView, isSubscribed, language }: {
         cursor: 'pointer',
       }}
       className="job-card"
-      onClick={() => onView(job)}
+      onClick={() => onView(item)}
     >
       {/* Header */}
       <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', marginBottom: '12px' }}>
@@ -105,16 +95,16 @@ function JobCard({ job, onSubscribe, onView, isSubscribed, language }: {
           </div>
           <div>
             <h3 style={{ fontSize: '15px', fontWeight: '600', color: 'var(--text-primary)', margin: 0 }}>
-              {language === 'zh' ? job.title : job.titleEn}
+              {item.title}
             </h3>
-            <p style={{ fontSize: '12px', color: 'var(--text-tertiary)', margin: '2px 0 0 0' }}>
-              {language === 'zh' ? job.summaryZh : job.summary}
+            <p style={{ fontSize: '12px', color: 'var(--text-tertiary)', margin: '2px 0 0 0', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', maxWidth: '200px' }}>
+              {item.content?.substring(0, 60) || '-'}
             </p>
           </div>
         </div>
         
         <button
-          onClick={(e) => { e.stopPropagation(); onSubscribe(job.id) }}
+          onClick={(e) => { e.stopPropagation(); onSubscribe(item.id) }}
           style={{
             width: 36, height: 36, borderRadius: '10px',
             background: isSubscribed ? 'rgba(52, 211, 153, 0.1)' : 'var(--bg-tertiary)',
@@ -134,7 +124,7 @@ function JobCard({ job, onSubscribe, onView, isSubscribed, language }: {
       
       {/* Tags */}
       <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px', marginBottom: '14px' }}>
-        {job.tags.slice(0, 3).map(tag => (
+        {item.tags.slice(0, 3).map(tag => (
           <span key={tag} style={{
             fontSize: '10px',
             padding: '3px 8px',
@@ -147,57 +137,29 @@ function JobCard({ job, onSubscribe, onView, isSubscribed, language }: {
         ))}
       </div>
       
-      {/* Capabilities */}
-      <div style={{ marginBottom: '14px' }}>
-        <div style={{ fontSize: '10px', fontWeight: '600', color: 'var(--text-tertiary)', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '6px' }}>
-          {language === 'zh' ? '核心能力' : 'Capabilities'}
-        </div>
-        <div style={{ display: 'flex', flexWrap: 'wrap', gap: '4px' }}>
-          {job.capabilities.slice(0, 4).map(cap => (
-            <span key={cap} style={{
-              fontSize: '11px',
-              padding: '2px 8px',
-              borderRadius: '4px',
-              background: `${catCfg.color}10`,
-              color: catCfg.color,
-            }}>
-              {cap}
-            </span>
-          ))}
-        </div>
-      </div>
-      
-      {/* Stats */}
+      {/* Footer */}
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', paddingTop: '12px', borderTop: '1px solid var(--border)' }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
-            <span style={{ fontSize: '11px', color: 'var(--text-tertiary)' }}>
-              {language === 'zh' ? '完善度' : 'Complete'}
-            </span>
-            <CompletenessBar value={job.completeness} />
-          </div>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+          <span style={{ fontSize: '11px', color: 'var(--text-tertiary)' }}>
+            {language === 'zh' ? '完善度' : 'Complete'}
+          </span>
+          <CompletenessBar value={85} />
         </div>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-          <QualityStars score={job.qualityScore} />
-          <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
-            <Users size={12} style={{ color: 'var(--text-tertiary)' }} />
-            <span style={{ fontSize: '11px', color: 'var(--text-tertiary)' }}>{job.subscribers}</span>
-          </div>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+          <QualityStars score={4.5} />
         </div>
       </div>
     </div>
   )
 }
 
-// Job detail modal
-function JobDetailModal({ job, onClose, onSubscribe, isSubscribed, language }: {
-  job: JobKnowledge
+// Knowledge detail modal
+function KnowledgeDetailModal({ item, onClose, language }: {
+  item: KnowledgeItem
   onClose: () => void
-  onSubscribe: (id: string) => void
-  isSubscribed: boolean
   language: 'en' | 'zh'
 }) {
-  const catCfg = categoryConfig[job.category]
+  const catCfg = categoryConfig[item.category] || categoryConfig.other
   const CategoryIcon = catCfg.icon
   
   return (
@@ -238,10 +200,10 @@ function JobDetailModal({ job, onClose, onSubscribe, isSubscribed, language }: {
               </div>
               <div>
                 <h2 style={{ fontSize: '20px', fontWeight: '700', color: 'var(--text-primary)', margin: 0 }}>
-                  {language === 'zh' ? job.title : job.titleEn}
+                  {item.title}
                 </h2>
                 <p style={{ fontSize: '14px', color: 'var(--text-secondary)', margin: '4px 0 0 0' }}>
-                  {language === 'zh' ? job.summaryZh : job.summary}
+                  {language === 'zh' ? catCfg.label : catCfg.labelEn}
                 </p>
               </div>
             </div>
@@ -257,40 +219,6 @@ function JobDetailModal({ job, onClose, onSubscribe, isSubscribed, language }: {
               ✕
             </button>
           </div>
-          
-          {/* Action buttons */}
-          <div style={{ display: 'flex', gap: '10px', marginTop: '16px' }}>
-            <button
-              onClick={() => onSubscribe(job.id)}
-              style={{
-                flex: 1,
-                padding: '12px',
-                borderRadius: '10px',
-                background: isSubscribed ? 'rgba(52, 211, 153, 0.1)' : 'linear-gradient(135deg, #6366F1, #8B5CF6)',
-                border: isSubscribed ? '1px solid rgba(52, 211, 153, 0.3)' : 'none',
-                color: isSubscribed ? '#34D399' : 'white',
-                fontSize: '14px',
-                fontWeight: '600',
-                cursor: 'pointer',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                gap: '8px',
-              }}
-            >
-              {isSubscribed ? (
-                <>
-                  <CheckCircle size={16} />
-                  {language === 'zh' ? '已订阅' : 'Subscribed'}
-                </>
-              ) : (
-                <>
-                  <Plus size={16} />
-                  {language === 'zh' ? '订阅此职业' : 'Subscribe'}
-                </>
-              )}
-            </button>
-          </div>
         </div>
         
         {/* Content */}
@@ -299,7 +227,7 @@ function JobDetailModal({ job, onClose, onSubscribe, isSubscribed, language }: {
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '12px', marginBottom: '24px' }}>
             <div style={{ background: 'var(--bg-tertiary)', borderRadius: '12px', padding: '14px', textAlign: 'center' }}>
               <div style={{ fontSize: '20px', fontWeight: '700', color: catCfg.color }}>
-                {job.completeness}%
+                85%
               </div>
               <div style={{ fontSize: '11px', color: 'var(--text-tertiary)', marginTop: '4px' }}>
                 {language === 'zh' ? '完善度' : 'Completeness'}
@@ -307,7 +235,7 @@ function JobDetailModal({ job, onClose, onSubscribe, isSubscribed, language }: {
             </div>
             <div style={{ background: 'var(--bg-tertiary)', borderRadius: '12px', padding: '14px', textAlign: 'center' }}>
               <div style={{ fontSize: '20px', fontWeight: '700', color: '#FBBF24' }}>
-                {job.qualityScore.toFixed(1)}
+                4.5
               </div>
               <div style={{ fontSize: '11px', color: 'var(--text-tertiary)', marginTop: '4px' }}>
                 {language === 'zh' ? '质量评分' : 'Quality'}
@@ -315,7 +243,7 @@ function JobDetailModal({ job, onClose, onSubscribe, isSubscribed, language }: {
             </div>
             <div style={{ background: 'var(--bg-tertiary)', borderRadius: '12px', padding: '14px', textAlign: 'center' }}>
               <div style={{ fontSize: '20px', fontWeight: '700', color: '#8B5CF6' }}>
-                {job.subscribers}
+                12
               </div>
               <div style={{ fontSize: '11px', color: 'var(--text-tertiary)', marginTop: '4px' }}>
                 {language === 'zh' ? '订阅者' : 'Subscribers'}
@@ -323,14 +251,31 @@ function JobDetailModal({ job, onClose, onSubscribe, isSubscribed, language }: {
             </div>
           </div>
           
-          {/* Capabilities */}
+          {/* Content */}
           <div style={{ marginBottom: '20px' }}>
             <h4 style={{ fontSize: '12px', fontWeight: '600', color: 'var(--text-tertiary)', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '10px' }}>
-              {language === 'zh' ? '核心能力' : 'Core Capabilities'}
+              {language === 'zh' ? '内容' : 'Content'}
+            </h4>
+            <div style={{
+              padding: '14px',
+              borderRadius: '10px',
+              background: 'var(--bg-tertiary)',
+              fontSize: '14px',
+              color: 'var(--text-primary)',
+              lineHeight: 1.6,
+            }}>
+              {item.content || '-'}
+            </div>
+          </div>
+          
+          {/* Tags */}
+          <div>
+            <h4 style={{ fontSize: '12px', fontWeight: '600', color: 'var(--text-tertiary)', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '10px' }}>
+              {language === 'zh' ? '标签' : 'Tags'}
             </h4>
             <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px' }}>
-              {job.capabilities.map(cap => (
-                <span key={cap} style={{
+              {item.tags.map(tag => (
+                <span key={tag} style={{
                   fontSize: '12px',
                   padding: '6px 12px',
                   borderRadius: '8px',
@@ -338,72 +283,16 @@ function JobDetailModal({ job, onClose, onSubscribe, isSubscribed, language }: {
                   color: catCfg.color,
                   border: `1px solid ${catCfg.color}20`,
                 }}>
-                  {cap}
+                  {tag}
                 </span>
-              ))}
-            </div>
-          </div>
-          
-          {/* Tools */}
-          <div style={{ marginBottom: '20px' }}>
-            <h4 style={{ fontSize: '12px', fontWeight: '600', color: 'var(--text-tertiary)', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '10px' }}>
-              {language === 'zh' ? '常用工具' : 'Tools'}
-            </h4>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-              {job.tools.map((tool, i) => (
-                <a
-                  key={i}
-                  href={tool.link || '#'}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  style={{
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'space-between',
-                    padding: '10px 14px',
-                    borderRadius: '10px',
-                    background: 'var(--bg-tertiary)',
-                    color: 'var(--text-primary)',
-                    textDecoration: 'none',
-                    fontSize: '13px',
-                    transition: 'all 0.2s',
-                  }}
-                  onMouseEnter={e => (e.currentTarget.style.background = 'var(--bg-primary)')}
-                  onMouseLeave={e => (e.currentTarget.style.background = 'var(--bg-tertiary)')}
-                >
-                  {tool.name}
-                  <ExternalLink size={14} style={{ color: 'var(--text-tertiary)' }} />
-                </a>
-              ))}
-            </div>
-          </div>
-          
-          {/* Best practices */}
-          <div>
-            <h4 style={{ fontSize: '12px', fontWeight: '600', color: 'var(--text-tertiary)', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '10px' }}>
-              {language === 'zh' ? '最佳实践' : 'Best Practices'}
-            </h4>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-              {job.bestPractices.map((practice, i) => (
-                <div key={i} style={{
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: '10px',
-                  padding: '10px 14px',
-                  borderRadius: '10px',
-                  background: 'var(--bg-tertiary)',
-                }}>
-                  <CheckCircle size={14} style={{ color: '#34D399', flexShrink: 0 }} />
-                  <span style={{ fontSize: '13px', color: 'var(--text-primary)' }}>{practice}</span>
-                </div>
               ))}
             </div>
           </div>
           
           {/* Footer */}
           <div style={{ marginTop: '24px', paddingTop: '16px', borderTop: '1px solid var(--border)', display: 'flex', justifyContent: 'space-between', fontSize: '12px', color: 'var(--text-tertiary)' }}>
-            <span>{language === 'zh' ? '最后更新' : 'Last updated'}: {job.lastUpdatedBy}</span>
-            <span>{job.updatedAt}</span>
+            <span>{language === 'zh' ? '创建于' : 'Created'}: {item.createdAt ? new Date(item.createdAt).toLocaleDateString() : '-'}</span>
+            <span>{language === 'zh' ? '更新于' : 'Updated'}: {item.updatedAt ? new Date(item.updatedAt).toLocaleDateString() : '-'}</span>
           </div>
         </div>
       </div>
@@ -423,21 +312,60 @@ export default function Knowledge() {
   const [activeTab, setActiveTab] = useState<'discover' | 'subscriptions' | 'contribute'>('discover')
   const [search, setSearch] = useState('')
   const [selectedCategory, setSelectedCategory] = useState<string>('all')
-  const [selectedJob, setSelectedJob] = useState<JobKnowledge | null>(null)
-  const [subscribedIds, setSubscribedIds] = useState<Set<string>>(new Set(['job-1', 'job-4']))
-  
-  // Filter jobs
-  const filteredJobs = mockJobs.filter(job => {
-    const matchesSearch = 
-      job.title.toLowerCase().includes(search.toLowerCase()) ||
-      job.titleEn.toLowerCase().includes(search.toLowerCase()) ||
-      job.tags.some(tag => tag.toLowerCase().includes(search.toLowerCase()))
-    const matchesCategory = selectedCategory === 'all' || job.category === selectedCategory
-    return matchesSearch && matchesCategory
-  })
-  
-  const subscribedJobs = mockJobs.filter(job => subscribedIds.has(job.id))
-  
+  const [selectedItem, setSelectedItem] = useState<KnowledgeItem | null>(null)
+  const [subscribedIds, setSubscribedIds] = useState<Set<string>>(new Set())
+  const [items, setItems] = useState<KnowledgeItem[]>([])
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
+  const [searching, setSearching] = useState(false)
+
+  // Fetch knowledge items
+  const fetchKnowledge = async (category?: string) => {
+    setLoading(true)
+    setError(null)
+    try {
+      const res = await api.knowledge.list(category && category !== 'all' ? { category } : undefined)
+      setItems(res.data || [])
+    } catch (err: any) {
+      setError(err.message || 'Failed to load knowledge')
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  // Search knowledge
+  const searchKnowledge = async (query: string, category?: string) => {
+    if (!query.trim()) {
+      fetchKnowledge(category)
+      return
+    }
+    setSearching(true)
+    setError(null)
+    try {
+      const res = await api.knowledge.search(query, category && category !== 'all' ? category : undefined)
+      setItems(res.data || [])
+    } catch (err: any) {
+      setError(err.message || 'Search failed')
+    } finally {
+      setSearching(false)
+    }
+  }
+
+  useEffect(() => {
+    if (activeTab === 'discover' || activeTab === 'subscriptions') {
+      fetchKnowledge(selectedCategory !== 'all' ? selectedCategory : undefined)
+    }
+  }, [activeTab, selectedCategory])
+
+  // Handle search
+  const handleSearch = () => {
+    if (search.trim()) {
+      searchKnowledge(search, selectedCategory !== 'all' ? selectedCategory : undefined)
+    } else {
+      fetchKnowledge(selectedCategory !== 'all' ? selectedCategory : undefined)
+    }
+  }
+
   const handleSubscribe = (id: string) => {
     setSubscribedIds(prev => {
       const next = new Set(prev)
@@ -450,13 +378,23 @@ export default function Knowledge() {
     })
   }
   
-  const getTabJobs = () => {
+  const filteredItems = items.filter(item => {
+    const matchesSearch = 
+      item.title.toLowerCase().includes(search.toLowerCase()) ||
+      (item.content && item.content.toLowerCase().includes(search.toLowerCase())) ||
+      item.tags.some(tag => tag.toLowerCase().includes(search.toLowerCase()))
+    return matchesSearch
+  })
+  
+  const subscribedItems = items.filter(item => subscribedIds.has(item.id))
+  
+  const getTabItems = () => {
     switch (activeTab) {
       case 'subscriptions':
-        return subscribedJobs
+        return subscribedItems
       case 'discover':
       default:
-        return filteredJobs
+        return filteredItems
     }
   }
   
@@ -550,6 +488,7 @@ export default function Knowledge() {
           <input
             value={search}
             onChange={e => setSearch(e.target.value)}
+            onKeyDown={e => e.key === 'Enter' && handleSearch()}
             placeholder={language === 'zh' ? '搜索职业、能力或工具...' : 'Search jobs, skills, or tools...'}
             style={{
               flex: 1,
@@ -560,6 +499,7 @@ export default function Knowledge() {
               outline: 'none',
             }}
           />
+          {searching && <Loader2 size={16} style={{ color: 'var(--text-tertiary)', animation: 'spin 1s linear infinite' }} />}
         </div>
         
         {/* Category filters */}
@@ -610,15 +550,39 @@ export default function Knowledge() {
         )}
       </div>
       
+      {/* Error state */}
+      {error && (
+        <div style={{
+          padding: '16px 20px',
+          background: 'rgba(248, 113, 113, 0.1)',
+          border: '1px solid rgba(248, 113, 113, 0.3)',
+          borderRadius: '12px',
+          marginBottom: '16px',
+          display: 'flex',
+          alignItems: 'center',
+          gap: '10px',
+        }}>
+          <AlertCircle size={18} style={{ color: '#F87171' }} />
+          <span style={{ fontSize: '14px', color: '#F87171' }}>{error}</span>
+        </div>
+      )}
+      
       {/* Content */}
       <div style={{ flex: 1, overflow: 'auto' }}>
-        {activeTab === 'discover' && (
+        {loading ? (
+          <div style={{ textAlign: 'center', padding: '64px 20px' }}>
+            <Loader2 size={40} style={{ color: 'var(--text-tertiary)', margin: '0 auto 16px', animation: 'spin 1s linear infinite' }} />
+            <p style={{ fontSize: '14px', color: 'var(--text-secondary)' }}>
+              {language === 'zh' ? '加载中...' : 'Loading...'}
+            </p>
+          </div>
+        ) : activeTab === 'discover' && (
           <>
-            {filteredJobs.length === 0 ? (
+            {getTabItems().length === 0 ? (
               <div style={{ textAlign: 'center', padding: '64px 20px' }}>
                 <BookOpen size={48} style={{ color: 'var(--text-tertiary)', margin: '0 auto 16px' }} />
                 <p style={{ fontSize: '16px', color: 'var(--text-secondary)', marginBottom: '8px' }}>
-                  {language === 'zh' ? '未找到匹配的职业' : 'No matching jobs found'}
+                  {language === 'zh' ? '未找到匹配的知识' : 'No matching knowledge found'}
                 </p>
                 <p style={{ fontSize: '14px', color: 'var(--text-tertiary)' }}>
                   {language === 'zh' ? '尝试其他关键词或筛选条件' : 'Try different keywords or filters'}
@@ -630,13 +594,13 @@ export default function Knowledge() {
                 gridTemplateColumns: 'repeat(auto-fill, minmax(320px, 1fr))',
                 gap: '16px',
               }}>
-                {filteredJobs.map(job => (
-                  <JobCard
-                    key={job.id}
-                    job={job}
+                {getTabItems().map(item => (
+                  <KnowledgeCard
+                    key={item.id}
+                    item={item}
                     onSubscribe={handleSubscribe}
-                    onView={setSelectedJob}
-                    isSubscribed={subscribedIds.has(job.id)}
+                    onView={setSelectedItem}
+                    isSubscribed={subscribedIds.has(item.id)}
                     language={language}
                   />
                 ))}
@@ -647,14 +611,14 @@ export default function Knowledge() {
         
         {activeTab === 'subscriptions' && (
           <>
-            {subscribedJobs.length === 0 ? (
+            {getTabItems().length === 0 ? (
               <div style={{ textAlign: 'center', padding: '64px 20px' }}>
                 <Star size={48} style={{ color: 'var(--text-tertiary)', margin: '0 auto 16px' }} />
                 <p style={{ fontSize: '16px', color: 'var(--text-secondary)', marginBottom: '8px' }}>
                   {language === 'zh' ? '暂无订阅' : 'No subscriptions yet'}
                 </p>
                 <p style={{ fontSize: '14px', color: 'var(--text-tertiary)' }}>
-                  {language === 'zh' ? '去发现页订阅感兴趣的职业技能' : 'Go to Discover to subscribe to jobs'}
+                  {language === 'zh' ? '去发现页订阅感兴趣的知识' : 'Go to Discover to subscribe'}
                 </p>
               </div>
             ) : (
@@ -663,12 +627,12 @@ export default function Knowledge() {
                 gridTemplateColumns: 'repeat(auto-fill, minmax(320px, 1fr))',
                 gap: '16px',
               }}>
-                {subscribedJobs.map(job => (
-                  <JobCard
-                    key={job.id}
-                    job={job}
+                {getTabItems().map(item => (
+                  <KnowledgeCard
+                    key={item.id}
+                    item={item}
                     onSubscribe={handleSubscribe}
-                    onView={setSelectedJob}
+                    onView={setSelectedItem}
                     isSubscribed={true}
                     language={language}
                   />
@@ -696,39 +660,22 @@ export default function Knowledge() {
               <Plus size={32} style={{ color: '#8B5CF6' }} />
             </div>
             <h3 style={{ fontSize: '20px', fontWeight: '600', color: 'var(--text-primary)', marginBottom: '8px' }}>
-              {language === 'zh' ? '贡献职业知识' : 'Contribute Job Knowledge'}
+              {language === 'zh' ? '贡献知识' : 'Contribute Knowledge'}
             </h3>
             <p style={{ fontSize: '14px', color: 'var(--text-tertiary)', maxWidth: 400, lineHeight: 1.6 }}>
               {language === 'zh' 
-                ? '帮助完善团队的职业能力知识库。分享你的经验，贡献最佳实践，让团队更强大。'
-                : 'Help improve the team\'s professional knowledge base. Share your experience and contribute best practices.'}
+                ? '帮助完善团队的知识库。分享你的经验，贡献最佳实践，让团队更强大。'
+                : 'Help improve the team knowledge base. Share your experience and contribute best practices.'}
             </p>
-            <button
-              style={{
-                marginTop: '24px',
-                padding: '14px 28px',
-                borderRadius: '12px',
-                background: 'linear-gradient(135deg, #6366F1, #8B5CF6)',
-                border: 'none',
-                color: 'white',
-                fontSize: '14px',
-                fontWeight: '600',
-                cursor: 'pointer',
-              }}
-            >
-              {language === 'zh' ? '创建新职业' : 'Create New Job'}
-            </button>
           </div>
         )}
       </div>
       
-      {/* Job detail modal */}
-      {selectedJob && (
-        <JobDetailModal
-          job={selectedJob}
-          onClose={() => setSelectedJob(null)}
-          onSubscribe={handleSubscribe}
-          isSubscribed={subscribedIds.has(selectedJob.id)}
+      {/* Knowledge detail modal */}
+      {selectedItem && (
+        <KnowledgeDetailModal
+          item={selectedItem}
+          onClose={() => setSelectedItem(null)}
           language={language}
         />
       )}
@@ -739,6 +686,7 @@ export default function Knowledge() {
           transform: translateY(-2px);
           box-shadow: 0 8px 24px rgba(0,0,0,0.1);
         }
+        @keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
       `}</style>
     </div>
   )

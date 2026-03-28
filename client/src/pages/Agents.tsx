@@ -1,16 +1,17 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { 
   Bot, Settings, Power, CheckCircle, XCircle, 
   AlertCircle, Search,
   Zap, Brain, Code, TestTube, ClipboardList,
   FolderKanban, Clock, Coins, Calendar, Play,
-  Bell, X, Loader2, WifiOff
+  Bell, X, Loader2, WifiOff, RefreshCw, Trash2
 } from 'lucide-react'
 import { useDashboardStore } from '../stores/dashboardStore'
 import { useLanguage } from '../context/LanguageContext'
 import { useDeployMode } from '../context/DeployModeContext'
 import AgentConfigModal from '../components/AgentConfigModal'
+import { api } from '../lib/api'
 
 const agentIcons: Record<string, any> = {
   'Planner Agent': ClipboardList,
@@ -62,9 +63,27 @@ const agentDescZh: Record<string, string> = {
 
 const models = ['gpt-4', 'gpt-4-turbo', 'claude-3', 'claude-3.5', 'gemini-pro']
 
+// Agent interface from API
+interface Agent {
+  id: string
+  name: string
+  role: string
+  status: string
+  modelProvider?: string
+  modelName: string
+  systemPrompt?: string
+  skills?: string[]
+  enabled: boolean
+  createdAt?: string
+  projectCount?: number
+  avgCompleteTime?: string
+  totalTokens?: number
+  runningDays?: number
+}
+
 export default function Agents() {
   const { language } = useLanguage()
-  const { agents: storeAgents } = useDashboardStore()
+  const { agents: storeAgents, setAgents, updateAgent, deleteAgent } = useDashboardStore()
   const { isConnected } = useDeployMode()
   const [search, setSearch] = useState('')
   const [showConfig, setShowConfig] = useState<string | null>(null)
@@ -72,17 +91,54 @@ export default function Agents() {
   const [pendingModel, setPendingModel] = useState<Record<string, string>>({})
   const [showAlertDropdown, setShowAlertDropdown] = useState(false)
   const [showGlobalConfig, setShowGlobalConfig] = useState(false)
+  const [loading, setLoading] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+  const [deletingId, setDeletingId] = useState<string | null>(null)
   const navigate = useNavigate()
 
-  // Use store agents only - do NOT auto-load default agents
-  const agents = storeAgents
+  // Fetch agents from API
+  const fetchAgents = async () => {
+    setLoading(true)
+    setError(null)
+    try {
+      const res = await api.agents.list()
+      // Transform API response to match expected format
+      const agents: Agent[] = (res.data || []).map((a: any) => ({
+        id: a.id,
+        name: a.name,
+        role: a.role,
+        status: a.status || 'offline',
+        modelProvider: a.model_provider,
+        modelName: a.model_name,
+        systemPrompt: a.system_prompt,
+        skills: a.skills || [],
+        enabled: a.enabled !== false,
+        createdAt: a.created_at,
+      }))
+      setAgents(agents as any)
+    } catch (err: any) {
+      setError(err.message || 'Failed to load agents')
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  // Initial load
+  useEffect(() => {
+    if (isConnected && storeAgents.length === 0) {
+      fetchAgents()
+    }
+  }, [isConnected])
+
+  // Use store agents
+  const agents = storeAgents as Agent[]
 
   const filteredAgents = agents.filter(agent => 
     agent.name.toLowerCase().includes(search.toLowerCase()) ||
-    agent.modelName.toLowerCase().includes(search.toLowerCase())
+    agent.modelName?.toLowerCase().includes(search.toLowerCase())
   )
 
-  // Mock error logs for agents
+  // Mock error logs for agents (in real app, this would come from API)
   const agentErrorLogs = [
     { agentId: '4', agentName: 'Reviewer Agent', error: 'API rate limit exceeded', time: '2 min ago' },
     { agentId: '2', agentName: 'Frontend Developer', error: 'Failed to fetch component schema', time: '15 min ago' },
@@ -137,6 +193,30 @@ export default function Agents() {
     navigate(`/knowledge?agent=${encodeURIComponent(agentName)}`)
   }
 
+  // Update agent status via API
+  const handleToggleAgent = async (agentId: string, enabled: boolean) => {
+    try {
+      await api.agents.update(agentId, { enabled: !enabled })
+      updateAgent(agentId, { enabled: !enabled } as any)
+    } catch (err: any) {
+      alert(err.message || 'Failed to update agent')
+    }
+  }
+
+  // Delete agent via API
+  const handleDeleteAgent = async (agentId: string) => {
+    if (!confirm(language === 'zh' ? '确定删除此智能体？' : 'Delete this agent?')) return
+    setDeletingId(agentId)
+    try {
+      await api.agents.delete(agentId)
+      deleteAgent(agentId)
+    } catch (err: any) {
+      alert(err.message || 'Failed to delete agent')
+    } finally {
+      setDeletingId(null)
+    }
+  }
+
   const formatToken = (token: number) => {
     if (token >= 1000000) return (token / 1000000).toFixed(1) + 'M'
     if (token >= 1000) return (token / 1000).toFixed(0) + 'K'
@@ -162,18 +242,7 @@ export default function Agents() {
           padding: '80px 20px',
           textAlign: 'center'
         }}>
-          <div style={{ 
-            width: '80px', 
-            height: '80px', 
-            borderRadius: '50%', 
-            background: 'rgba(248, 113, 113, 0.1)', 
-            display: 'flex', 
-            alignItems: 'center', 
-            justifyContent: 'center',
-            marginBottom: '24px'
-          }}>
-            <Loader2 size={40} style={{ color: '#F87171', animation: 'spin 2s linear infinite' }} />
-          </div>
+          <Loader2 size={40} style={{ color: 'var(--text-tertiary)', margin: '0 auto 24px', animation: 'spin 2s linear infinite' }} />
           <h2 style={{ fontSize: '20px', fontWeight: '600', color: 'var(--text-primary)', marginBottom: '8px' }}>
             {language === 'zh' ? '等待 Teams 服务器连接...' : 'Waiting for Teams Server Connection...'}
           </h2>
@@ -205,6 +274,25 @@ export default function Agents() {
           </p>
         </div>
         <div style={{ display: 'flex', alignItems: 'center', gap: '12px', position: 'relative' }}>
+          {/* Refresh button */}
+          <button
+            onClick={fetchAgents}
+            disabled={loading}
+            style={{
+              padding: '10px',
+              background: 'var(--bg-card)',
+              border: '1px solid var(--border)',
+              borderRadius: '10px',
+              cursor: 'pointer',
+              transition: 'all 0.2s',
+              display: 'flex',
+              alignItems: 'center',
+            }}
+            title={language === 'zh' ? '刷新' : 'Refresh'}
+          >
+            <RefreshCw size={18} style={{ color: 'var(--text-secondary)', animation: loading ? 'spin 1s linear infinite' : 'none' }} />
+          </button>
+
           {/* Bell Icon with Alert Dropdown */}
           <button
             onClick={() => setShowAlertDropdown(!showAlertDropdown)}
@@ -328,8 +416,33 @@ export default function Agents() {
         </div>
       </div>
 
-      {/* Stats Cards - Empty State if no agents */}
-      {agents.length === 0 ? (
+      {/* Error state */}
+      {error && (
+        <div style={{
+          padding: '16px 20px',
+          background: 'rgba(248, 113, 113, 0.1)',
+          border: '1px solid rgba(248, 113, 113, 0.3)',
+          borderRadius: '12px',
+          marginBottom: '16px',
+          display: 'flex',
+          alignItems: 'center',
+          gap: '10px',
+        }}>
+          <AlertCircle size={18} style={{ color: '#F87171' }} />
+          <span style={{ fontSize: '14px', color: '#F87171' }}>{error}</span>
+        </div>
+      )}
+
+      {/* Loading state */}
+      {loading && agents.length === 0 ? (
+        <div className="card" style={{ textAlign: 'center', padding: '64px 48px', marginBottom: '24px' }}>
+          <Loader2 size={48} style={{ color: 'var(--text-tertiary)', margin: '0 auto 20px', animation: 'spin 1s linear infinite' }} />
+          <p style={{ fontSize: '16px', color: 'var(--text-secondary)' }}>
+            {language === 'zh' ? '加载智能体列表...' : 'Loading agents...'}
+          </p>
+        </div>
+      ) : agents.length === 0 ? (
+        /* Empty state */
         <div className="card" style={{ textAlign: 'center', padding: '64px 48px', marginBottom: '24px' }}>
           <Bot size={56} style={{ color: 'var(--text-tertiary)', margin: '0 auto 20px' }} />
           <p style={{ fontSize: '18px', fontWeight: '600', color: 'var(--text-secondary)', marginBottom: '8px' }}>
@@ -403,9 +516,10 @@ export default function Agents() {
               const AgentIcon = agentIcons[agent.name] || Bot
               const agentColor = agentColors[agent.name] || '#6366F1'
               const hasPendingChange = pendingModel[agent.id] && pendingModel[agent.id] !== selectedModel[agent.id]
+              const isDeleting = deletingId === agent.id
               
               return (
-                <div key={agent.id} className="card animate-slide-up" style={{ padding: '24px', animationDelay: `${0.1 + index * 0.05}s` }}>
+                <div key={agent.id} className="card animate-slide-up" style={{ padding: '24px', animationDelay: `${0.1 + index * 0.05}s`, opacity: isDeleting ? 0.5 : 1 }}>
                   {/* Header */}
                   <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', marginBottom: '16px' }}>
                     <div style={{ display: 'flex', alignItems: 'center', gap: '14px' }}>
@@ -424,6 +538,13 @@ export default function Agents() {
                     <div style={{ display: 'flex', gap: '6px' }}>
                       <button onClick={() => handleKnowledgeConfig(agent.name)} style={{ padding: '8px', background: 'var(--bg-tertiary)', border: '1px solid var(--border)', borderRadius: '10px', cursor: 'pointer', transition: 'all 0.2s' }} className="knowledge-btn" title={language === 'zh' ? '知识库配置' : 'Knowledge Config'}>
                         <Brain size={16} style={{ color: 'var(--text-secondary)' }} />
+                      </button>
+                      <button onClick={() => handleDeleteAgent(agent.id)} disabled={isDeleting} style={{ padding: '8px', background: 'var(--bg-tertiary)', border: '1px solid var(--border)', borderRadius: '10px', cursor: isDeleting ? 'not-allowed' : 'pointer', transition: 'all 0.2s' }} title={language === 'zh' ? '删除' : 'Delete'}>
+                        {isDeleting ? (
+                          <Loader2 size={16} style={{ color: 'var(--text-tertiary)', animation: 'spin 1s linear infinite' }} />
+                        ) : (
+                          <Trash2 size={16} style={{ color: '#F87171' }} />
+                        )}
                       </button>
                       <button onClick={() => handleConfigClick(agent.id, agent.modelName)} style={{ padding: '8px', background: showConfig === agent.id ? 'var(--primary)' : 'var(--bg-tertiary)', border: '1px solid var(--border)', borderRadius: '10px', cursor: 'pointer', transition: 'all 0.2s' }} className="config-btn">
                         <Settings size={16} style={{ color: showConfig === agent.id ? '#fff' : 'var(--text-secondary)' }} />
@@ -518,7 +639,28 @@ export default function Agents() {
 
                   {/* Actions */}
                   <div style={{ display: 'flex', gap: '10px', paddingTop: '12px' }}>
-                    <button style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px', padding: '12px', borderRadius: '12px', fontSize: '14px', fontWeight: '600', border: 'none', cursor: 'pointer', transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)', background: agent.enabled ? 'linear-gradient(135deg, #DC2626, #F43F5E)' : 'linear-gradient(135deg, #059669, #10B981)', color: 'white', boxShadow: agent.enabled ? '0 4px 16px rgba(220, 38, 38, 0.3)' : '0 4px 16px rgba(5, 150, 105, 0.3)' }} className="power-btn">
+                    <button 
+                      onClick={() => handleToggleAgent(agent.id, agent.enabled)}
+                      disabled={isDeleting}
+                      style={{ 
+                        flex: 1, 
+                        display: 'flex', 
+                        alignItems: 'center', 
+                        justifyContent: 'center', 
+                        gap: '8px', 
+                        padding: '12px', 
+                        borderRadius: '12px', 
+                        fontSize: '14px', 
+                        fontWeight: '600', 
+                        border: 'none', 
+                        cursor: isDeleting ? 'not-allowed' : 'pointer', 
+                        transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)', 
+                        background: agent.enabled ? 'linear-gradient(135deg, #DC2626, #F43F5E)' : 'linear-gradient(135deg, #059669, #10B981)', 
+                        color: 'white', 
+                        boxShadow: agent.enabled ? '0 4px 16px rgba(220, 38, 38, 0.3)' : '0 4px 16px rgba(5, 150, 105, 0.3)' 
+                      }} 
+                      className="power-btn"
+                    >
                       <Power size={16} />
                       {agent.enabled ? (language === 'zh' ? '禁用' : 'Disable') : (language === 'zh' ? '启用' : 'Enable')}
                     </button>
