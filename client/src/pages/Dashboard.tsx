@@ -27,6 +27,7 @@ import {
   RefreshCw,
 } from 'lucide-react'
 import { useDashboardStore } from '../stores/dashboardStore'
+import type { Agent } from '../stores/dashboardStore'
 import { useLanguage } from '../context/LanguageContext'
 import { useDeployMode } from '../context/DeployModeContext'
 
@@ -125,7 +126,6 @@ function QuickAction({ icon, label, color, onClick }: {
 }
 
 // Agent mini card
-import { Agent } from '../stores/dashboardStore'
 
 function AgentMiniCard({ agent, language }: { agent: Agent; language: 'en' | 'zh' }) {
   const cfg = agentStatusConfig[agent.status as keyof typeof agentStatusConfig]
@@ -165,7 +165,7 @@ function AgentMiniCard({ agent, language }: { agent: Agent; language: 'en' | 'zh
           {agent.name}
         </div>
         <div style={{ fontSize: '11px', color: 'var(--text-tertiary)' }}>
-          {agent.tasks} {language === 'zh' ? '个任务' : 'tasks'}
+          {(agent as any).tasks || 0} {language === 'zh' ? '个任务' : 'tasks'}
         </div>
       </div>
       
