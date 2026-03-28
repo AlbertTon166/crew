@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { useNavigate } from 'react-router-dom'
 import { X, Lock, Mail, AlertCircle, Check, Sparkles, Eye, Loader2, Zap } from 'lucide-react'
 import { useAuth } from '../context/AuthContext'
 import { useLanguage } from '../context/LanguageContext'
@@ -10,7 +11,8 @@ interface LoginModalProps {
 }
 
 export default function LoginModal({ isOpen, onClose }: LoginModalProps) {
-  const { login, user, users } = useAuth()
+  const navigate = useNavigate()
+  const { login, user, users, updateUser } = useAuth()
   const { language } = useLanguage()
   const { loadDemoData } = useDemo()
   
@@ -72,17 +74,26 @@ export default function LoginModal({ isOpen, onClose }: LoginModalProps) {
       createdAt: new Date().toISOString(),
     }
     
-    // Save to localStorage (in real app this would be an API call)
+    // Add user to auth context (this also saves to localStorage via useEffect)
+    // We need to directly update the users state and set current user
     const updatedUsers = [...users, newUser]
+    
+    // Manually trigger the storage update since we're bypassing the context's updateUser
     localStorage.setItem('auth_users', JSON.stringify(updatedUsers))
-    localStorage.setItem('auth_user', JSON.stringify(newUser))
+    
+    // Set session expiry
     localStorage.setItem('auth_session_expiry', (Date.now() + 30 * 24 * 60 * 60 * 1000).toString())
+    
+    // Set current user in localStorage (AuthContext will pick this up on next render)
+    localStorage.setItem('auth_user', JSON.stringify(newUser))
     
     setSuccess(language === 'zh' ? '注册成功！正在进入...' : 'Registration successful! Entering...')
     
+    // Close modal and navigate to dashboard
     setTimeout(() => {
-      window.location.reload()
-    }, 1000)
+      onClose()
+      navigate('/dashboard')
+    }, 500)
     
     setIsLoading(false)
   }
@@ -92,7 +103,7 @@ export default function LoginModal({ isOpen, onClose }: LoginModalProps) {
     await loadDemoData()
     setTimeout(() => {
       onClose()
-      window.location.reload()
+      navigate('/dashboard')
     }, 500)
     setIsLoading(false)
   }
