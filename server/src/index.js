@@ -24,6 +24,7 @@ import usersRouter from './routes/users.js';
 import userRolesRouter from './routes/userRoles.js';
 import rolesRouter from './routes/roles.js';
 import webhooksRouter from './routes/webhooks.js';
+import apiKeysRouter from './routes/api-keys.js';
 import demoRouter from './routes/demo.js';
 
 // Create Express app
@@ -83,6 +84,7 @@ app.get('/', (req, res) => {
       agents: '/api/agents',
       teams: '/api/teams',
       execution: '/api/execution',
+      'api-keys': '/api/api-keys',
       demo: '/api/demo',
     },
   });
@@ -96,6 +98,7 @@ app.use('/api/users', usersRouter);
 app.use('/api/users', userRolesRouter);
 app.use('/api/roles', rolesRouter);
 app.use('/api/webhooks', webhooksRouter);
+app.use('/api/api-keys', apiKeysRouter);
 app.use('/api/projects', projectsRouter);
 app.use('/api/tasks', tasksRouter);
 app.use('/api/agents', agentsRouter);

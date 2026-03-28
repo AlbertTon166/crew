@@ -125,6 +125,7 @@ model ApiKey {
   model     String
   status    String    @default("active")
   lastUsed  DateTime?
+  tenantId  String?
   createdAt DateTime  @default(now())
 }
 
