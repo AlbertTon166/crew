@@ -74,49 +74,14 @@ const priorityConfig = {
   P3: { label: 'P3', color: '#64748B', bg: 'rgba(100, 116, 139, 0.15)' },
 }
 
-const priorityConfig = {
-  critical: { label: '紧急', labelEn: 'Critical', color: '#EF4444' },
-  high: { label: '高', labelEn: 'High', color: '#F97316' },
-  medium: { label: '中', labelEn: 'Medium', color: '#FBBF24' },
-  low: { label: '低', labelEn: 'Low', color: '#22C55E' },
-}
-
 const timeoutStrategyConfig = {
   retry: { label: '重试', labelEn: 'Retry', color: '#F59E0B' },
   fallback: { label: '降级', labelEn: 'Fallback', color: '#8B5CF6' },
   interrupt: { label: '中断', labelEn: 'Interrupt', color: '#EF4444' },
 }
 
-// Priority badge
-function PriorityBadge({ priority }: { priority: string }) {
-  const cfg = priorityConfig[priority as keyof typeof priorityConfig] || priorityConfig.P3
-  return (
-    <span style={{
-      fontSize: '10px',
-      fontWeight: '600',
-      padding: '2px 6px',
-      borderRadius: '4px',
-      background: cfg.bg,
-      color: cfg.color,
-    }}>
-      {cfg.label}
-    </span>
-  )
-}
-
-// Status badge
-function StatusBadge({ status }: { status: string }) {
-  const cfg = statusConfig[status as keyof typeof statusConfig] || statusConfig.new
-  return (
-    <span style={{
-      fontSize: '10px',
-      fontWeight: '500',
-      padding: '3px 8px',
-      borderRadius: '6px',
-      background: cfg.bg,
-      color: cfg.color,
-      border: `1px solid ${cfg.border}`,
-    }}>
+// Mock data
+const mockProjects: Project[] = [
       {cfg.label}
     </span>
   )

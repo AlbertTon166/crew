@@ -55,17 +55,29 @@ const activityTypes = [
 ]
 
 // Mock data
-const mockAgents: any[] = []
+const mockAgents = [
+  { id: '1', name: 'Coder', role: 'coder', status: 'online', model: 'GPT-4o', tasks: 3 },
+  { id: '2', name: 'Reviewer', role: 'reviewer', status: 'busy', model: 'Claude-3.5', tasks: 2 },
+  { id: '3', name: 'PM', role: 'pm', status: 'thinking', model: 'GPT-4o', tasks: 1 },
+  { id: '4', name: 'Tester', role: 'tester', status: 'idle', model: 'DeepSeek', tasks: 0 },
+  { id: '5', name: 'Deployer', role: 'deployer', status: 'offline', model: 'GPT-4o-mini', tasks: 0 },
+]
 
-const mockActivities: any[] = []
+const mockActivities = [
+  { id: '1', type: 'task', agent: 'Coder', content: '完成了 API 集成模块', time: '2min ago' },
+  { id: '2', type: 'review', agent: 'Reviewer', content: '通过代码审查 #23', time: '5min ago' },
+  { id: '3', type: 'deploy', agent: 'Deployer', content: '上线版本 v2.1.0', time: '12min ago' },
+  { id: '4', type: 'task', agent: 'Coder', content: '修复登录 bug', time: '1h ago' },
+  { id: '5', type: 'message', agent: 'PM', content: '确认需求：支付模块', time: '2h ago' },
+]
 
 const mockStats = {
-  activeAgents: 0,
-  totalTasks: 0,
-  completedToday: 0,
-  pendingTasks: 0,
-  totalTokens: 0,
-  todayCost: 0,
+  activeAgents: 4,
+  totalTasks: 12,
+  completedToday: 3,
+  pendingTasks: 7,
+  totalTokens: 2847293,
+  todayCost: 10.53,
 }
 
 // Quick action
