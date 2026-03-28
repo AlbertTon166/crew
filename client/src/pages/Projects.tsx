@@ -74,6 +74,13 @@ const priorityConfig = {
   P3: { label: 'P3', color: '#64748B', bg: 'rgba(100, 116, 139, 0.15)' },
 }
 
+const priorityConfig = {
+  critical: { label: '紧急', labelEn: 'Critical', color: '#EF4444' },
+  high: { label: '高', labelEn: 'High', color: '#F97316' },
+  medium: { label: '中', labelEn: 'Medium', color: '#FBBF24' },
+  low: { label: '低', labelEn: 'Low', color: '#22C55E' },
+}
+
 const timeoutStrategyConfig = {
   retry: { label: '重试', labelEn: 'Retry', color: '#F59E0B' },
   fallback: { label: '降级', labelEn: 'Fallback', color: '#8B5CF6' },
