@@ -25,11 +25,13 @@ import {
   Play,
   Pause,
   RefreshCw,
+  Loader2,
 } from 'lucide-react'
 import { useDashboardStore } from '../stores/dashboardStore'
 import type { Agent } from '../stores/dashboardStore'
 import { useLanguage } from '../context/LanguageContext'
 import { useDeployMode } from '../context/DeployModeContext'
+import { api } from '../lib/api'
 
 // Agent status config
 const agentStatusConfig = {
@@ -186,9 +188,34 @@ function AgentMiniCard({ agent, language }: { agent: Agent; language: 'en' | 'zh
 export default function Dashboard() {
   const navigate = useNavigate()
   const { language } = useLanguage()
-  const { agents, stats, projects, resources, setAgents } = useDashboardStore()
+  const { agents, stats, projects, resources, setAgents, setProjects } = useDashboardStore()
   const { isConnected } = useDeployMode()
   
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
+
+  // Fetch agents and projects from API
+  useEffect(() => {
+    async function fetchData() {
+      try {
+        setLoading(true)
+        setError(null)
+        const [agentsData, projectsData] = await Promise.all([
+          api.agents.list(),
+          api.projects.list(),
+        ])
+        setAgents(agentsData.agents || agentsData || [])
+        setProjects(projectsData.projects || projectsData || [])
+      } catch (err: any) {
+        console.error('Failed to fetch dashboard data:', err)
+        setError(err.message || 'Failed to load data')
+      } finally {
+        setLoading(false)
+      }
+    }
+    fetchData()
+  }, [setAgents, setProjects])
+
   // Compute stats from actual data
   const activeAgents = agents.filter(a => a.status === 'online' || a.status === 'busy').length
   const totalTasks = Object.values({}).length // No tasks in store yet
@@ -256,20 +283,47 @@ export default function Dashboard() {
         </p>
       </div>
 
-      {/* Quick Actions */}
-      <div style={{ marginBottom: '32px' }}>
-        <h2 style={{ fontSize: '14px', fontWeight: '600', color: 'var(--text-tertiary)', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '12px' }}>
-          {language === 'zh' ? '快捷操作' : 'Quick Actions'}
-        </h2>
-        <div style={{ display: 'flex', gap: '12px', flexWrap: 'wrap' }}>
-          {quickActions.map((action, i) => (
-            <QuickAction key={i} {...action} />
-          ))}
+      {/* Loading State */}
+      {loading && (
+        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: '80px 20px', gap: '16px' }}>
+          <Loader2 size={40} style={{ color: 'var(--primary)', animation: 'spin 1s linear infinite' }} />
+          <p style={{ color: 'var(--text-secondary)', fontSize: '14px' }}>
+            {language === 'zh' ? '加载中...' : 'Loading...'}
+          </p>
         </div>
-      </div>
+      )}
 
-      {/* Main Grid */}
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 340px', gap: '20px' }}>
+      {/* Error State */}
+      {error && !loading && (
+        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: '60px 20px', gap: '16px' }}>
+          <AlertCircle size={40} style={{ color: '#EF4444' }} />
+          <p style={{ color: 'var(--text-secondary)', fontSize: '14px' }}>{error}</p>
+          <button
+            onClick={() => { setLoading(true); setError(null); Promise.all([api.agents.list(), api.projects.list()]).then(([agentsData, projectsData]) => { setAgents(agentsData.agents || agentsData || []); setProjects(projectsData.projects || projectsData || []); }).catch(e => setError(e.message)).finally(() => setLoading(false)) }}
+            style={{ padding: '8px 16px', borderRadius: '8px', border: 'none', background: 'var(--primary)', color: 'white', fontSize: '13px', cursor: 'pointer' }}
+          >
+            {language === 'zh' ? '重试' : 'Retry'}
+          </button>
+        </div>
+      )}
+
+      {/* Main Content */}
+      {!loading && !error && (
+      <>
+        {/* Quick Actions */}
+        <div style={{ marginBottom: '32px' }}>
+          <h2 style={{ fontSize: '14px', fontWeight: '600', color: 'var(--text-tertiary)', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '12px' }}>
+            {language === 'zh' ? '快捷操作' : 'Quick Actions'}
+          </h2>
+          <div style={{ display: 'flex', gap: '12px', flexWrap: 'wrap' }}>
+            {quickActions.map((action, i) => (
+              <QuickAction key={i} {...action} />
+            ))}
+          </div>
+        </div>
+
+        {/* Main Grid */}
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 340px', gap: '20px' }}>
         {/* Left Column */}
         <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
           {/* Stats Row */}
@@ -443,6 +497,8 @@ export default function Dashboard() {
           </div>
         </div>
       </div>
+      </>
+      )}
     </div>
   )
 }

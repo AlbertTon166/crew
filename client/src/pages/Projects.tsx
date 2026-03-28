@@ -1,4 +1,4 @@
-import { useState, useRef } from 'react'
+import { useState, useRef, useEffect } from 'react'
 import { 
   Plus, Search, FolderKanban, Clock, Grid3X3, List,
   CheckCircle, Loader2, X, Bot, Users, ArrowRight, Coins,
@@ -11,6 +11,7 @@ import { useDashboardStore } from '../stores/dashboardStore'
 import { useLanguage } from '../context/LanguageContext'
 import { useDeployMode } from '../context/DeployModeContext'
 import { updateTaskStatus, canTransition, statusConfig as apiStatusConfig, getNextStatuses } from '../lib/taskApi'
+import { api } from '../lib/api'
 import ExecutionLogsPanel from '../components/ExecutionLogsPanel'
 
 // Task interface
@@ -593,7 +594,33 @@ export default function Projects() {
   // Execution logs panel
   const [selectedExecutionId, setSelectedExecutionId] = useState<string | null>(null)
 
-  const [projects, setProjects] = useState<Project[]>(mockProjects)
+  // API state
+  const [projects, setProjects] = useState<Project[]>([])
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
+
+  // Fetch projects from API
+  useEffect(() => {
+    async function fetchProjects() {
+      try {
+        setLoading(true)
+        setError(null)
+        const data = await api.projects.list()
+        setProjects(data.projects || data || [])
+        if (storeProjects.length === 0) {
+          // Optionally sync to store if empty
+        }
+      } catch (err: any) {
+        console.error('Failed to fetch projects:', err)
+        setError(err.message || 'Failed to load projects')
+        // Fall back to mock data for development
+        setProjects(mockProjects)
+      } finally {
+        setLoading(false)
+      }
+    }
+    fetchProjects()
+  }, [])
   
   const getProjectName = (p: Project) => language === 'zh' ? (p.nameZh || p.name) : p.name
   
@@ -713,8 +740,32 @@ export default function Projects() {
         </div>
       </div>
       
+      {/* Loading State */}
+      {loading && (
+        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: '80px 20px', gap: '16px' }}>
+          <Loader2 size={40} style={{ color: 'var(--primary)', animation: 'spin 1s linear infinite' }} />
+          <p style={{ color: 'var(--text-secondary)', fontSize: '14px' }}>
+            {language === 'zh' ? '加载中...' : 'Loading...'}
+          </p>
+        </div>
+      )}
+
+      {/* Error State */}
+      {!loading && error && (
+        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: '60px 20px', gap: '16px' }}>
+          <AlertCircle size={40} style={{ color: '#EF4444' }} />
+          <p style={{ color: 'var(--text-secondary)', fontSize: '14px' }}>{error}</p>
+          <button
+            onClick={() => { setLoading(true); setError(null); api.projects.list().then(d => setProjects(d.projects || d || [])).catch(e => { setError(e.message); setProjects(mockProjects); }).finally(() => setLoading(false)) }}
+            style={{ padding: '8px 16px', borderRadius: '8px', border: 'none', background: 'var(--primary)', color: 'white', fontSize: '13px', cursor: 'pointer' }}
+          >
+            {language === 'zh' ? '重试' : 'Retry'}
+          </button>
+        </div>
+      )}
+
       {/* Content */}
-      {viewMode === 'kanban' && currentProject && (
+      {!loading && !error && viewMode === 'kanban' && currentProject && (
         <div style={{ overflow: 'auto', flex: 1 }}>
           <div style={{ display: 'flex', gap: '12px', overflowX: 'auto', paddingBottom: '12px' }}>
             {(Object.keys(statusConfig) as Array<keyof typeof statusConfig>).map(status => (
@@ -749,7 +800,7 @@ export default function Projects() {
         </div>
       )}
       
-      {viewMode === 'workflow' && currentProject && (
+      {viewMode === 'workflow' && currentProject && !loading && !error && (
         <div style={{ background: 'var(--bg-secondary)', borderRadius: '16px', border: '1px solid var(--border)', padding: '20px', flex: 1, overflow: 'auto' }}>
           {/* Workflow header */}
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '20px' }}>
@@ -1013,7 +1064,7 @@ export default function Projects() {
         </div>
       )}
       
-      {viewMode === 'list' && (
+      {viewMode === 'list' && !loading && !error && (
         <div style={{ background: 'var(--bg-secondary)', borderRadius: '16px', border: '1px solid var(--border)', overflow: 'hidden' }}>
           <table style={{ width: '100%', borderCollapse: 'collapse' }}>
             <thead>
