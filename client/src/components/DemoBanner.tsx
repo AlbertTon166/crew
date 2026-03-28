@@ -58,6 +58,11 @@ export default function DemoBanner() {
     )
   }
 
+  // Only show banner for demo mode, not for logged-in users
+  if (!isDemoMode) {
+    return null
+  }
+
   if (error) {
     return (
       <div
@@ -117,34 +122,26 @@ export default function DemoBanner() {
       <Eye size={14} />
       <span>
         {language === 'zh' 
-          ? '👀 正在浏览演示版本 - 点击加载示例数据' 
-          : '👀 Browsing Demo Version - Click to Load Sample Data'}
+          ? '📊 Demo模式 - 展示示例数据' 
+          : '📊 Demo Mode - Showing Sample Data'}
       </span>
       <button
-        onClick={loadDemoData}
-        disabled={isLoading}
+        onClick={clearDemoData}
         style={{
           background: 'rgba(255,255,255,0.2)',
           border: 'none',
           color: 'white',
-          padding: '4px 12px',
+          padding: '4px 8px',
           borderRadius: '4px',
-          cursor: isLoading ? 'not-allowed' : 'pointer',
+          cursor: 'pointer',
           display: 'flex',
           alignItems: 'center',
-          gap: '6px',
+          gap: '4px',
           fontSize: '12px',
-          opacity: isLoading ? 0.7 : 1,
         }}
       >
-        {isLoading ? (
-          <>
-            <Loader2 size={12} className="animate-spin" />
-            {language === 'zh' ? '加载中...' : 'Loading...'}
-          </>
-        ) : (
-          language === 'zh' ? '加载 Demo' : 'Load Demo'
-        )}
+        <X size={12} />
+        {language === 'zh' ? '退出' : 'Exit'}
       </button>
     </div>
   )
