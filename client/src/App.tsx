@@ -1,6 +1,7 @@
 import { BrowserRouter, Routes, Route } from 'react-router-dom'
 import Layout from './components/Layout'
 import Dashboard from './pages/Dashboard'
+import Landing from './pages/Landing'
 import Projects from './pages/Projects'
 import Agents from './pages/Agents'
 import Knowledge from './pages/Knowledge'
@@ -24,7 +25,8 @@ function App() {
           <DemoProvider>
             <BrowserRouter>
               <Routes>
-                <Route path="/" element={<Layout />}>
+                <Route path="/" element={<Landing />} />
+                <Route path="/dashboard" element={<Layout />}>
                   <Route index element={<Dashboard />} />
                   <Route path="projects" element={<Projects />} />
                   <Route path="requirements" element={<Requirements />} />
