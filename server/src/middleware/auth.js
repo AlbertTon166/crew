@@ -38,7 +38,7 @@ export async function authenticate(req, res, next) {
     
     // Optionally verify user still exists in database
     const result = await query(
-      'SELECT id, username, email, role FROM users WHERE id = $1 AND active = true',
+      'SELECT id, username, email, role, tenant_id FROM users WHERE id = $1 AND active = true',
       [decoded.userId]
     );
     
@@ -48,6 +48,7 @@ export async function authenticate(req, res, next) {
     
     req.user = result.rows[0];
     req.userId = decoded.userId;
+    req.tenantId = result.rows[0].tenant_id || null;
     
     next();
   } catch (error) {
@@ -74,13 +75,14 @@ export async function optionalAuth(req, res, next) {
     try {
       const decoded = jwt.verify(token, jwtSecret);
       const result = await query(
-        'SELECT id, username, email, role FROM users WHERE id = $1 AND active = true',
+        'SELECT id, username, email, role, tenant_id FROM users WHERE id = $1 AND active = true',
         [decoded.userId]
       );
       
       if (result.rows.length > 0) {
         req.user = result.rows[0];
         req.userId = decoded.userId;
+        req.tenantId = result.rows[0].tenant_id || null;
       }
     } catch {
       // Token invalid or expired - continue without auth

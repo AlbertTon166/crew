@@ -8,25 +8,58 @@ datasource db {
   provider = "postgresql"
 }
 
+// ============================================
+// Multi-Tenant Support
+// ============================================
+
+model Tenant {
+  id        String    @id @default(uuid())
+  name      String
+  domain    String?   @unique
+  settings  Json?     @default("{}")
+  active    Boolean   @default(true)
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+
+  users     User[]
+  projects  Project[]
+  webhooks  Webhook[]
+  agents    Agent[]
+}
+
 model User {
   id        String    @id @default(uuid())
   email     String    @unique
   password  String
   name      String
+  role      String    @default("user")      // user, admin, manager
+  tenantId  String?
+  tenant    Tenant?   @relation(fields: [tenantId], references: [id])
+  active    Boolean   @default(true)
   createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+
   projects  Project[]
   agents    Agent[]
+  tasks     Task[]    @relation("TaskAssignee")
 }
+
+// ============================================
+// Core Models
+// ============================================
 
 model Project {
   id          String        @id @default(uuid())
   name        String
   description String
-  status      String
+  status      String        @default("active")
+  tenantId    String?
+  tenant      Tenant?       @relation(fields: [tenantId], references: [id])
   userId      String?
   user        User?         @relation(fields: [userId], references: [id])
   tasks       Task[]
   requirements Requirement[]
+  agents      Agent[]       @relation("ProjectAgents")
   createdAt   DateTime      @default(now())
   updatedAt   DateTime      @updatedAt
 }
@@ -40,6 +73,7 @@ model Task {
   status      String   @default("pending")
   priority    String   @default("medium")
   assigneeId  String?
+  assignee    User?    @relation("TaskAssignee", fields: [assigneeId], references: [id])
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
 }
@@ -48,11 +82,14 @@ model Agent {
   id             String   @id @default(uuid())
   name           String
   role           String
-  modelProvider  String
+  modelProvider   String
   modelName      String
   status         String   @default("offline")
+  tenantId       String?
+  tenant         Tenant?  @relation(fields: [tenantId], references: [id])
   userId         String?
   user           User?    @relation(fields: [userId], references: [id])
+  projects       Project[] @relation("ProjectAgents")
   createdAt      DateTime @default(now())
   updatedAt      DateTime @updatedAt
 }
@@ -117,4 +154,72 @@ model UsageRecord {
   agentId   String?
   projectId String?
   createdAt DateTime @default(now())
+}
+
+// ============================================
+// Webhook Support
+// ============================================
+
+model Webhook {
+  id        String   @id @default(uuid())
+  name      String
+  url       String
+  events    String[] // 'task.created', 'task.completed', 'project.status_changed', etc.
+  secret    String
+  active    Boolean  @default(true)
+  tenantId  String?
+  tenant    Tenant?  @relation(fields: [tenantId], references: [id])
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  deliveries WebhookDelivery[]
+}
+
+model WebhookDelivery {
+  id           String   @id @default(uuid())
+  webhookId    String
+  webhook      Webhook  @relation(fields: [webhookId], references: [id])
+  event        String
+  payload      Json
+  response     Json?
+  statusCode   Int?
+  success      Boolean  @default(false)
+  error        String?
+  attempts     Int      @default(1)
+  deliveredAt  DateTime @default(now())
+}
+
+// ============================================
+// Role & Permission System
+// ============================================
+
+model Permission {
+  id          String   @id @default(uuid())
+  name        String   @unique  // 'users.read', 'projects.write', 'tasks.delete', etc.
+  description String?
+  resource    String   // 'users', 'projects', 'tasks', 'agents', etc.
+  action      String   // 'read', 'write', 'delete', 'admin'
+  createdAt   DateTime @default(now())
+
+  roles       RolePermission[]
+}
+
+model Role {
+  id          String   @id @default(uuid())
+  name        String   @unique  // 'admin', 'manager', 'user', 'viewer'
+  description String?
+  isSystem    Boolean  @default(false)  // System roles cannot be deleted
+  createdAt   DateTime @default(now())
+
+  permissions RolePermission[]
+}
+
+model RolePermission {
+  id         String      @id @default(uuid())
+  roleId     String
+  role       Role        @relation(fields: [roleId], references: [id])
+  permissionId String
+  permission Permission  @relation(fields: [permissionId], references: [id])
+
+  @@unique([roleId, permissionId])
 }
