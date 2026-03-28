@@ -1,0 +1,120 @@
+// Prisma schema for Crew - Agent Teams Workflow Management Platform
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+model User {
+  id        String    @id @default(uuid())
+  email     String    @unique
+  password  String
+  name      String
+  createdAt DateTime  @default(now())
+  projects  Project[]
+  agents    Agent[]
+}
+
+model Project {
+  id          String        @id @default(uuid())
+  name        String
+  description String
+  status      String
+  userId      String?
+  user        User?         @relation(fields: [userId], references: [id])
+  tasks       Task[]
+  requirements Requirement[]
+  createdAt   DateTime      @default(now())
+  updatedAt   DateTime      @updatedAt
+}
+
+model Task {
+  id          String   @id @default(uuid())
+  projectId   String?
+  project     Project? @relation(fields: [projectId], references: [id])
+  title       String
+  description String
+  status      String   @default("pending")
+  priority    String   @default("medium")
+  assigneeId  String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+}
+
+model Agent {
+  id             String   @id @default(uuid())
+  name           String
+  role           String
+  modelProvider  String
+  modelName      String
+  status         String   @default("offline")
+  userId         String?
+  user           User?    @relation(fields: [userId], references: [id])
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+}
+
+model Requirement {
+  id          String   @id @default(uuid())
+  projectId   String?
+  project     Project? @relation(fields: [projectId], references: [id])
+  title       String
+  description String
+  status      String   @default("pending")
+  priority    String   @default("medium")
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+}
+
+model Knowledge {
+  id        String   @id @default(uuid())
+  title     String
+  content   String
+  category  String
+  tags      String[]
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model ApiKey {
+  id        String    @id @default(uuid())
+  name      String
+  key       String    @unique
+  prefix    String
+  provider  String
+  model     String
+  status    String    @default("active")
+  lastUsed  DateTime?
+  createdAt DateTime  @default(now())
+}
+
+model Workflow {
+  id          String   @id @default(uuid())
+  name        String
+  description String
+  steps       Json
+  status      String   @default("draft")
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+}
+
+model RagDocument {
+  id        String   @id @default(uuid())
+  content   String
+  metadata  Json
+  embedding String
+  createdAt DateTime @default(now())
+}
+
+model UsageRecord {
+  id        String   @id @default(uuid())
+  date      String
+  tokens    Int
+  cost      Float
+  agentId   String?
+  projectId String?
+  createdAt DateTime @default(now())
+}
