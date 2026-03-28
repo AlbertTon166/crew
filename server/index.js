@@ -286,6 +286,123 @@ app.get('/api/team-templates', (req, res) => {
   ])
 })
 
+// ==================== Demo APIs ====================
+
+app.get('/api/demo/overview', (req, res) => {
+  res.json({
+    success: true,
+    data: {
+      agents: db.agents.map(a => ({
+        id: a.id,
+        name: a.name,
+        role: a.role,
+        model_provider: a.model_provider,
+        model_name: a.model_name,
+        status: a.status,
+        avg_response_time: '1.2s',
+        task_count: db.tasks.filter(t => t.assigned_agent_id === a.id).length,
+        current_load: a.status === 'online' ? 0.3 : 0,
+        personality: '专业高效',
+        skills: ['代码开发', '代码审查', '问题解决']
+      })),
+      projects: db.projects.map(p => ({
+        id: p.id,
+        name: p.name,
+        description: p.description,
+        status: p.status,
+        task_count: db.tasks.filter(t => t.project_id === p.id).length,
+        completed_tasks: db.tasks.filter(t => t.project_id === p.id && t.status === 'completed').length
+      })),
+      tasks: db.tasks.map(t => ({
+        id: t.id,
+        title: t.title,
+        description: t.description,
+        status: t.status,
+        priority: 'medium',
+        workflow_position: { x: 100, y: 200 },
+        node_type: 'task',
+        project_name: db.projects.find(p => p.id === t.project_id)?.name || '',
+        assignee_name: db.agents.find(a => a.id === t.assigned_agent_id)?.name || null,
+        assignee_role: db.agents.find(a => a.id === t.assigned_agent_id)?.role || null
+      })),
+      requirements: [
+        {
+          id: 'req-1',
+          title: '用户登录功能',
+          description: '实现邮箱密码登录，支持记住登录状态',
+          status: 'analyzed',
+          priority: 'high',
+          project_name: 'E-commerce API'
+        },
+        {
+          id: 'req-2',
+          title: '商品列表展示',
+          description: '分页展示商品列表，支持筛选和搜索',
+          status: 'pending',
+          priority: 'medium',
+          project_name: 'E-commerce API'
+        },
+        {
+          id: 'req-3',
+          title: '购物车功能',
+          description: '添加商品到购物车，修改数量，删除商品',
+          status: 'pending',
+          priority: 'high',
+          project_name: 'E-commerce API'
+        }
+      ],
+      stats: {
+        totalAgents: db.agents.length,
+        totalProjects: db.projects.length,
+        totalTasks: db.tasks.length,
+        completedTasks: db.tasks.filter(t => t.status === 'completed').length,
+        runningTasks: db.tasks.filter(t => t.status === 'in_progress').length,
+      },
+      rolesSummary: [
+        { role: 'pm', count: 1, avg_tasks: 0, avg_load: 0.2 },
+        { role: 'architect', count: 1, avg_tasks: 1, avg_load: 0.5 },
+        { role: 'coder', count: 1, avg_tasks: 1, avg_load: 0.8 },
+        { role: 'reviewer', count: 1, avg_tasks: 0, avg_load: 0.1 },
+        { role: 'tester', count: 1, avg_tasks: 0, avg_load: 0 },
+      ]
+    }
+  })
+})
+
+app.get('/api/demo/agents', (req, res) => {
+  res.json({
+    success: true,
+    data: db.agents
+  })
+})
+
+app.get('/api/demo/projects', (req, res) => {
+  res.json({
+    success: true,
+    data: db.projects
+  })
+})
+
+app.get('/api/demo/tasks', (req, res) => {
+  res.json({
+    success: true,
+    data: db.tasks
+  })
+})
+
+app.get('/api/demo/roles', (req, res) => {
+  res.json({
+    success: true,
+    data: [
+      { role: 'pm', agent_count: 1, agents: 'Product Manager Agent' },
+      { role: 'architect', agent_count: 1, agents: 'Architect Agent' },
+      { role: 'coder', agent_count: 1, agents: 'Code Agent' },
+      { role: 'reviewer', agent_count: 1, agents: 'Review Agent' },
+      { role: 'tester', agent_count: 1, agents: 'Test Agent' },
+    ]
+  })
+})
+
 // Start server
 app.listen(PORT, () => {
   console.log(`🚀 Agent Teams Manager running on http://localhost:${PORT}`)
