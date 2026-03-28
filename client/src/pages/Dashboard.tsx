@@ -55,16 +55,18 @@ const activityTypes = [
 ]
 
 // Mock data
-const mockAgents = [
-  { id: '1', name: 'Coder', role: 'coder', status: 'online', model: 'GPT-4o', tasks: 3 },
-  { id: '2', name: 'Reviewer', role: 'reviewer', status: 'busy', model: 'Claude-3.5', tasks: 2 },
-  { id: '3', name: 'PM', role: 'pm', status: 'thinking', model: 'GPT-4o', tasks: 1 },
-  { id: '4', name: 'Tester', role: 'tester', status: 'idle', model: 'DeepSeek', tasks: 0 },
-  { id: '5', name: 'Deployer', role: 'deployer', status: 'offline', model: 'GPT-4o-mini', tasks: 0 },
-]
+const mockAgents: any[] = []
 
-const mockActivities = [
+const mockActivities: any[] = []
 
+const mockStats = {
+  activeAgents: 0,
+  totalTasks: 0,
+  completedToday: 0,
+  pendingTasks: 0,
+  totalTokens: 0,
+  todayCost: 0,
+}
 
 // Quick action
 function QuickAction({ icon, label, color, onClick }: {
