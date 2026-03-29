@@ -13,7 +13,7 @@ interface APIKey {
   name: string
   key: string
   prefix: string
-  provider: 'openai' | 'anthropic' | 'deepseek' | 'other'
+  provider: 'openai' | 'anthropic' | 'deepseek' | 'aliyun-qwen' | 'baidu-wenxin' | 'iflytek-xunfei' | 'tencent-hunyuan' | 'zhipu' | 'minimax' | 'other'
   model: string
   status: 'active' | 'expired' | 'disabled'
   createdAt: string
@@ -28,21 +28,63 @@ const providerConfig = {
     icon: Zap, 
     color: '#10A37F',
     models: ['gpt-4o', 'gpt-4o-mini', 'gpt-4-turbo', 'gpt-3.5-turbo'],
-    placeholder: 'sk-...',
+    placeholder: 'sk-proj-...',
   },
   anthropic: { 
     label: 'Anthropic', 
     icon: Bot, 
     color: '#CC785C',
-    models: ['claude-3-5-sonnet', 'claude-3-opus', 'claude-3-haiku'],
-    placeholder: 'sk-ant-...',
+    models: ['claude-sonnet-4', 'claude-3-5-sonnet', 'claude-3-5-haiku', 'claude-3-opus'],
+    placeholder: 'sk-ant-api01-...',
   },
   deepseek: { 
     label: 'DeepSeek', 
     icon: Cpu, 
     color: '#0066CC',
-    models: ['deepseek-chat', 'deepseek-coder'],
+    models: ['deepseek-chat', 'deepseek-coder', 'deepseek-reasoner'],
     placeholder: 'sk-...',
+  },
+  'aliyun-qwen': { 
+    label: '通义千问', 
+    icon: Zap, 
+    color: '#FF6A00',
+    models: ['qwen-plus', 'qwen-max', 'qwen-turbo', 'qwen-long'],
+    placeholder: 'sk-...',
+  },
+  'baidu-wenxin': { 
+    label: '文心一言', 
+    icon: Zap, 
+    color: '#2932E1',
+    models: ['ernie-4.0-8k', 'ernie-3.5-8k', 'ernie-speed-128k', 'ernie-lite-8k'],
+    placeholder: 'API Key',
+  },
+  'iflytek-xunfei': { 
+    label: '讯飞星火', 
+    icon: Zap, 
+    color: '#00A6F0',
+    models: ['spark-4.0', 'spark-3.5-pro', 'spark-3.5-standard'],
+    placeholder: 'API Key',
+  },
+  'tencent-hunyuan': { 
+    label: '腾讯混元', 
+    icon: Zap, 
+    color: '#12B7F5',
+    models: ['hunyuan-pro', 'hunyuan-standard', 'hunyuan-lite'],
+    placeholder: 'API Key',
+  },
+  zhipu: { 
+    label: '智谱AI', 
+    icon: Zap, 
+    color: '#7C3AED',
+    models: ['glm-4-plus', 'glm-4', 'glm-4-flash', 'glm-3-turbo'],
+    placeholder: 'API Key',
+  },
+  minimax: { 
+    label: 'MiniMax', 
+    icon: Zap, 
+    color: '#00D4AA',
+    models: ['MiniMax-Text-01', 'abab6.5s-chat', 'abab6.5-chat'],
+    placeholder: 'API Key',
   },
   other: { 
     label: 'Other', 
@@ -104,7 +146,7 @@ export default function APIKeys() {
   const [deletingId, setDeletingId] = useState<string | null>(null)
   const [newKeyForm, setNewKeyForm] = useState({
     name: '',
-    provider: 'openai' as 'openai' | 'anthropic' | 'deepseek' | 'other',
+    provider: 'openai' as 'openai' | 'anthropic' | 'deepseek' | 'aliyun-qwen' | 'baidu-wenxin' | 'iflytek-xunfei' | 'tencent-hunyuan' | 'zhipu' | 'minimax' | 'other',
     apiKey: '',
     model: '',
   })
