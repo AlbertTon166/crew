@@ -15,9 +15,24 @@ class TimeoutError extends Error {
   }
 }
 
-// Get tenant ID from localStorage (set during login)
+// Get tenant ID and auth token from localStorage (set during login)
 function getTenantId(): string | null {
   return localStorage.getItem('tenantId')
+}
+
+function getAuthToken(): string | null {
+  try {
+    const tokens = localStorage.getItem('auth_tokens')
+    if (tokens) {
+      const parsed = JSON.parse(tokens)
+      // Return the first active non-expired token
+      const validToken = parsed.find((t: any) => t.isActive && (!t.expiresAt || new Date(t.expiresAt) > new Date()))
+      return validToken?.token || null
+    }
+  } catch (e) {
+    // Ignore parse errors
+  }
+  return null
 }
 
 async function request(endpoint: string, options?: RequestInit) {
@@ -25,11 +40,17 @@ async function request(endpoint: string, options?: RequestInit) {
   const timeoutId = setTimeout(() => controller.abort(), REQUEST_TIMEOUT)
   
   const tenantId = getTenantId()
+  const authToken = getAuthToken()
   const headers: Record<string, string> = { 'Content-Type': 'application/json' }
   
   // Add tenant ID header for multi-tenancy support
   if (tenantId) {
     headers['X-Tenant-ID'] = tenantId
+  }
+  
+  // Add auth token for protected endpoints
+  if (authToken) {
+    headers['Authorization'] = `Bearer ${authToken}`
   }
 
   try {
