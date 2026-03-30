@@ -144,14 +144,14 @@ export const api = {
   // API Keys
   apiKeys: {
     list: () => request('/api/api-keys'),
-    create: (data: { name: string; provider: string; model?: string }) =>
+    create: (data: { name: string; provider: string; model?: string; key: string }) =>
       request('/api/api-keys', { method: 'POST', body: JSON.stringify(data) }),
     delete: (id: string) => request(`/api/api-keys/${id}`, { method: 'DELETE' }),
   },
   // Servers
   servers: {
     list: () => request('/api/servers'),
-    create: (data: { name: string; type: string; baseURL: string; apiKey: string; rateLimit?: number; rateLimitWindow?: number }) =>
+    create: (data: { name: string; type: string; host: string; port?: number; username?: string; password?: string }) =>
       request('/api/servers', { method: 'POST', body: JSON.stringify(data) }),
     update: (id: string, data: any) => request(`/api/servers/${id}`, { method: 'PUT', body: JSON.stringify(data) }),
     test: (id: string) => request(`/api/servers/${id}/test`, { method: 'POST' }),

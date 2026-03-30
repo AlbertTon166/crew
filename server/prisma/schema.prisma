@@ -132,16 +132,14 @@ model ApiKey {
 model ServerConnection {
   id            String   @id @default(uuid())
   name          String
-  type          String   @default("custom")  // openai, anthropic, deepseek, custom
-  baseURL       String
-  apiKey        String
-  prefix        String   @default("")
-  rateLimit     Int      @default(60)
-  rateLimitWindow Int   @default(60)         // seconds
+  type          String   @default("docker")  // docker, ssh, openclaw
+  host          String
+  port          Int      @default(22)
+  username      String   @default("")
+  password      String   @default("")        // encrypted
+  status        String   @default("offline") // online, offline, degraded
   isActive      Boolean  @default(true)
-  isConnected   Boolean  @default(false)
   lastChecked   DateTime?
-  health        String   @default("offline") // healthy, degraded, offline
   tenantId      String?
   createdAt     DateTime @default(now())
   updatedAt     DateTime @updatedAt

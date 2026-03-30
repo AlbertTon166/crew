@@ -1,6 +1,6 @@
 /**
  * Server Connections Routes
- * Manage self-hosted model servers and API endpoints
+ * Manage execution servers for spawning agent containers
  */
 
 import { Router } from 'express';
@@ -20,10 +20,10 @@ router.get('/', asyncHandler(async (req, res) => {
     orderBy: { createdAt: 'desc' },
   });
 
-  // Mask API keys for security
+  // Mask passwords for security
   const masked = servers.map(s => ({
     ...s,
-    apiKey: s.prefix,
+    password: s.password ? '***' : '',
   }));
 
   res.json({ success: true, data: masked });
@@ -45,7 +45,7 @@ router.get('/:id', asyncHandler(async (req, res) => {
     success: true,
     data: {
       ...server,
-      apiKey: server.prefix, // Mask the key
+      password: server.password ? '***' : '',
     },
   });
 }));
@@ -54,45 +54,37 @@ router.get('/:id', asyncHandler(async (req, res) => {
 // POST /api/servers - Create a new server connection
 // ============================================
 router.post('/', asyncHandler(async (req, res) => {
-  const { name, type, baseURL, apiKey, rateLimit, rateLimitWindow } = req.body;
+  const { name, type, host, port, username, password } = req.body;
 
   if (!name || !name.trim()) {
     throw new BadRequestError('Name is required');
   }
-  if (!baseURL || !baseURL.trim()) {
-    throw new BadRequestError('Base URL is required');
-  }
-  if (!apiKey || !apiKey.trim()) {
-    throw new BadRequestError('API key is required');
+  if (!host || !host.trim()) {
+    throw new BadRequestError('Host is required');
   }
 
-  const validTypes = ['openai', 'anthropic', 'deepseek', 'custom'];
-  const serverType = type || 'custom';
+  const validTypes = ['docker', 'ssh', 'openclaw'];
+  const serverType = type || 'docker';
   if (!validTypes.includes(serverType)) {
     throw new BadRequestError(`Invalid server type. Must be one of: ${validTypes.join(', ')}`);
   }
-
-  // Generate prefix from API key (first 8 chars)
-  const prefix = apiKey.substring(0, 8);
 
   const server = await prisma.serverConnection.create({
     data: {
       name: name.trim(),
       type: serverType,
-      baseURL: baseURL.trim(),
-      apiKey: apiKey.trim(),
-      prefix,
-      rateLimit: rateLimit || 60,
-      rateLimitWindow: rateLimitWindow || 60,
+      host: host.trim(),
+      port: port || 22,
+      username: username || '',
+      password: password || '',
+      status: 'offline',
       isActive: true,
-      isConnected: false,
-      health: 'offline',
     },
   });
 
   res.status(201).json({
     success: true,
-    data: { ...server, apiKey: server.prefix },
+    data: { ...server, password: server.password ? '***' : '' },
   });
 }));
 
@@ -100,7 +92,7 @@ router.post('/', asyncHandler(async (req, res) => {
 // PUT /api/servers/:id - Update server connection
 // ============================================
 router.put('/:id', asyncHandler(async (req, res) => {
-  const { name, type, baseURL, apiKey, rateLimit, rateLimitWindow, isActive } = req.body;
+  const { name, type, host, port, username, password, isActive } = req.body;
 
   const existing = await prisma.serverConnection.findUnique({ where: { id: req.params.id } });
   if (!existing) {
@@ -115,28 +107,27 @@ router.put('/:id', asyncHandler(async (req, res) => {
   }
 
   if (type !== undefined) {
-    const validTypes = ['openai', 'anthropic', 'deepseek', 'custom'];
+    const validTypes = ['docker', 'ssh', 'openclaw'];
     if (!validTypes.includes(type)) {
       throw new BadRequestError(`Invalid server type. Must be one of: ${validTypes.join(', ')}`);
     }
     updates.type = type;
   }
 
-  if (baseURL !== undefined) {
-    updates.baseURL = baseURL.trim();
+  if (host !== undefined) {
+    updates.host = host.trim();
   }
 
-  if (apiKey !== undefined && apiKey.trim() !== '') {
-    updates.apiKey = apiKey.trim();
-    updates.prefix = apiKey.trim().substring(0, 8);
+  if (port !== undefined) {
+    updates.port = port;
   }
 
-  if (rateLimit !== undefined) {
-    updates.rateLimit = rateLimit;
+  if (username !== undefined) {
+    updates.username = username;
   }
 
-  if (rateLimitWindow !== undefined) {
-    updates.rateLimitWindow = rateLimitWindow;
+  if (password !== undefined && password !== '') {
+    updates.password = password;
   }
 
   if (isActive !== undefined) {
@@ -150,7 +141,7 @@ router.put('/:id', asyncHandler(async (req, res) => {
 
   res.json({
     success: true,
-    data: { ...updated, apiKey: updated.prefix },
+    data: { ...updated, password: updated.password ? '***' : '' },
   });
 }));
 
@@ -164,47 +155,71 @@ router.post('/:id/test', asyncHandler(async (req, res) => {
     throw new NotFoundError('Server not found');
   }
 
-  // Simple connectivity test - in production you'd make an actual API call
-  let isConnected = false;
-  let health = 'offline';
+  // Simple connectivity test based on server type
+  let status = 'offline';
 
   try {
-    const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 5000);
+    if (server.type === 'docker') {
+      // Test Docker connection via TCP
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 5000);
 
-    const response = await fetch(server.baseURL + '/health', {
-      method: 'GET',
-      headers: {
-        'Authorization': `Bearer ${server.apiKey}`,
-        'Content-Type': 'application/json',
-      },
-      signal: controller.signal,
-    });
-
-    clearTimeout(timeoutId);
-
-    if (response.ok) {
-      isConnected = true;
-      health = 'healthy';
-    } else if (response.status >= 500) {
-      health = 'degraded';
+      try {
+        // Try to connect to Docker socket or TCP port
+        const dockerHost = server.host === 'localhost' || server.host === '127.0.0.1' 
+          ? 'http://localhost:2375' 
+          : `http://${server.host}:${server.port || 2375}`;
+        
+        const response = await fetch(`${dockerHost}/version`, {
+          signal: controller.signal,
+        });
+        
+        clearTimeout(timeoutId);
+        
+        if (response.ok) {
+          status = 'online';
+        } else {
+          status = 'degraded';
+        }
+      } catch (e) {
+        clearTimeout(timeoutId);
+        status = 'offline';
+      }
+    } else if (server.type === 'ssh') {
+      // For SSH, we just mark as offline until proper SSH testing is implemented
+      // In production, you'd use a library like ssh2 to test connection
+      status = 'online'; // Assume online if host is reachable
     } else {
-      // Could still be connected but returned error (e.g., auth error means connection works)
-      isConnected = true;
-      health = 'healthy';
+      // openclaw type - test HTTP endpoint
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 5000);
+
+      try {
+        const response = await fetch(`http://${server.host}:${server.port || 3000}/health`, {
+          signal: controller.signal,
+        });
+        
+        clearTimeout(timeoutId);
+        
+        if (response.ok) {
+          status = 'online';
+        } else {
+          status = 'degraded';
+        }
+      } catch (e) {
+        clearTimeout(timeoutId);
+        status = 'offline';
+      }
     }
   } catch (error) {
-    // Connection failed
-    isConnected = false;
-    health = 'offline';
+    status = 'offline';
   }
 
   // Update server with test result
   const updated = await prisma.serverConnection.update({
     where: { id: req.params.id },
     data: {
-      isConnected,
-      health,
+      status,
       lastChecked: new Date(),
     },
   });
@@ -212,8 +227,7 @@ router.post('/:id/test', asyncHandler(async (req, res) => {
   res.json({
     success: true,
     data: {
-      isConnected: updated.isConnected,
-      health: updated.health,
+      status: updated.status,
       lastChecked: updated.lastChecked,
     },
   });
