@@ -1,22 +1,19 @@
 /**
  * Webhooks API Routes
- * Webhook management for event notifications
+ * Webhook management for event notifications using Prisma
  */
 
 import { Router } from 'express';
-import { query, transaction } from '../config/db.js';
-import { asyncHandler, NotFoundError, BadRequestError, ForbiddenError } from '../utils/errors.js';
+import prisma from '../lib/prisma.js';
+import { asyncHandler, NotFoundError, BadRequestError } from '../utils/errors.js';
 import { authenticate } from '../middleware/auth.js';
-import { triggerWebhook } from '../lib/webhook.js';
 import crypto from 'crypto';
 
 const router = Router();
 
 router.use(authenticate);
 
-// ============================================
-// Webhook Events
-// ============================================
+// Valid webhook events
 const WEBHOOK_EVENTS = [
   'task.created',
   'task.updated',
@@ -31,17 +28,9 @@ const WEBHOOK_EVENTS = [
   'agent.status_changed',
 ];
 
-// ============================================
-// Helper: Build tenant filter
-// ============================================
-function tenantCondition(tenantId, alias = 'w') {
-  if (!tenantId) return '';
-  return ` AND ${alias}.tenant_id = '${tenantId}' `;
-}
-
-// ============================================
-// POST /api/webhooks - Create webhook
-// ============================================
+/**
+ * POST /api/webhooks - Create webhook
+ */
 router.post('/', asyncHandler(async (req, res) => {
   const { name, url, events, active = true } = req.body;
 
@@ -62,252 +51,247 @@ router.post('/', asyncHandler(async (req, res) => {
   }
 
   const secret = crypto.randomBytes(32).toString('hex');
-  const tenantId = req.user.tenant_id || null;
 
-  const result = await query(
-    `INSERT INTO webhooks (name, url, events, secret, active, tenant_id, created_at, updated_at)
-     VALUES ($1, $2, $3, $4, $5, $6, NOW(), NOW())
-     RETURNING id, name, url, events, active, created_at`,
-    [name.trim(), url, events, secret, active, tenantId]
-  );
+  const webhook = await prisma.webhook.create({
+    data: {
+      name: name.trim(),
+      url,
+      events,
+      secret,
+      active,
+      tenantId: req.tenantId || null,
+    },
+    select: {
+      id: true,
+      name: true,
+      url: true,
+      events: true,
+      active: true,
+      createdAt: true,
+    },
+  });
 
   res.status(201).json({
     success: true,
     data: {
-      ...result.rows[0],
+      ...webhook,
       secret, // Only returned on creation
     },
   });
 }));
 
-// ============================================
-// GET /api/webhooks - List webhooks
-// ============================================
+/**
+ * GET /api/webhooks - List webhooks
+ */
 router.get('/', asyncHandler(async (req, res) => {
-  const { page = 1, limit = 20, active } = req.query;
-  const offset = (parseInt(page) - 1) * parseInt(limit);
-  const tenantId = req.user.tenant_id || null;
+  const { page = 1, limit = 20 } = req.query;
+  const skip = (parseInt(page) - 1) * parseInt(limit);
 
-  let sql = `SELECT id, name, url, events, active, created_at FROM webhooks WHERE 1=1`;
-  const params = [];
-  let p = 1;
-
-  if (tenantId) {
-    sql += ` AND tenant_id = $${p++}`;
-    params.push(tenantId);
-  }
-  if (active !== undefined) {
-    sql += ` AND active = $${p++}`;
-    params.push(active === 'true');
+  const where = {};
+  // Tenant scoping
+  if (req.user.role !== 'admin') {
+    where.tenantId = req.tenantId || null;
   }
 
-  sql += ` ORDER BY created_at DESC LIMIT $${p++} OFFSET $${p}`;
-  params.push(parseInt(limit), offset);
-
-  const result = await query(sql, params);
-
-  let countSql = `SELECT COUNT(*) FROM webhooks WHERE 1=1`;
-  const countParams = [];
-  let cp = 1;
-  if (tenantId) {
-    countSql += ` AND tenant_id = $${cp++}`;
-    countParams.push(tenantId);
-  }
-  if (active !== undefined) {
-    countSql += ` AND active = $${cp++}`;
-    countParams.push(active === 'true');
-  }
-  const countResult = await query(countSql, countParams);
+  const [webhooks, total] = await Promise.all([
+    prisma.webhook.findMany({
+      where,
+      skip,
+      take: parseInt(limit),
+      orderBy: { createdAt: 'desc' },
+      select: {
+        id: true,
+        name: true,
+        url: true,
+        events: true,
+        active: true,
+        tenantId: true,
+        createdAt: true,
+        updatedAt: true,
+      },
+    }),
+    prisma.webhook.count({ where }),
+  ]);
 
   res.json({
     success: true,
-    data: result.rows,
+    data: webhooks,
     pagination: {
       page: parseInt(page),
       limit: parseInt(limit),
-      total: parseInt(countResult.rows[0].count),
+      total,
     },
   });
 }));
 
-// ============================================
-// GET /api/webhooks/:id - Get webhook
-// ============================================
+/**
+ * GET /api/webhooks/:id - Get webhook
+ */
 router.get('/:id', asyncHandler(async (req, res) => {
   const { id } = req.params;
-  const tenantId = req.user.tenant_id || null;
 
-  let sql = `SELECT * FROM webhooks WHERE id = $1`;
-  const params = [id];
+  const webhook = await prisma.webhook.findUnique({
+    where: { id },
+    select: {
+      id: true,
+      name: true,
+      url: true,
+      events: true,
+      active: true,
+      tenantId: true,
+      createdAt: true,
+      updatedAt: true,
+    },
+  });
 
-  if (tenantId) {
-    sql += ` AND tenant_id = $2`;
-    params.push(tenantId);
-  }
-
-  const result = await query(sql, params);
-
-  if (result.rows.length === 0) {
+  if (!webhook) {
     throw new NotFoundError('Webhook not found');
   }
 
-  // Get recent deliveries
-  const deliveriesResult = await query(
-    `SELECT id, event, status_code, success, error, attempts, delivered_at
-     FROM webhook_deliveries WHERE webhook_id = $1
-     ORDER BY delivered_at DESC LIMIT 10`,
-    [id]
-  );
+  // Tenant check
+  if (req.user.role !== 'admin' && webhook.tenantId !== (req.tenantId || null)) {
+    throw new NotFoundError('Webhook not found');
+  }
 
   res.json({
     success: true,
-    data: {
-      ...result.rows[0],
-      recent_deliveries: deliveriesResult.rows,
-    },
+    data: webhook,
   });
 }));
 
-// ============================================
-// PUT /api/webhooks/:id - Update webhook
-// ============================================
+/**
+ * PUT /api/webhooks/:id - Update webhook
+ */
 router.put('/:id', asyncHandler(async (req, res) => {
   const { id } = req.params;
   const { name, url, events, active } = req.body;
-  const tenantId = req.user.tenant_id || null;
 
-  // Check ownership
-  let checkSql = `SELECT id FROM webhooks WHERE id = $1`;
-  const checkParams = [id];
-  if (tenantId) {
-    checkSql += ` AND tenant_id = $2`;
-    checkParams.push(tenantId);
-  }
+  const existing = await prisma.webhook.findUnique({
+    where: { id },
+    select: { id: true, tenantId: true },
+  });
 
-  const check = await query(checkSql, checkParams);
-  if (check.rows.length === 0) {
+  if (!existing) {
     throw new NotFoundError('Webhook not found');
   }
 
-  const updates = [];
-  const values = [];
-  let p = 1;
-
-  if (name !== undefined) {
-    updates.push(`name = $${p++}`);
-    values.push(name.trim());
+  if (req.user.role !== 'admin' && existing.tenantId !== (req.tenantId || null)) {
+    throw new NotFoundError('Webhook not found');
   }
+
+  const updates = {};
+  if (name !== undefined) updates.name = name.trim();
   if (url !== undefined) {
     if (!url.startsWith('http')) {
-      throw new BadRequestError('Invalid URL');
+      throw new BadRequestError('Valid URL is required');
     }
-    updates.push(`url = $${p++}`);
-    values.push(url);
+    updates.url = url;
   }
   if (events !== undefined) {
-    if (!Array.isArray(events)) {
-      throw new BadRequestError('Events must be an array');
+    if (!Array.isArray(events) || events.length === 0) {
+      throw new BadRequestError('At least one event is required');
     }
-    const invalidEvents = events.filter(e => !WEBHOOK_EVENTS.includes(e));
-    if (invalidEvents.length > 0) {
-      throw new BadRequestError(`Invalid events: ${invalidEvents.join(', ')}`);
-    }
-    updates.push(`events = $${p++}`);
-    values.push(events);
+    updates.events = events;
   }
-  if (active !== undefined) {
-    updates.push(`active = $${p++}`);
-    values.push(active);
-  }
+  if (active !== undefined) updates.active = active;
 
-  if (updates.length === 0) {
-    throw new BadRequestError('No fields to update');
-  }
-
-  updates.push(`updated_at = NOW()`);
-  values.push(id);
-
-  const result = await query(
-    `UPDATE webhooks SET ${updates.join(', ')} WHERE id = $${p} RETURNING id, name, url, events, active, created_at, updated_at`,
-    values
-  );
+  const webhook = await prisma.webhook.update({
+    where: { id },
+    data: updates,
+    select: {
+      id: true,
+      name: true,
+      url: true,
+      events: true,
+      active: true,
+      createdAt: true,
+      updatedAt: true,
+    },
+  });
 
   res.json({
     success: true,
-    data: result.rows[0],
+    data: webhook,
   });
 }));
 
-// ============================================
-// DELETE /api/webhooks/:id - Delete webhook
-// ============================================
-router.delete('/:id', asyncHandler(async (req, res) => {
+/**
+ * POST /api/webhooks/:id/test - Test webhook
+ */
+router.post('/:id/test', asyncHandler(async (req, res) => {
   const { id } = req.params;
-  const tenantId = req.user.tenant_id || null;
 
-  let sql = `DELETE FROM webhooks WHERE id = $1`;
-  const params = [id];
+  const webhook = await prisma.webhook.findUnique({
+    where: { id },
+  });
 
-  if (tenantId) {
-    sql += ` AND tenant_id = $2`;
-    params.push(tenantId);
-  }
-
-  sql += ` RETURNING id`;
-
-  const result = await query(sql, params);
-
-  if (result.rows.length === 0) {
+  if (!webhook) {
     throw new NotFoundError('Webhook not found');
   }
+
+  if (req.user.role !== 'admin' && webhook.tenantId !== (req.tenantId || null)) {
+    throw new NotFoundError('Webhook not found');
+  }
+
+  // Send test event
+  try {
+    const response = await fetch(webhook.url, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'X-Webhook-Secret': webhook.secret,
+        'X-Webhook-Event': 'test',
+      },
+      body: JSON.stringify({
+        event: 'test',
+        timestamp: new Date().toISOString(),
+      }),
+    });
+
+    res.json({
+      success: true,
+      data: {
+        delivered: response.ok,
+        statusCode: response.status,
+      },
+    });
+  } catch (error) {
+    res.status(200).json({
+      success: true,
+      data: {
+        delivered: false,
+        error: error.message,
+      },
+    });
+  }
+}));
+
+/**
+ * DELETE /api/webhooks/:id - Delete webhook
+ */
+router.delete('/:id', asyncHandler(async (req, res) => {
+  const { id } = req.params;
+
+  const existing = await prisma.webhook.findUnique({
+    where: { id },
+    select: { id: true, tenantId: true },
+  });
+
+  if (!existing) {
+    throw new NotFoundError('Webhook not found');
+  }
+
+  if (req.user.role !== 'admin' && existing.tenantId !== (req.tenantId || null)) {
+    throw new NotFoundError('Webhook not found');
+  }
+
+  await prisma.webhook.delete({
+    where: { id },
+  });
 
   res.json({
     success: true,
     message: 'Webhook deleted successfully',
-  });
-}));
-
-// ============================================
-// GET /api/webhooks/events - List available events
-// ============================================
-router.get('/meta/events', asyncHandler(async (req, res) => {
-  res.json({
-    success: true,
-    data: WEBHOOK_EVENTS,
-  });
-}));
-
-// ============================================
-// POST /api/webhooks/:id/test - Test webhook delivery
-// ============================================
-router.post('/:id/test', asyncHandler(async (req, res) => {
-  const { id } = req.params;
-  const tenantId = req.user.tenant_id || null;
-
-  let sql = `SELECT * FROM webhooks WHERE id = $1`;
-  const params = [id];
-  if (tenantId) {
-    sql += ` AND tenant_id = $2`;
-    params.push(tenantId);
-  }
-
-  const result = await query(sql, params);
-  if (result.rows.length === 0) {
-    throw new NotFoundError('Webhook not found');
-  }
-
-  const webhook = result.rows[0];
-
-  // Trigger a test event
-  await triggerWebhook(webhook, 'test', {
-    test: true,
-    message: 'This is a test webhook delivery',
-    triggered_at: new Date().toISOString(),
-  });
-
-  res.json({
-    success: true,
-    message: 'Test webhook triggered',
   });
 }));
 

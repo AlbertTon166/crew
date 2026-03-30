@@ -38,7 +38,7 @@ export async function authenticate(req, res, next) {
     
     // Optionally verify user still exists in database
     const result = await query(
-      'SELECT id, username, email, role, tenant_id FROM users WHERE id = $1 AND active = true',
+      'SELECT id, name, email, role, "tenantId" FROM "User" WHERE id = $1 AND active = true',
       [decoded.userId]
     );
     
@@ -75,7 +75,7 @@ export async function optionalAuth(req, res, next) {
     try {
       const decoded = jwt.verify(token, jwtSecret);
       const result = await query(
-        'SELECT id, username, email, role, tenant_id FROM users WHERE id = $1 AND active = true',
+        'SELECT id, name, email, role, "tenantId" FROM "User" WHERE id = $1 AND active = true',
         [decoded.userId]
       );
       
@@ -124,7 +124,7 @@ export function generateToken(user, expiresIn = 604800) {
   return jwt.sign(
     { 
       userId: user.id, 
-      username: user.username, 
+      username: user.name, 
       email: user.email,
       role: user.role 
     },
@@ -140,7 +140,7 @@ export function generateToken(user, expiresIn = 604800) {
  */
 export async function hashPassword(password) {
   const bcrypt = await import('bcryptjs');
-  return bcrypt.hash(password, 12);
+  return bcrypt.default.hash(password, 12);
 }
 
 /**
@@ -151,5 +151,5 @@ export async function hashPassword(password) {
  */
 export async function comparePassword(password, hash) {
   const bcrypt = await import('bcryptjs');
-  return bcrypt.compare(password, hash);
+  return bcrypt.default.compare(password, hash);
 }

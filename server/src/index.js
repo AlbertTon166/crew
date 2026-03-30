@@ -72,6 +72,21 @@ app.get('/health', async (req, res) => {
   });
 });
 
+// ============================================
+// STATUS CHECK (for frontend DeployModeContext)
+// ============================================
+
+app.get('/api/status', async (req, res) => {
+  const dbHealthy = await testConnection().catch(() => false);
+  
+  res.json({
+    connected: dbHealthy,
+    mode: 'cloud',
+    version: '1.0.0',
+    database: dbHealthy ? 'connected' : 'disconnected',
+  });
+});
+
 app.get('/', (req, res) => {
   res.json({
     service: 'Crew API',

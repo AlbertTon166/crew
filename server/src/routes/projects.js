@@ -1,60 +1,56 @@
 /**
  * Projects API Routes
- * CRUD operations for projects
+ * CRUD operations for projects using Prisma
  */
 
 import { Router } from 'express';
-import { query, transaction } from '../config/db.js';
+import prisma from '../lib/prisma.js';
 import { asyncHandler, NotFoundError, BadRequestError } from '../utils/errors.js';
 import { authenticate } from '../middleware/auth.js';
 
 const router = Router();
 
-// Apply authentication to all project routes
 router.use(authenticate);
 
 /**
- * GET /api/projects - List all projects
+ * GET /api/projects - List all projects for current user
  */
 router.get('/', asyncHandler(async (req, res) => {
   const { status, page = 1, limit = 20 } = req.query;
-  const offset = (parseInt(page) - 1) * parseInt(limit);
+  const skip = (parseInt(page) - 1) * parseInt(limit);
   
-  let sql = `
-    SELECT p.*, 
-           u.username as owner_name,
-           COUNT(t.id) as task_count,
-           COUNT(CASE WHEN t.status = 'completed' THEN 1 END) as completed_task_count
-    FROM projects p
-    LEFT JOIN users u ON p.owner_id = u.id
-    LEFT JOIN tasks t ON t.project_id = p.id
-    WHERE p.owner_id = $1 OR $1 = ANY(p.team_members)
-  `;
-  const params = [req.userId];
+  const where = {
+    OR: [
+      { userId: req.user.id },
+    ],
+  };
   
   if (status) {
-    sql += ` AND p.status = $${params.length + 1}`;
-    params.push(status);
+    where.status = status;
   }
   
-  sql += ` GROUP BY p.id, u.username ORDER BY p.updated_at DESC LIMIT $${params.length + 1} OFFSET $${params.length + 2}`;
-  params.push(parseInt(limit), offset);
-  
-  const result = await query(sql, params);
-  
-  // Get total count
-  const countResult = await query(
-    'SELECT COUNT(*) FROM projects WHERE owner_id = $1',
-    [req.userId]
-  );
+  const [projects, total] = await Promise.all([
+    prisma.project.findMany({
+      where,
+      skip,
+      take: parseInt(limit),
+      orderBy: { updatedAt: 'desc' },
+      include: {
+        _count: {
+          select: { tasks: true },
+        },
+      },
+    }),
+    prisma.project.count({ where }),
+  ]);
   
   res.json({
     success: true,
-    data: result.rows,
+    data: projects,
     pagination: {
       page: parseInt(page),
       limit: parseInt(limit),
-      total: parseInt(countResult.rows[0].count),
+      total,
     },
   });
 }));
@@ -65,39 +61,24 @@ router.get('/', asyncHandler(async (req, res) => {
 router.get('/:id', asyncHandler(async (req, res) => {
   const { id } = req.params;
   
-  const result = await query(
-    `SELECT p.*, u.username as owner_name
-     FROM projects p
-     LEFT JOIN users u ON p.owner_id = u.id
-     WHERE p.id = $1`,
-    [id]
-  );
+  const project = await prisma.project.findUnique({
+    where: { id },
+    include: {
+      tasks: {
+        orderBy: { createdAt: 'desc' },
+      },
+      agents: true,
+      requirements: true,
+    },
+  });
   
-  if (result.rows.length === 0) {
+  if (!project) {
     throw new NotFoundError('Project not found');
   }
   
-  // Get project tasks
-  const tasksResult = await query(
-    'SELECT * FROM tasks WHERE project_id = $1 ORDER BY created_at DESC',
-    [id]
-  );
-  
-  // Get project agents
-  const agentsResult = await query(
-    `SELECT a.* FROM agents a
-     INNER JOIN project_agents pa ON a.id = pa.agent_id
-     WHERE pa.project_id = $1`,
-    [id]
-  );
-  
   res.json({
     success: true,
-    data: {
-      ...result.rows[0],
-      tasks: tasksResult.rows,
-      agents: agentsResult.rows,
-    },
+    data: project,
   });
 }));
 
@@ -105,22 +86,24 @@ router.get('/:id', asyncHandler(async (req, res) => {
  * POST /api/projects - Create new project
  */
 router.post('/', asyncHandler(async (req, res) => {
-  const { name, description, status = 'active', team_members = [] } = req.body;
+  const { name, description, status = 'active' } = req.body;
   
   if (!name || name.trim() === '') {
     throw new BadRequestError('Project name is required');
   }
   
-  const result = await query(
-    `INSERT INTO projects (name, description, status, owner_id, team_members, created_at, updated_at)
-     VALUES ($1, $2, $3, $4, $5, NOW(), NOW())
-     RETURNING *`,
-    [name.trim(), description, status, req.userId, team_members]
-  );
+  const project = await prisma.project.create({
+    data: {
+      name: name.trim(),
+      description: description || '',
+      status,
+      userId: req.user.id,
+    },
+  });
   
   res.status(201).json({
     success: true,
-    data: result.rows[0],
+    data: project,
   });
 }));
 
@@ -129,55 +112,34 @@ router.post('/', asyncHandler(async (req, res) => {
  */
 router.put('/:id', asyncHandler(async (req, res) => {
   const { id } = req.params;
-  const { name, description, status, team_members } = req.body;
+  const { name, description, status } = req.body;
   
-  // Check ownership
-  const check = await query(
-    'SELECT owner_id FROM projects WHERE id = $1',
-    [id]
-  );
+  const existing = await prisma.project.findUnique({
+    where: { id },
+    select: { userId: true },
+  });
   
-  if (check.rows.length === 0) {
+  if (!existing) {
     throw new NotFoundError('Project not found');
   }
   
-  if (check.rows[0].owner_id !== req.userId) {
+  if (existing.userId !== req.user.id) {
     throw new BadRequestError('Only project owner can update');
   }
   
-  const updates = [];
-  const values = [];
-  let paramCount = 1;
+  const updates = {};
+  if (name !== undefined) updates.name = name.trim();
+  if (description !== undefined) updates.description = description;
+  if (status !== undefined) updates.status = status;
   
-  if (name !== undefined) {
-    updates.push(`name = $${paramCount++}`);
-    values.push(name.trim());
-  }
-  if (description !== undefined) {
-    updates.push(`description = $${paramCount++}`);
-    values.push(description);
-  }
-  if (status !== undefined) {
-    updates.push(`status = $${paramCount++}`);
-    values.push(status);
-  }
-  if (team_members !== undefined) {
-    updates.push(`team_members = $${paramCount++}`);
-    values.push(team_members);
-  }
-  
-  updates.push(`updated_at = NOW()`);
-  
-  values.push(id);
-  
-  const result = await query(
-    `UPDATE projects SET ${updates.join(', ')} WHERE id = $${paramCount} RETURNING *`,
-    values
-  );
+  const project = await prisma.project.update({
+    where: { id },
+    data: updates,
+  });
   
   res.json({
     success: true,
-    data: result.rows[0],
+    data: project,
   });
 }));
 
@@ -187,21 +149,22 @@ router.put('/:id', asyncHandler(async (req, res) => {
 router.delete('/:id', asyncHandler(async (req, res) => {
   const { id } = req.params;
   
-  // Check ownership
-  const check = await query(
-    'SELECT owner_id FROM projects WHERE id = $1',
-    [id]
-  );
+  const existing = await prisma.project.findUnique({
+    where: { id },
+    select: { userId: true },
+  });
   
-  if (check.rows.length === 0) {
+  if (!existing) {
     throw new NotFoundError('Project not found');
   }
   
-  if (check.rows[0].owner_id !== req.userId) {
+  if (existing.userId !== req.user.id) {
     throw new BadRequestError('Only project owner can delete');
   }
   
-  await query('DELETE FROM projects WHERE id = $1', [id]);
+  await prisma.project.delete({
+    where: { id },
+  });
   
   res.json({
     success: true,
@@ -215,20 +178,23 @@ router.delete('/:id', asyncHandler(async (req, res) => {
 router.get('/:id/stats', asyncHandler(async (req, res) => {
   const { id } = req.params;
   
-  const result = await query(
-    `SELECT 
-       COUNT(*) as total_tasks,
-       COUNT(CASE WHEN status = 'pending' THEN 1 END) as pending_tasks,
-       COUNT(CASE WHEN status = 'running' THEN 1 END) as running_tasks,
-       COUNT(CASE WHEN status = 'completed' THEN 1 END) as completed_tasks,
-       COUNT(CASE WHEN status IN ('failed', 'waiting_retry', 'waiting_human') THEN 1 END) as blocked_tasks
-     FROM tasks WHERE project_id = $1`,
-    [id]
-  );
+  const [total, pending, running, completed, blocked] = await Promise.all([
+    prisma.task.count({ where: { projectId: id } }),
+    prisma.task.count({ where: { projectId: id, status: 'pending' } }),
+    prisma.task.count({ where: { projectId: id, status: 'running' } }),
+    prisma.task.count({ where: { projectId: id, status: 'completed' } }),
+    prisma.task.count({ where: { projectId: id, status: { in: ['failed', 'waiting_retry', 'waiting_human'] } } }),
+  ]);
   
   res.json({
     success: true,
-    data: result.rows[0],
+    data: {
+      total_tasks: total,
+      pending_tasks: pending,
+      running_tasks: running,
+      completed_tasks: completed,
+      blocked_tasks: blocked,
+    },
   });
 }));
 

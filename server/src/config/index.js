@@ -23,7 +23,14 @@ const host = process.env.HOST || '0.0.0.0';
 const port = parseInt(process.env.PORT || '3001', 10);
 
 /** @type {string} */
-const jwtSecret = process.env.JWT_SECRET || 'crew-dev-secret-change-in-production';
+const jwtSecret = process.env.JWT_SECRET;
+if (!jwtSecret) {
+  if (process.env.NODE_ENV === 'production') {
+    throw new Error('JWT_SECRET environment variable is required in production');
+  }
+  // Development only - generate a warning but allow startup
+  console.warn('WARNING: Using insecure development JWT secret. Set JWT_SECRET for production.');
+}
 
 /** @type {number} */
 const jwtExpiresIn = parseInt(process.env.JWT_EXPIRES_IN || '604800', 10); // 7 days in seconds
@@ -44,7 +51,7 @@ const postgres = {
 // CORS Configuration
 /** @type {Object} */
 const cors = {
-  origin: process.env.CORS_ORIGIN || '*',
+  origin: process.env.CORS_ORIGIN || 'https://tzx.aiteamsvr.work',
   credentials: process.env.CORS_CREDENTIALS === 'true',
 };
 
