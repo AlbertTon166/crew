@@ -129,6 +129,24 @@ model ApiKey {
   createdAt DateTime  @default(now())
 }
 
+model ServerConnection {
+  id            String   @id @default(uuid())
+  name          String
+  type          String   @default("custom")  // openai, anthropic, deepseek, custom
+  baseURL       String
+  apiKey        String
+  prefix        String   @default("")
+  rateLimit     Int      @default(60)
+  rateLimitWindow Int   @default(60)         // seconds
+  isActive      Boolean  @default(true)
+  isConnected   Boolean  @default(false)
+  lastChecked   DateTime?
+  health        String   @default("offline") // healthy, degraded, offline
+  tenantId      String?
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+}
+
 model Workflow {
   id          String   @id @default(uuid())
   name        String

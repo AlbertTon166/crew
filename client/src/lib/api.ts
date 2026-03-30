@@ -127,4 +127,13 @@ export const api = {
       request('/api/api-keys', { method: 'POST', body: JSON.stringify(data) }),
     delete: (id: string) => request(`/api/api-keys/${id}`, { method: 'DELETE' }),
   },
+  // Servers
+  servers: {
+    list: () => request('/api/servers'),
+    create: (data: { name: string; type: string; baseURL: string; apiKey: string; rateLimit?: number; rateLimitWindow?: number }) =>
+      request('/api/servers', { method: 'POST', body: JSON.stringify(data) }),
+    update: (id: string, data: any) => request(`/api/servers/${id}`, { method: 'PUT', body: JSON.stringify(data) }),
+    test: (id: string) => request(`/api/servers/${id}/test`, { method: 'POST' }),
+    delete: (id: string) => request(`/api/servers/${id}`, { method: 'DELETE' }),
+  },
 }

@@ -25,6 +25,7 @@ import userRolesRouter from './routes/userRoles.js';
 import rolesRouter from './routes/roles.js';
 import webhooksRouter from './routes/webhooks.js';
 import apiKeysRouter from './routes/api-keys.js';
+import serversRouter from './routes/servers.js';
 import demoRouter from './routes/demo.js';
 
 // Create Express app
@@ -105,6 +106,7 @@ app.use('/api/agents', agentsRouter);
 app.use('/api/teams', teamsRouter);
 app.use('/api/execution', executionRouter);
 app.use('/api/demo', demoRouter);
+app.use('/api/servers', serversRouter);
 
 // ============================================
 // ERROR HANDLING
