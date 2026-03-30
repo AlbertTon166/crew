@@ -210,6 +210,7 @@ export default function APIKeys() {
         name: newKeyForm.name,
         provider: newKeyForm.provider,
         model: newKeyForm.model || providerConfig[newKeyForm.provider].models[0] || 'default',
+        key: newKeyForm.apiKey,
       })
       // The API returns the full key only on creation
       const newKey: APIKey = {
