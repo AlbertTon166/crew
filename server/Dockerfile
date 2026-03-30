@@ -25,6 +25,9 @@ WORKDIR /app
 COPY package*.json ./
 RUN npm ci --only=production && npm cache clean --force
 
+# Copy prisma schema for client generation
+COPY prisma ./prisma
+
 # Generate Prisma client
 RUN npx prisma generate
 
