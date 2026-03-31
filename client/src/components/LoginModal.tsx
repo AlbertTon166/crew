@@ -56,7 +56,7 @@ export default function LoginModal({ isOpen, onClose, onLoginSuccess }: LoginMod
       const tokens = JSON.parse(localStorage.getItem('auth_tokens') || '[]')
       tokens.push({ token: data.data.token, isActive: true })
       localStorage.setItem('auth_tokens', JSON.stringify(tokens))
-      localStorage.setItem('current_user', JSON.stringify(data.data.user))
+      localStorage.setItem('auth_user', JSON.stringify(data.data.user))
 
       setSuccess(language === 'zh' ? '登录成功！' : 'Login successful!')
       setTimeout(() => {
@@ -65,7 +65,7 @@ export default function LoginModal({ isOpen, onClose, onLoginSuccess }: LoginMod
           onLoginSuccess(data.data.user, data.data.token)
         } else {
           // Navigate to dashboard after successful login
-          window.location.href = '/#/dashboard'
+          window.location.replace('/#/dashboard')
         }
       }, 500)
     } catch (err: any) {
@@ -136,7 +136,7 @@ export default function LoginModal({ isOpen, onClose, onLoginSuccess }: LoginMod
       const tokens = JSON.parse(localStorage.getItem('auth_tokens') || '[]')
       tokens.push({ token: data.data.token, isActive: true })
       localStorage.setItem('auth_tokens', JSON.stringify(tokens))
-      localStorage.setItem('current_user', JSON.stringify(data.data.user))
+      localStorage.setItem('auth_user', JSON.stringify(data.data.user))
 
       setSuccess(language === 'zh' ? '注册成功！正在进入...' : 'Registered successfully! Entering...')
       setTimeout(() => {
@@ -145,7 +145,7 @@ export default function LoginModal({ isOpen, onClose, onLoginSuccess }: LoginMod
           onLoginSuccess(data.data.user, data.data.token)
         } else {
           // Navigate to dashboard after successful registration
-          window.location.href = '/#/dashboard'
+          window.location.replace('/#/dashboard')
         }
       }, 500)
     } catch (err: any) {
