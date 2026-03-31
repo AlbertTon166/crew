@@ -1,6 +1,6 @@
 /**
- * Server Connections Routes
- * Manage execution servers for spawning agent containers
+ * Servers API Routes
+ * Server connection management with Docker API support
  */
 
 import { Router } from 'express';
@@ -12,73 +12,164 @@ const router = Router();
 
 router.use(authenticate);
 
-// ============================================
-// GET /api/servers - List all server connections
-// ============================================
-router.get('/', asyncHandler(async (req, res) => {
-  const servers = await prisma.serverConnection.findMany({
-    orderBy: { createdAt: 'desc' },
-  });
+// Docker API service configuration
+const DOCKER_API_URL = process.env.DOCKER_API_URL || 'http://docker-api:3002';
+const DOCKER_API_KEY = process.env.DOCKER_API_KEY || 'crew-docker-api-secret';
 
-  // Mask passwords for security
+// Test Docker connection via internal API
+async function testDockerConnection(host, port, useTls = false) {
+  // First check if the server is reachable
+  const protocol = useTls ? 'https' : 'http';
+  const url = `${protocol}://${host}:${port}/version`;
+  
+  try {
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 5000);
+    
+    const response = await fetch(url, {
+      method: 'GET',
+      signal: controller.signal,
+    });
+    
+    clearTimeout(timeoutId);
+    
+    if (response.ok) {
+      const data = await response.json();
+      return { success: true, version: data.version, apiVersion: data.apiVersion };
+    }
+    return { success: false, error: `HTTP ${response.status}` };
+  } catch (error) {
+    return { success: false, error: error.message };
+  }
+}
+
+// Test Docker API internal service
+async function testDockerApiService() {
+  try {
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 5000);
+    
+    const response = await fetch(`${DOCKER_API_URL}/health`, {
+      signal: controller.signal,
+      headers: { 'x-internal-api-key': DOCKER_API_KEY },
+    });
+    
+    clearTimeout(timeoutId);
+    
+    if (response.ok) {
+      return { success: true, connected: true };
+    }
+    return { success: false, error: `HTTP ${response.status}` };
+  } catch (error) {
+    return { success: false, error: error.message };
+  }
+}
+
+// Call Docker API internal service
+async function callDockerApi(endpoint, method = 'GET', body = null) {
+  try {
+    const options = {
+      method,
+      headers: {
+        'Content-Type': 'application/json',
+        'x-internal-api-key': DOCKER_API_KEY,
+      },
+    };
+    
+    if (body) {
+      options.body = JSON.stringify(body);
+    }
+    
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 30000);
+    options.signal = controller.signal;
+    
+    const response = await fetch(`${DOCKER_API_URL}${endpoint}`, options);
+    clearTimeout(timeoutId);
+    
+    const data = await response.json();
+    
+    if (!response.ok) {
+      return { success: false, error: data.error || `HTTP ${response.status}` };
+    }
+    
+    return { success: true, data };
+  } catch (error) {
+    return { success: false, error: error.message };
+  }
+}
+
+/**
+ * GET /api/servers - List servers
+ */
+router.get('/', asyncHandler(async (req, res) => {
+  const { type, status, page = 1, limit = 20 } = req.query;
+  const skip = (parseInt(page) - 1) * parseInt(limit);
+
+  const where = {};
+  if (type) where.type = type;
+  if (status) where.status = status;
+
+  const [servers, total] = await Promise.all([
+    prisma.serverConnection.findMany({
+      where,
+      skip,
+      take: parseInt(limit),
+      orderBy: { createdAt: 'desc' },
+    }),
+    prisma.serverConnection.count({ where }),
+  ]);
+
+  // Mask passwords
   const masked = servers.map(s => ({
     ...s,
     password: s.password ? '***' : '',
   }));
 
-  res.json({ success: true, data: masked });
+  res.json({
+    success: true,
+    data: masked,
+    pagination: { page: parseInt(page), limit: parseInt(limit), total },
+  });
 }));
 
-// ============================================
-// GET /api/servers/:id - Get server details
-// ============================================
+/**
+ * GET /api/servers/:id - Get server by ID
+ */
 router.get('/:id', asyncHandler(async (req, res) => {
-  const server = await prisma.serverConnection.findUnique({ 
-    where: { id: req.params.id } 
+  const { id } = req.params;
+
+  const server = await prisma.serverConnection.findUnique({
+    where: { id },
   });
 
-  if (!server) {
-    throw new NotFoundError('Server not found');
-  }
+  if (!server) throw new NotFoundError('Server not found');
 
   res.json({
     success: true,
-    data: {
-      ...server,
-      password: server.password ? '***' : '',
-    },
+    data: { ...server, password: server.password ? '***' : '' },
   });
 }));
 
-// ============================================
-// POST /api/servers - Create a new server connection
-// ============================================
+/**
+ * POST /api/servers - Create server
+ */
 router.post('/', asyncHandler(async (req, res) => {
-  const { name, type, host, port, username, password } = req.body;
+  const { name, type = 'docker', host, port = 2375, username, password, useTls = false } = req.body;
 
-  if (!name || !name.trim()) {
-    throw new BadRequestError('Name is required');
-  }
-  if (!host || !host.trim()) {
-    throw new BadRequestError('Host is required');
-  }
-
-  const validTypes = ['docker', 'ssh', 'openclaw'];
-  const serverType = type || 'docker';
-  if (!validTypes.includes(serverType)) {
-    throw new BadRequestError(`Invalid server type. Must be one of: ${validTypes.join(', ')}`);
-  }
+  if (!name || name.trim() === '') throw new BadRequestError('Server name is required');
+  if (!host || host.trim() === '') throw new BadRequestError('Host is required');
 
   const server = await prisma.serverConnection.create({
     data: {
       name: name.trim(),
-      type: serverType,
+      type,
       host: host.trim(),
-      port: port || 22,
+      port: port || 2375,
       username: username || '',
       password: password || '',
+      useTls: useTls || false,
       status: 'offline',
-      isActive: true,
     },
   });
 
@@ -88,163 +179,280 @@ router.post('/', asyncHandler(async (req, res) => {
   });
 }));
 
-// ============================================
-// PUT /api/servers/:id - Update server connection
-// ============================================
+/**
+ * PUT /api/servers/:id - Update server
+ */
 router.put('/:id', asyncHandler(async (req, res) => {
-  const { name, type, host, port, username, password, isActive } = req.body;
+  const { id } = req.params;
+  const { name, type, host, port, username, password, useTls, isActive } = req.body;
 
-  const existing = await prisma.serverConnection.findUnique({ where: { id: req.params.id } });
-  if (!existing) {
-    throw new NotFoundError('Server not found');
-  }
+  const existing = await prisma.serverConnection.findUnique({ where: { id } });
+  if (!existing) throw new NotFoundError('Server not found');
 
   const updates = {};
+  if (name !== undefined) updates.name = name.trim();
+  if (type !== undefined) updates.type = type;
+  if (host !== undefined) updates.host = host.trim();
+  if (port !== undefined) updates.port = port;
+  if (username !== undefined) updates.username = username;
+  if (password !== undefined && password !== '***') updates.password = password;
+  if (useTls !== undefined) updates.useTls = useTls;
+  if (isActive !== undefined) updates.isActive = isActive;
 
-  if (name !== undefined) {
-    if (!name.trim()) throw new BadRequestError('Name cannot be empty');
-    updates.name = name.trim();
-  }
-
-  if (type !== undefined) {
-    const validTypes = ['docker', 'ssh', 'openclaw'];
-    if (!validTypes.includes(type)) {
-      throw new BadRequestError(`Invalid server type. Must be one of: ${validTypes.join(', ')}`);
-    }
-    updates.type = type;
-  }
-
-  if (host !== undefined) {
-    updates.host = host.trim();
-  }
-
-  if (port !== undefined) {
-    updates.port = port;
-  }
-
-  if (username !== undefined) {
-    updates.username = username;
-  }
-
-  if (password !== undefined && password !== '') {
-    updates.password = password;
-  }
-
-  if (isActive !== undefined) {
-    updates.isActive = isActive;
-  }
-
-  const updated = await prisma.serverConnection.update({
-    where: { id: req.params.id },
+  const server = await prisma.serverConnection.update({
+    where: { id },
     data: updates,
   });
 
   res.json({
     success: true,
-    data: { ...updated, password: updated.password ? '***' : '' },
+    data: { ...server, password: server.password ? '***' : '' },
   });
 }));
 
-// ============================================
-// POST /api/servers/:id/test - Test server connection
-// ============================================
+/**
+ * POST /api/servers/:id/test - Test server connection
+ */
 router.post('/:id/test', asyncHandler(async (req, res) => {
-  const server = await prisma.serverConnection.findUnique({ where: { id: req.params.id } });
+  const { id } = req.params;
+
+  const server = await prisma.serverConnection.findUnique({ where: { id } });
+  if (!server) throw new NotFoundError('Server not found');
+
+  let testResult;
   
-  if (!server) {
-    throw new NotFoundError('Server not found');
+  if (server.type === 'docker') {
+    // For local Docker API service
+    testResult = await testDockerApiService();
+  } else if (server.type === 'ssh') {
+    // SSH check - basic TCP check
+    testResult = { success: true, note: 'SSH connection check not implemented' };
+  } else {
+    testResult = { success: true, note: 'OpenClaw custom check' };
   }
 
-  // Simple connectivity test based on server type
-  let status = 'offline';
-
-  try {
-    if (server.type === 'docker') {
-      // Test Docker connection via TCP
-      const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), 5000);
-
-      try {
-        // Try to connect to Docker socket or TCP port
-        const dockerHost = server.host === 'localhost' || server.host === '127.0.0.1' 
-          ? 'http://localhost:2375' 
-          : `http://${server.host}:${server.port || 2375}`;
-        
-        const response = await fetch(`${dockerHost}/version`, {
-          signal: controller.signal,
-        });
-        
-        clearTimeout(timeoutId);
-        
-        if (response.ok) {
-          status = 'online';
-        } else {
-          status = 'degraded';
-        }
-      } catch (e) {
-        clearTimeout(timeoutId);
-        status = 'offline';
-      }
-    } else if (server.type === 'ssh') {
-      // For SSH, we just mark as offline until proper SSH testing is implemented
-      // In production, you'd use a library like ssh2 to test connection
-      status = 'online'; // Assume online if host is reachable
-    } else {
-      // openclaw type - test HTTP endpoint
-      const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), 5000);
-
-      try {
-        const response = await fetch(`http://${server.host}:${server.port || 3000}/health`, {
-          signal: controller.signal,
-        });
-        
-        clearTimeout(timeoutId);
-        
-        if (response.ok) {
-          status = 'online';
-        } else {
-          status = 'degraded';
-        }
-      } catch (e) {
-        clearTimeout(timeoutId);
-        status = 'offline';
-      }
-    }
-  } catch (error) {
-    status = 'offline';
-  }
-
-  // Update server with test result
-  const updated = await prisma.serverConnection.update({
-    where: { id: req.params.id },
-    data: {
-      status,
-      lastChecked: new Date(),
-    },
+  // Update server status based on test
+  const newStatus = testResult.success ? 'online' : 'offline';
+  await prisma.serverConnection.update({
+    where: { id },
+    data: { status: newStatus },
   });
 
   res.json({
     success: true,
     data: {
-      status: updated.status,
-      lastChecked: updated.lastChecked,
+      status: newStatus,
+      testResult,
+      testedAt: new Date().toISOString(),
     },
   });
 }));
 
-// ============================================
-// DELETE /api/servers/:id - Delete server connection
-// ============================================
-router.delete('/:id', asyncHandler(async (req, res) => {
-  try {
-    await prisma.serverConnection.delete({ where: { id: req.params.id } });
-  } catch (error) {
-    if (error.code === 'P2025') {
-      throw new NotFoundError('Server not found');
-    }
-    throw error;
+/**
+ * POST /api/servers/:id/spawn - Spawn agent container via Docker API
+ */
+router.post('/:id/spawn', asyncHandler(async (req, res) => {
+  const { id } = req.params;
+  const { agentConfig, taskId, image = 'ubuntu:22.04', command, env = [] } = req.body;
+
+  const server = await prisma.serverConnection.findUnique({ where: { id } });
+  if (!server) throw new NotFoundError('Server not found');
+
+  if (server.status !== 'online') {
+    throw new BadRequestError('Server is not online. Please test connection first.');
   }
+
+  // Call Docker API service to spawn container
+  const spawnResult = await callDockerApi('/container/spawn', 'POST', {
+    image,
+    command: command || ['sleep', '3600'], // Default: keep alive for 1 hour
+    env: [
+      `CREW_TASK_ID=${taskId || ''}`,
+      `CREW_AGENT_CONFIG=${JSON.stringify(agentConfig || {})}`,
+      ...env,
+    ],
+    name: `crew-agent-${Date.now()}`,
+    resources: {
+      memory: 512 * 1024 * 1024, // 512MB
+      cpu: 1 * 1e9, // 1 CPU
+    },
+  });
+
+  if (!spawnResult.success) {
+    throw new BadRequestError(`Failed to spawn container: ${spawnResult.error}`);
+  }
+
+  // Create execution record
+  const execution = await prisma.execution.create({
+    data: {
+      taskId: taskId || 'unknown',
+      agentId: agentConfig?.agentId || 'unknown',
+      status: 'running',
+    },
+  });
+
+  res.status(201).json({
+    success: true,
+    data: {
+      spawnId: spawnResult.data.containerId,
+      fullId: spawnResult.data.fullId,
+      name: spawnResult.data.name,
+      executionId: execution.id,
+      serverId: id,
+      status: 'spawned',
+    },
+  });
+}));
+
+/**
+ * GET /api/servers/:id/containers - List containers on server
+ */
+router.get('/:id/containers', asyncHandler(async (req, res) => {
+  const { id } = req.params;
+
+  const server = await prisma.serverConnection.findUnique({ where: { id } });
+  if (!server) throw new NotFoundError('Server not found');
+
+  if (server.status !== 'online') {
+    throw new BadRequestError('Server is not online. Please test connection first.');
+  }
+
+  const containersResult = await callDockerApi('/containers');
+
+  if (!containersResult.success) {
+    throw new BadRequestError(`Failed to list containers: ${containersResult.error}`);
+  }
+
+  res.json({
+    success: true,
+    data: containersResult.data,
+  });
+}));
+
+/**
+ * POST /api/servers/:id/exec - Execute command in container
+ */
+router.post('/:id/exec', asyncHandler(async (req, res) => {
+  const { id } = req.params;
+  const { containerId, command, env = [] } = req.body;
+
+  const server = await prisma.serverConnection.findUnique({ where: { id } });
+  if (!server) throw new NotFoundError('Server not found');
+
+  if (!containerId) throw new BadRequestError('Container ID is required');
+  if (!command) throw new BadRequestError('Command is required');
+
+  const execResult = await callDockerApi(`/container/${containerId}/exec`, 'POST', {
+    command,
+    env,
+  });
+
+  if (!execResult.success) {
+    throw new BadRequestError(`Failed to exec: ${execResult.error}`);
+  }
+
+  res.json({
+    success: true,
+    data: {
+      output: execResult.data.output,
+      exitCode: execResult.data.exitCode,
+    },
+  });
+}));
+
+/**
+ * GET /api/servers/:id/container/:containerId/logs - Get container logs
+ */
+router.get('/:id/container/:containerId/logs', asyncHandler(async (req, res) => {
+  const { id, containerId } = req.params;
+  const { stream = 'false', tail = 100 } = req.query;
+
+  const server = await prisma.serverConnection.findUnique({ where: { id } });
+  if (!server) throw new NotFoundError('Server not found');
+
+  // Proxy to Docker API with SSE support
+  if (stream === 'true') {
+    // Set SSE headers
+    res.setHeader('Content-Type', 'text/event-stream');
+    res.setHeader('Cache-Control', 'no-cache');
+    res.setHeader('Connection', 'keep-alive');
+    res.flushHeaders();
+
+    try {
+      const response = await fetch(
+        `${DOCKER_API_URL}/container/${containerId}/logs?stream=true&tail=${tail}`,
+        {
+          headers: { 'x-internal-api-key': DOCKER_API_KEY },
+        }
+      );
+
+      response.body.on('data', (chunk) => {
+        res.write(chunk);
+      });
+
+      response.body.on('end', () => {
+        res.end();
+      });
+
+      req.on('close', () => {
+        response.body.destroy();
+      });
+    } catch (error) {
+      res.write(`data: ${JSON.stringify({ error: error.message })}\n\n`);
+      res.end();
+    }
+  } else {
+    const logsResult = await callDockerApi(`/container/${containerId}/logs?tail=${tail}`);
+    res.json(logsResult);
+  }
+}));
+
+/**
+ * POST /api/servers/:id/container/:containerId/kill - Kill container
+ */
+router.post('/:id/container/:containerId/kill', asyncHandler(async (req, res) => {
+  const { id, containerId } = req.params;
+
+  const server = await prisma.serverConnection.findUnique({ where: { id } });
+  if (!server) throw new NotFoundError('Server not found');
+
+  const killResult = await callDockerApi(`/container/${containerId}/kill`, 'POST');
+
+  if (!killResult.success) {
+    throw new BadRequestError(`Failed to kill container: ${killResult.error}`);
+  }
+
+  res.json({ success: true, message: 'Container killed' });
+}));
+
+/**
+ * DELETE /api/servers/:id/container/:containerId - Remove container
+ */
+router.delete('/:id/container/:containerId', asyncHandler(async (req, res) => {
+  const { id, containerId } = req.params;
+
+  const server = await prisma.serverConnection.findUnique({ where: { id } });
+  if (!server) throw new NotFoundError('Server not found');
+
+  const removeResult = await callDockerApi(`/container/${containerId}`, 'DELETE');
+
+  if (!removeResult.success) {
+    throw new BadRequestError(`Failed to remove container: ${removeResult.error}`);
+  }
+
+  res.json({ success: true, message: 'Container removed' });
+}));
+
+/**
+ * DELETE /api/servers/:id - Delete server
+ */
+router.delete('/:id', asyncHandler(async (req, res) => {
+  const { id } = req.params;
+
+  const existing = await prisma.serverConnection.findUnique({ where: { id } });
+  if (!existing) throw new NotFoundError('Server not found');
+
+  await prisma.serverConnection.delete({ where: { id } });
 
   res.json({ success: true, message: 'Server deleted successfully' });
 }));

@@ -430,6 +430,15 @@ function ServersTab({ language }: { language: 'en' | 'zh' }) {
   const [deletingId, setDeletingId] = useState<string | null>(null)
   const [testingId, setTestingId] = useState<string | null>(null)
   const [showCreate, setShowCreate] = useState(false)
+  const [selectedServer, setSelectedServer] = useState<string | null>(null)
+  const [containers, setContainers] = useState<any[]>([])
+  const [loadingContainers, setLoadingContainers] = useState(false)
+  const [spawning, setSpawning] = useState(false)
+  const [showSpawn, setShowSpawn] = useState(false)
+  const [spawnConfig, setSpawnConfig] = useState({ image: 'ubuntu:22.04', command: 'sleep 3600', taskId: '' })
+  const [containerLogs, setContainerLogs] = useState<Record<string, string>>({})
+  const [showLogsFor, setShowLogsFor] = useState<string | null>(null)
+  const [killingId, setKillingId] = useState<string | null>(null)
   const [newServer, setNewServer] = useState({ 
     name: '', type: 'docker', host: 'localhost', port: 22, username: '', password: '' 
   })
@@ -459,6 +468,18 @@ function ServersTab({ language }: { language: 'en' | 'zh' }) {
       setError(err.message)
     } finally {
       setLoading(false)
+    }
+  }
+
+  const fetchContainers = async (serverId: string) => {
+    setLoadingContainers(true)
+    try {
+      const res = await api.servers.getContainers(serverId)
+      setContainers(res.data?.containers || [])
+    } catch (err: any) {
+      console.error('Failed to fetch containers:', err)
+    } finally {
+      setLoadingContainers(false)
     }
   }
 
@@ -506,6 +527,55 @@ function ServersTab({ language }: { language: 'en' | 'zh' }) {
       alert(err.message)
     } finally {
       setTestingId(null)
+    }
+  }
+
+  const handleSpawn = async (serverId: string) => {
+    setSpawning(true)
+    try {
+      const cmdArray = spawnConfig.command.split(' ').filter(Boolean)
+      await api.servers.spawn(serverId, {
+        image: spawnConfig.image,
+        command: cmdArray,
+        taskId: spawnConfig.taskId || undefined,
+      })
+      setShowSpawn(false)
+      setSpawnConfig({ image: 'ubuntu:22.04', command: 'sleep 3600', taskId: '' })
+      if (selectedServer) fetchContainers(selectedServer)
+    } catch (err: any) {
+      alert(err.message)
+    } finally {
+      setSpawning(false)
+    }
+  }
+
+  const handleViewLogs = async (serverId: string, containerId: string) => {
+    try {
+      const res = await api.servers.getContainerLogs(serverId, containerId, 50)
+      setContainerLogs(prev => ({ ...prev, [containerId]: res.data?.logs || '' }))
+      setShowLogsFor(containerId)
+    } catch (err: any) {
+      alert(err.message)
+    }
+  }
+
+  const handleKill = async (serverId: string, containerId: string) => {
+    if (!confirm(language === 'zh' ? '确定停止容器？' : 'Stop container?')) return
+    setKillingId(containerId)
+    try {
+      await api.servers.killContainer(serverId, containerId)
+      if (selectedServer) fetchContainers(selectedServer)
+    } catch (err: any) {
+      alert(err.message)
+    } finally {
+      setKillingId(null)
+    }
+  }
+
+  const handleSelectServer = (serverId: string) => {
+    setSelectedServer(selectedServer === serverId ? null : serverId)
+    if (selectedServer !== serverId) {
+      fetchContainers(serverId)
     }
   }
 
@@ -617,6 +687,17 @@ function ServersTab({ language }: { language: 'en' | 'zh' }) {
                     )}
                   </button>
                   <button 
+                    onClick={() => handleSelectServer(server.id)}
+                    style={{ 
+                      padding: '10px 14px', borderRadius: '10px', background: server.id === selectedServer ? 'linear-gradient(135deg, #6366F1, #8B5CF6)' : 'var(--bg-tertiary)', 
+                      border: '1px solid var(--border)', cursor: 'pointer',
+                      display: 'flex', alignItems: 'center', gap: '6px',
+                      fontSize: '12px', fontWeight: '600', color: server.id === selectedServer ? 'white' : 'var(--text-secondary)'
+                    }}>
+                    <Terminal size={14} />
+                    {server.id === selectedServer ? (language === 'zh' ? '收起' : 'Collapse') : (language === 'zh' ? '容器' : 'Containers')}
+                  </button>
+                  <button 
                     onClick={() => handleDelete(server.id)}
                     disabled={deletingId === server.id}
                     style={{ 
@@ -631,9 +712,211 @@ function ServersTab({ language }: { language: 'en' | 'zh' }) {
                   </button>
                 </div>
               </div>
+
+              {/* Container Management Section */}
+              {server.id === selectedServer && (
+                <div style={{ marginTop: '16px', paddingTop: '16px', borderTop: '1px solid var(--border)' }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' }}>
+                    <h4 style={{ fontSize: '13px', fontWeight: '600', color: 'var(--text-primary)', margin: 0 }}>
+                      {language === 'zh' ? '容器列表' : 'Containers'}
+                    </h4>
+                    <button
+                      onClick={() => { setShowSpawn(true); fetchContainers(server.id); }}
+                      style={{
+                        padding: '8px 14px', borderRadius: '8px',
+                        background: 'linear-gradient(135deg, #10B981, #059669)', border: 'none',
+                        color: 'white', fontSize: '12px', fontWeight: '600', cursor: 'pointer',
+                        display: 'flex', alignItems: 'center', gap: '4px',
+                      }}>
+                      <Plus size={14} />
+                      {language === 'zh' ? '启动容器' : 'Spawn'}
+                    </button>
+                  </div>
+
+                  {loadingContainers ? (
+                    <div style={{ textAlign: 'center', padding: '20px', color: 'var(--text-secondary)' }}>
+                      <Loader2 size={20} style={{ animation: 'spin 1s linear infinite' }} />
+                    </div>
+                  ) : containers.length === 0 ? (
+                    <div style={{ textAlign: 'center', padding: '20px', color: 'var(--text-tertiary)', fontSize: '13px' }}>
+                      {language === 'zh' ? '暂无运行中的容器' : 'No running containers'}
+                    </div>
+                  ) : (
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                      {containers.map((c: any) => (
+                        <div key={c.id} style={{
+                          background: 'var(--bg-tertiary)', borderRadius: '10px', padding: '12px',
+                          display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+                        }}>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                            <div style={{
+                              width: 8, height: 8, borderRadius: '50%',
+                              background: c.state === 'running' ? '#34D399' : '#F87171',
+                            }} />
+                            <div>
+                              <div style={{ fontSize: '13px', fontWeight: '600', color: 'var(--text-primary)' }}>
+                                {c.names?.[0] || c.id.slice(0, 12)}
+                              </div>
+                              <div style={{ fontSize: '11px', color: 'var(--text-tertiary)' }}>
+                                {c.image} • {c.status}
+                              </div>
+                            </div>
+                          </div>
+                          <div style={{ display: 'flex', gap: '6px' }}>
+                            <button
+                              onClick={() => handleViewLogs(server.id, c.id)}
+                              style={{
+                                padding: '6px 10px', borderRadius: '6px',
+                                background: 'var(--bg-secondary)', border: '1px solid var(--border)',
+                                cursor: 'pointer', fontSize: '11px', color: 'var(--text-secondary)',
+                              }}>
+                              {language === 'zh' ? '日志' : 'Logs'}
+                            </button>
+                            {c.state === 'running' && (
+                              <button
+                                onClick={() => handleKill(server.id, c.id)}
+                                disabled={killingId === c.id}
+                                style={{
+                                  padding: '6px 10px', borderRadius: '6px',
+                                  background: 'rgba(248,113,113,0.1)', border: '1px solid rgba(248,113,113,0.3)',
+                                  cursor: killingId === c.id ? 'not-allowed' : 'pointer', fontSize: '11px', color: '#F87171',
+                                }}>
+                                {killingId === c.id ? '...' : (language === 'zh' ? '停止' : 'Stop')}
+                              </button>
+                            )}
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              )}
             </div>
           )
         })
+      )}
+
+      {/* Spawn Modal */}
+      {showSpawn && selectedServer && (
+        <div style={{
+          position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.6)', backdropFilter: 'blur(4px)',
+          display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000,
+        }} onClick={() => setShowSpawn(false)}>
+          <div style={{
+            background: 'var(--bg-secondary)', borderRadius: '20px', border: '1px solid var(--border)',
+            width: '90%', maxWidth: '420px', padding: '24px',
+          }} onClick={e => e.stopPropagation()}>
+            <h2 style={{ fontSize: '18px', fontWeight: '600', color: 'var(--text-primary)', marginBottom: '20px' }}>
+              {language === 'zh' ? '启动容器' : 'Spawn Container'}
+            </h2>
+
+            <div style={{ marginBottom: '16px' }}>
+              <label style={{ fontSize: '12px', fontWeight: '600', color: 'var(--text-tertiary)', display: 'block', marginBottom: '6px' }}>
+                {language === 'zh' ? '镜像' : 'Image'}
+              </label>
+              <input
+                type="text" value={spawnConfig.image}
+                onChange={e => setSpawnConfig(prev => ({ ...prev, image: e.target.value }))}
+                placeholder="ubuntu:22.04"
+                style={{
+                  width: '100%', padding: '12px 14px', borderRadius: '10px',
+                  border: '1px solid var(--border)', background: 'var(--bg-tertiary)',
+                  color: 'var(--text-primary)', fontSize: '14px', outline: 'none',
+                }}
+              />
+            </div>
+
+            <div style={{ marginBottom: '16px' }}>
+              <label style={{ fontSize: '12px', fontWeight: '600', color: 'var(--text-tertiary)', display: 'block', marginBottom: '6px' }}>
+                {language === 'zh' ? '命令' : 'Command'}
+              </label>
+              <input
+                type="text" value={spawnConfig.command}
+                onChange={e => setSpawnConfig(prev => ({ ...prev, command: e.target.value }))}
+                placeholder="sleep 3600"
+                style={{
+                  width: '100%', padding: '12px 14px', borderRadius: '10px',
+                  border: '1px solid var(--border)', background: 'var(--bg-tertiary)',
+                  color: 'var(--text-primary)', fontSize: '14px', outline: 'none',
+                }}
+              />
+            </div>
+
+            <div style={{ marginBottom: '20px' }}>
+              <label style={{ fontSize: '12px', fontWeight: '600', color: 'var(--text-tertiary)', display: 'block', marginBottom: '6px' }}>
+                {language === 'zh' ? '任务 ID (可选)' : 'Task ID (optional)'}
+              </label>
+              <input
+                type="text" value={spawnConfig.taskId}
+                onChange={e => setSpawnConfig(prev => ({ ...prev, taskId: e.target.value }))}
+                placeholder={language === 'zh' ? '例如：task-001' : 'e.g., task-001'}
+                style={{
+                  width: '100%', padding: '12px 14px', borderRadius: '10px',
+                  border: '1px solid var(--border)', background: 'var(--bg-tertiary)',
+                  color: 'var(--text-primary)', fontSize: '14px', outline: 'none',
+                }}
+              />
+            </div>
+
+            <div style={{ display: 'flex', gap: '10px', justifyContent: 'flex-end' }}>
+              <button
+                onClick={() => setShowSpawn(false)}
+                style={{
+                  padding: '12px 20px', borderRadius: '10px', border: '1px solid var(--border)',
+                  background: 'var(--bg-tertiary)', color: 'var(--text-secondary)',
+                  fontSize: '14px', fontWeight: '500', cursor: 'pointer',
+                }}>
+                {language === 'zh' ? '取消' : 'Cancel'}
+              </button>
+              <button
+                onClick={() => handleSpawn(selectedServer)}
+                disabled={!spawnConfig.image || spawning}
+                style={{
+                  padding: '12px 20px', borderRadius: '10px', border: 'none',
+                  background: spawnConfig.image && !spawning ? 'linear-gradient(135deg, #10B981, #059669)' : 'var(--bg-tertiary)',
+                  color: spawnConfig.image && !spawning ? 'white' : 'var(--text-tertiary)',
+                  fontSize: '14px', fontWeight: '600', cursor: spawnConfig.image && !spawning ? 'pointer' : 'not-allowed',
+                }}>
+                {spawning ? (language === 'zh' ? '启动中...' : 'Spawning...') : (language === 'zh' ? '启动' : 'Spawn')}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Logs Modal */}
+      {showLogsFor && containerLogs[showLogsFor] !== undefined && (
+        <div style={{
+          position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.6)', backdropFilter: 'blur(4px)',
+          display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000,
+        }} onClick={() => { setShowLogsFor(null); setContainerLogs(prev => ({ ...prev, [showLogsFor]: '' })); }}>
+          <div style={{
+            background: 'var(--bg-secondary)', borderRadius: '20px', border: '1px solid var(--border)',
+            width: '90%', maxWidth: '600px', maxHeight: '70vh', padding: '24px',
+            display: 'flex', flexDirection: 'column',
+          }} onClick={e => e.stopPropagation()}>
+            <h2 style={{ fontSize: '18px', fontWeight: '600', color: 'var(--text-primary)', marginBottom: '16px' }}>
+              {language === 'zh' ? '容器日志' : 'Container Logs'}
+            </h2>
+            <div style={{
+              flex: 1, background: '#0D1117', borderRadius: '10px', padding: '16px',
+              overflow: 'auto', maxHeight: '400px',
+              fontFamily: 'monospace', fontSize: '12px', color: '#E6EDF3',
+              whiteSpace: 'pre-wrap', wordBreak: 'break-all',
+            }}>
+              {containerLogs[showLogsFor] || '(no logs)'}
+            </div>
+            <button
+              onClick={() => { setShowLogsFor(null); setContainerLogs(prev => ({ ...prev, [showLogsFor]: '' })); }}
+              style={{
+                marginTop: '16px', padding: '12px 20px', borderRadius: '10px', border: '1px solid var(--border)',
+                background: 'var(--bg-tertiary)', color: 'var(--text-secondary)',
+                fontSize: '14px', fontWeight: '500', cursor: 'pointer', alignSelf: 'flex-end',
+              }}>
+              {language === 'zh' ? '关闭' : 'Close'}
+            </button>
+          </div>
+        </div>
       )}
 
       {/* Create Modal */}

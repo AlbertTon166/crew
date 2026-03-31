@@ -137,6 +137,7 @@ model ServerConnection {
   port          Int      @default(22)
   username      String   @default("")
   password      String   @default("")        // encrypted
+  useTls        Boolean  @default(false)
   status        String   @default("offline") // online, offline, degraded
   isActive      Boolean  @default(true)
   lastChecked   DateTime?
@@ -171,6 +172,62 @@ model UsageRecord {
   agentId   String?
   projectId String?
   createdAt DateTime @default(now())
+}
+
+// ============================================
+// Agent Execution
+// ============================================
+
+model Execution {
+  id           String    @id @default(uuid())
+  taskId      String   @map("task_id")
+  agentId     String   @map("agent_id")
+  status      String   @default("pending") // pending, running, completed, failed
+  result      Json?
+  error       String?
+  startedAt   DateTime  @default(now()) @map("started_at")
+  completedAt DateTime? @map("completed_at")
+  createdAt   DateTime  @default(now()) @map("created_at")
+  
+  logs        ExecutionLog[]
+}
+
+model ExecutionLog {
+  id           String   @id @default(uuid())
+  executionId String   @map("execution_id")
+  level       String   @default("info") // debug, info, warn, error
+  message     String
+  metadata    Json?
+  timestamp   DateTime @default(now())
+  
+  execution   Execution @relation(fields: [executionId], references: [id], onDelete: Cascade)
+}
+
+// ============================================
+// Teams
+// ============================================
+
+model Team {
+  id          String   @id @default(uuid())
+  name        String
+  description String?
+  projectId   String?
+  agentIds    String[] @default([])
+  workflow    Json     @default("{}")
+  status      String   @default("active")
+  tenantId    String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+}
+
+model TeamTemplate {
+  id          String   @id @default(uuid())
+  name        String
+  description String?
+  config      Json
+  tenantId    String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
 }
 
 // ============================================

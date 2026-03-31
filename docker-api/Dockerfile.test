@@ -1,0 +1,15 @@
+FROM mcr.microsoft.com/playwright:v1.40.0
+
+WORKDIR /app
+
+# Install playwright as npm package
+RUN npm init -y && npm install playwright@1.40.0
+
+# Copy test script
+COPY test-ui.js .
+
+# Set environment
+ENV TARGET_URL=https://tzx.aiteamsvr.work
+
+# Run tests
+CMD ["node", "test-ui.js"]

@@ -156,5 +156,15 @@ export const api = {
     update: (id: string, data: any) => request(`/api/servers/${id}`, { method: 'PUT', body: JSON.stringify(data) }),
     test: (id: string) => request(`/api/servers/${id}/test`, { method: 'POST' }),
     delete: (id: string) => request(`/api/servers/${id}`, { method: 'DELETE' }),
+    // Container management
+    spawn: (id: string, data: { image: string; command?: string[]; taskId?: string; env?: string[] }) =>
+      request(`/api/servers/${id}/spawn`, { method: 'POST', body: JSON.stringify(data) }),
+    getContainers: (id: string) => request(`/api/servers/${id}/containers`, { method: 'GET' }),
+    getContainerLogs: (id: string, containerId: string, tail?: number) =>
+      request(`/api/servers/${id}/container/${containerId}/logs?tail=${tail || 100}`),
+    killContainer: (id: string, containerId: string) =>
+      request(`/api/servers/${id}/container/${containerId}/kill`, { method: 'POST' }),
+    removeContainer: (id: string, containerId: string) =>
+      request(`/api/servers/${id}/container/${containerId}`, { method: 'DELETE' }),
   },
 }

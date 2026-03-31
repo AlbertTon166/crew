@@ -11,6 +11,9 @@ import { host, port, cors as corsConfig, isProduction } from './config/index.js'
 import { testConnection, closePool } from './config/db.js';
 import { logger } from './config/logger.js';
 
+// Redis Pub/Sub
+import { initRedis, closeRedis } from './lib/redisPubSub.js';
+
 // Middleware
 import { errorHandler, notFoundHandler, requestLogger } from './middleware/errorHandler.js';
 
@@ -26,6 +29,9 @@ import rolesRouter from './routes/roles.js';
 import webhooksRouter from './routes/webhooks.js';
 import apiKeysRouter from './routes/api-keys.js';
 import serversRouter from './routes/servers.js';
+import permissionsRouter from './routes/permissions.js';
+import executionLogsRouter from './routes/executionLogs.js';
+import testRunnerRouter, { webhookRouter } from './routes/testRunner.js';
 import demoRouter from './routes/demo.js';
 
 // Create Express app
@@ -122,6 +128,10 @@ app.use('/api/teams', teamsRouter);
 app.use('/api/execution', executionRouter);
 app.use('/api/demo', demoRouter);
 app.use('/api/servers', serversRouter);
+app.use('/api/permissions', permissionsRouter);
+app.use('/api/execution-logs', executionLogsRouter);
+app.use('/api/test-runner/webhook', webhookRouter);  // No auth needed
+app.use('/api/test-runner', testRunnerRouter);
 
 // ============================================
 // ERROR HANDLING
@@ -149,6 +159,14 @@ async function start() {
       logger.warn('Database connection failed - server will start but some features may not work');
     }
     
+    // Initialize Redis pub/sub
+    const redisConnected = await initRedis();
+    if (redisConnected) {
+      logger.info('Redis pub/sub initialized');
+    } else {
+      logger.warn('Redis connection failed - real-time log streaming will fall back to polling');
+    }
+    
     // Start listening
     const server = app.listen(port, host, () => {
       logger.info(`Crew API server started`, {
@@ -165,6 +183,13 @@ async function start() {
       
       server.close(async () => {
         logger.info('HTTP server closed');
+        
+        try {
+          await closeRedis();
+          logger.info('Redis connection closed');
+        } catch (error) {
+          logger.error('Error closing Redis', { error: error.message });
+        }
         
         try {
           await closePool();

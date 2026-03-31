@@ -64,7 +64,8 @@ export default function LoginModal({ isOpen, onClose, onLoginSuccess }: LoginMod
         if (onLoginSuccess) {
           onLoginSuccess(data.data.user, data.data.token)
         } else {
-          window.location.reload()
+          // Navigate to dashboard after successful login
+          window.location.href = '/#/dashboard'
         }
       }, 500)
     } catch (err: any) {
@@ -143,7 +144,8 @@ export default function LoginModal({ isOpen, onClose, onLoginSuccess }: LoginMod
         if (onLoginSuccess) {
           onLoginSuccess(data.data.user, data.data.token)
         } else {
-          window.location.reload()
+          // Navigate to dashboard after successful registration
+          window.location.href = '/#/dashboard'
         }
       }, 500)
     } catch (err: any) {

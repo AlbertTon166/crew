@@ -58,11 +58,21 @@ services:
     restart: unless-stopped
     environment:
       NODE_ENV: production
+      # PostgreSQL - use PG* vars that server expects
+      PGHOST: postgres
+      PGPORT: 5432
+      PGDATABASE: ${POSTGRES_DB:-crew}
+      PGUSER: ${POSTGRES_USER:-crew_user}
+      PGPASSWORD: ${POSTGRES_PASSWORD}
+      # Also support DATABASE_URL for Prisma
       DATABASE_URL: postgresql://${POSTGRES_USER:-crew_user}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB:-crew}
       REDIS_URL: redis://:${REDIS_PASSWORD}@redis:6379
       JWT_SECRET: ${JWT_SECRET:-crew-dev-secret-change-in-production}
       GITHUB_TOKEN: ${GITHUB_TOKEN}
       PORT: 3001
+      DOCKER_API_URL: http://docker-api:3002
+      DOCKER_API_KEY: ${DOCKER_API_KEY:-crew-docker-api-secret-change-in-production}
+      GITHUB_WEBHOOK_SECRET: crew-test-secret-2024
     depends_on:
       postgres:
         condition: service_healthy
@@ -121,6 +131,29 @@ services:
   #   image: docker:dind
   #   privileged: true
   #   ...
+
+  # Docker API Service (for spawning agent containers)
+  docker-api:
+    build:
+      context: ./docker-api
+      dockerfile: Dockerfile
+    container_name: crew-docker-api
+    restart: unless-stopped
+    environment:
+      PORT: 3002
+      DOCKER_SOCKET: /var/run/docker.sock
+      INTERNAL_API_KEY: ${DOCKER_API_KEY:-crew-docker-api-secret-change-in-production}
+    volumes:
+      # Mount Docker socket from host for container management
+      - /var/run/docker.sock:/var/run/docker.sock
+    healthcheck:
+      test: ["CMD-SHELL", "curl -f http://localhost:3002/health || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+    networks:
+      - crew-network
+    # Don't expose to external network - internal only
 
 volumes:
   postgres_data:
