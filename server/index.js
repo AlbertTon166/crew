@@ -99,7 +99,7 @@ async function initDemoData() {
       }),
     ])
 
-    // Create demo tasks
+    // Create demo tasks (assigneeId removed - Task.assigneeId references User, not Agent)
     await Promise.all([
       prisma.task.create({
         data: {
@@ -108,7 +108,6 @@ async function initDemoData() {
           description: '完成用户模块API设计',
           status: 'in_progress',
           priority: 'high',
-          assigneeId: agents[1].id,
         }
       }),
       prisma.task.create({
@@ -118,7 +117,6 @@ async function initDemoData() {
           description: '设计商品表结构',
           status: 'completed',
           priority: 'high',
-          assigneeId: agents[0].id,
         }
       }),
       prisma.task.create({
@@ -128,7 +126,6 @@ async function initDemoData() {
           description: '编写API单元测试',
           status: 'pending',
           priority: 'medium',
-          assigneeId: agents[3].id,
         }
       }),
     ])
