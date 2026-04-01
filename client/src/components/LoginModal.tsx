@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { X, Lock, Mail, AlertCircle, Check, Sparkles, Loader2, User, Eye, EyeOff } from 'lucide-react'
 import { useLanguage } from '../context/LanguageContext'
+import { useAuth } from '../context/AuthContext'
 
 interface LoginModalProps {
   isOpen: boolean
@@ -12,6 +13,7 @@ interface LoginModalProps {
 export default function LoginModal({ isOpen, onClose, onLoginSuccess }: LoginModalProps) {
   const navigate = useNavigate()
   const { language } = useLanguage()
+  const { quickLogin } = useAuth()
   
   const [formMode, setFormMode] = useState<'login' | 'register'>('login')
   const [email, setEmail] = useState('')
@@ -58,16 +60,15 @@ export default function LoginModal({ isOpen, onClose, onLoginSuccess }: LoginMod
       localStorage.setItem('auth_tokens', JSON.stringify(tokens))
       localStorage.setItem('auth_user', JSON.stringify(data.data.user))
 
-      setSuccess(language === 'zh' ? '登录成功！' : 'Login successful!')
-      setTimeout(() => {
-        onClose()
-        if (onLoginSuccess) {
-          onLoginSuccess(data.data.user, data.data.token)
-        } else {
-          // Navigate to dashboard after successful login
-          window.location.replace('/#/dashboard')
-        }
-      }, 500)
+      // Update AuthContext state immediately
+      quickLogin(data.data.user)
+
+      // Direct redirect - no setTimeout to avoid timing issues
+      if (onLoginSuccess) {
+        onLoginSuccess(data.data.user, data.data.token)
+      }
+      // Navigate to dashboard after successful login
+      navigate('/dashboard')
     } catch (err: any) {
       setError(err.message || (language === 'zh' ? '登录失败' : 'Login failed'))
     } finally {
@@ -138,16 +139,15 @@ export default function LoginModal({ isOpen, onClose, onLoginSuccess }: LoginMod
       localStorage.setItem('auth_tokens', JSON.stringify(tokens))
       localStorage.setItem('auth_user', JSON.stringify(data.data.user))
 
-      setSuccess(language === 'zh' ? '注册成功！正在进入...' : 'Registered successfully! Entering...')
-      setTimeout(() => {
-        onClose()
-        if (onLoginSuccess) {
-          onLoginSuccess(data.data.user, data.data.token)
-        } else {
-          // Navigate to dashboard after successful registration
-          window.location.replace('/#/dashboard')
-        }
-      }, 500)
+      // Update AuthContext state immediately
+      quickLogin(data.data.user)
+
+      // Direct redirect - no setTimeout to avoid timing issues
+      if (onLoginSuccess) {
+        onLoginSuccess(data.data.user, data.data.token)
+      }
+      // Navigate to dashboard after successful registration
+      navigate('/dashboard')
     } catch (err: any) {
       setError(err.message || (language === 'zh' ? '注册失败' : 'Registration failed'))
     } finally {

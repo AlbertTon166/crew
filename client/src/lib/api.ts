@@ -25,9 +25,24 @@ function getAuthToken(): string | null {
     const tokens = localStorage.getItem('auth_tokens')
     if (tokens) {
       const parsed = JSON.parse(tokens)
-      // Return the first active non-expired token
-      const validToken = parsed.find((t: any) => t.isActive && (!t.expiresAt || new Date(t.expiresAt) > new Date()))
-      return validToken?.token || null
+      // Ensure parsed is an array
+      if (!Array.isArray(parsed)) {
+        return null
+      }
+      // Find any active, non-expired token (support both JWT and simple token formats)
+      const now = Date.now()
+      const validTokens = parsed.filter((t: any) => 
+        t && 
+        t.token && 
+        typeof t.token === 'string' &&
+        t.isActive && 
+        (!t.expiresAt || new Date(t.expiresAt).getTime() > now)
+      )
+      // Return the most recent valid token (last in array = most recently added)
+      if (validTokens.length > 0) {
+        return validTokens[validTokens.length - 1].token
+      }
+      return null
     }
   } catch (e) {
     // Ignore parse errors
@@ -62,7 +77,7 @@ async function request(endpoint: string, options?: RequestInit) {
     clearTimeout(timeoutId)
 
     const data = await res.json()
-    if (!res.ok) throw new Error(data.error || `Request failed (${res.status})`)
+    if (!res.ok) throw new Error(typeof data.error === 'string' ? data.error : `Request failed (${res.status})`)
     return data
   } catch (err: any) {
     clearTimeout(timeoutId)

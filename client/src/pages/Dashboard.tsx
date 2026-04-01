@@ -204,8 +204,8 @@ export default function Dashboard() {
           api.agents.list(),
           api.projects.list(),
         ])
-        setAgents(agentsData.agents || agentsData || [])
-        setProjects(projectsData.projects || projectsData || [])
+        setAgents(Array.isArray(agentsData) ? agentsData : (Array.isArray(agentsData?.agents) ? agentsData.agents : []))
+        setProjects(Array.isArray(projectsData) ? projectsData : (Array.isArray(projectsData?.projects) ? projectsData.projects : []))
       } catch (err: any) {
         console.error('Failed to fetch dashboard data:', err)
         setError(err.message || 'Failed to load data')
@@ -300,7 +300,7 @@ export default function Dashboard() {
           <AlertCircle size={40} style={{ color: '#EF4444' }} />
           <p style={{ color: 'var(--text-secondary)', fontSize: '14px' }}>{error}</p>
           <button
-            onClick={() => { setLoading(true); setError(null); Promise.all([api.agents.list(), api.projects.list()]).then(([agentsData, projectsData]) => { setAgents(agentsData.agents || agentsData || []); setProjects(projectsData.projects || projectsData || []); }).catch(e => setError(e.message)).finally(() => setLoading(false)) }}
+            onClick={() => { setLoading(true); setError(null); Promise.all([api.agents.list(), api.projects.list()]).then(([agentsData, projectsData]) => { setAgents(Array.isArray(agentsData) ? agentsData : (Array.isArray(agentsData?.agents) ? agentsData.agents : [])); setProjects(Array.isArray(projectsData) ? projectsData : (Array.isArray(projectsData?.projects) ? projectsData.projects : [])); }).catch(e => setError(e.message)).finally(() => setLoading(false)) }}
             style={{ padding: '8px 16px', borderRadius: '8px', border: 'none', background: 'var(--primary)', color: 'white', fontSize: '13px', cursor: 'pointer' }}
           >
             {language === 'zh' ? '重试' : 'Retry'}

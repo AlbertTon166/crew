@@ -118,7 +118,7 @@ export default function Requirements() {
     setError(null)
     try {
       const res = await api.requirements.list({ projectId: selectedProject.id })
-      setRequirements(res.data || [])
+      setRequirements(Array.isArray(res) ? res : (Array.isArray(res?.data) ? res.data : []))
     } catch (err: any) {
       setError(err.message || 'Failed to load requirements')
     } finally {

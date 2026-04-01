@@ -102,8 +102,9 @@ export default function Agents() {
     setError(null)
     try {
       const res = await api.agents.list()
-      // Transform API response to match expected format
-      const agents: Agent[] = (res.data || []).map((a: any) => ({
+      // Transform API response to match expected format (with safety check)
+      const dataArray = Array.isArray(res) ? res : (Array.isArray(res?.data) ? res.data : [])
+      const agents: Agent[] = dataArray.map((a: any) => ({
         id: a.id,
         name: a.name,
         role: a.role,

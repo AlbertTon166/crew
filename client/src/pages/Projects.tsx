@@ -606,7 +606,7 @@ export default function Projects() {
         setLoading(true)
         setError(null)
         const data = await api.projects.list()
-        setProjects(data.projects || data || [])
+        setProjects(Array.isArray(data) ? data : (Array.isArray(data?.projects) ? data.projects : []))
         if (storeProjects.length === 0) {
           // Optionally sync to store if empty
         }
@@ -756,7 +756,7 @@ export default function Projects() {
           <AlertCircle size={40} style={{ color: '#EF4444' }} />
           <p style={{ color: 'var(--text-secondary)', fontSize: '14px' }}>{error}</p>
           <button
-            onClick={() => { setLoading(true); setError(null); api.projects.list().then(d => setProjects(d.projects || d || [])).catch(e => { setError(e.message); setProjects(mockProjects); }).finally(() => setLoading(false)) }}
+            onClick={() => { setLoading(true); setError(null); api.projects.list().then(d => setProjects(Array.isArray(d) ? d : (Array.isArray(d?.projects) ? d.projects : []))).catch(e => { setError(e.message); setProjects(mockProjects); }).finally(() => setLoading(false)) }}
             style={{ padding: '8px 16px', borderRadius: '8px', border: 'none', background: 'var(--primary)', color: 'white', fontSize: '13px', cursor: 'pointer' }}
           >
             {language === 'zh' ? '重试' : 'Retry'}
